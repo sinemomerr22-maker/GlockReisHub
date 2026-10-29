@@ -18,11 +18,17 @@ Common.Teams = game:GetService("Teams")
 
 Common.LocalPlayer = Common.Players.LocalPlayer
 
--- 2. FLUENT UI & MANAGERS (Loaded immediately to prevent nil errors)
-local ok1, Fluent = pcall(function()
+-- 2. FLUENT UI & MANAGERS (Safe Loading)
+local success, FluentLoaded = pcall(function()
     return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 end)
-Common.Fluent = Fluent or {}
+
+if success and type(FluentLoaded) == "table" then
+    Common.Fluent = FluentLoaded
+else
+    warn("[GlockreisHub] Fluent UI yüklenemedi! Varsayılan boş tablo atanıyor.")
+    Common.Fluent = {}
+end
 
 local ok2, SaveManager = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
@@ -71,6 +77,10 @@ end
 
 -- 4. FLUENT UI WINDOW FACTORY
 function Common.loadFluentUI(gameDisplayName, placeId)
+    if not Common.Fluent.CreateWindow then
+        error("[GlockreisHub] Fluent UI CreateWindow fonksiyonu bulunamadı! Kütüphane yüklenememiş olabilir.")
+    end
+
     local Window = Common.Fluent:CreateWindow({
         Title = "GlockreisHub | " .. gameDisplayName,
         SubTitle = "Detected: " .. gameDisplayName .. " (PlaceId: " .. placeId .. ")",
@@ -179,11 +189,13 @@ function Common.setupUniversalMode()
     })
     
     ui.Window:SelectTab(1)
-    ui.Fluent:Notify({
-        Title = "GlockreisHub",
-        Content = "Loaded in Universal Mode",
-        Duration = 5
-    })
+    if ui.Fluent.Notify then
+        ui.Fluent:Notify({
+            Title = "GlockreisHub",
+            Content = "Loaded in Universal Mode",
+            Duration = 5
+        })
+    end
 end
 
 -- 9. INITIALIZE COMMON FEATURES
