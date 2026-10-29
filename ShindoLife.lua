@@ -1,6 +1,7 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
+-- // Continuous Facing + Underground Attack
 -- // ==========================================
 
 return function(Common)
@@ -29,13 +30,12 @@ return function(Common)
             AutoFarmEnabled = false, AutoFarmSpeed = 500,
             AutoFarmUseM1 = true,
             AutoFarmM1Cooldown = 0.3,
-            AutoFarmAttackDistance = -8,  -- Y offset (studs below NPC)
-            AutoFarmAttackBehind = 0,     -- Z offset (studs behind NPC)
+            AutoFarmAttackDistance = -8,
+            AutoFarmAttackBehind = 0,
             ScrollSniperEnabled = false,
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
             AutoRankEnabled = false,
-            -- Stats Config
             AutoStatsEnabled = false,
             AutoStatsNinEnabled = true,
             AutoStatsTaiEnabled = false,
@@ -43,7 +43,6 @@ return function(Common)
             AutoStatsHpEnabled = false,
             AutoStatsInterval = 2,
             AutoStatsMinPoints = 5,
-            -- Godmode Config
             GodModeEnabled = false,
             FakeHealthValue = 999999
         }
@@ -52,7 +51,6 @@ return function(Common)
     local ConfigManager = Common.setupConfigManager(isShindoMenu and "ShindoLife_Menu" or "ShindoLife_InGame")
     local Config = ConfigManager.Load(DefaultConfig)
     
-    -- UI
     local gameDisplayName = isShindoMenu and "Shindo Life (Menu)" or "Shindo Life (In-Game)"
     local ui = Common.loadFluentUI(gameDisplayName, placeId)
     local Tabs = {}
@@ -74,7 +72,10 @@ return function(Common)
         return ok, err
     end
     
-    -- M1 Attack Helper
+    -- Shared state: current target for continuous facing
+    local currentTargetNPC = nil
+    
+    -- M1 Attack Helper - FIXED: looks UP at target from below
     local lastM1Time = 0
     local function attackM1(targetHRP)
         local char = LocalPlayer.Character
@@ -90,12 +91,12 @@ return function(Common)
             return false
         end
         
-        -- Face target
+        -- Face target - LOOK UP from below (no Y-axis zeroing)
         if targetHRP then
-            local dir = (targetHRP.Position - root.Position) * Vector3.new(1, 0, 1)
-            if dir.Magnitude > 0.1 then
-                root.CFrame = CFrame.lookAt(root.Position, root.Position + dir.Unit)
-            end
+            local targetPos = targetHRP.Position
+            -- CFrame.lookAt makes the player look directly at targetPos
+            -- When player is below NPC, this naturally looks UP
+            root.CFrame = CFrame.lookAt(root.Position, targetPos)
         end
         
         -- Fire M1
@@ -457,7 +458,6 @@ return function(Common)
         Tabs.Chakra = ui.Window:AddTab({ Title = "Auto Chakra", Icon = "zap" })
         Tabs.Utilities = ui.Window:AddTab({ Title = "Utilities", Icon = "tool" })
         
-        -- State variables
         local FarmState = {
             AutoFarmEnabled = Config.AutoFarmEnabled,
             AutoFarmUseM1 = Config.AutoFarmUseM1,
@@ -478,6 +478,37 @@ return function(Common)
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0}
         }
+        
+        -- ==========================================
+        -- CONTINUOUS FACING LOOP (NEW!)
+        -- Every frame, if AutoFarm is active and we have a target,
+        -- player looks at the target from below (underground attack stance)
+        -- ==========================================
+        RunService.RenderStepped:Connect(function()
+            if not FarmState.AutoFarmEnabled then
+                currentTargetNPC = nil
+                return
+            end
+            
+            local char = LocalPlayer.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            
+            -- If we have a valid target NPC, face it continuously
+            if currentTargetNPC and currentTargetNPC.Parent then
+                local npcRoot = currentTargetNPC:FindFirstChild("HumanoidRootPart")
+                local npcHum = currentTargetNPC:FindFirstChild("Humanoid")
+                
+                if npcRoot and npcHum and npcHum.Health > 0 then
+                    -- Look directly at target (upward from underground position)
+                    local targetPos = npcRoot.Position
+                    root.CFrame = CFrame.lookAt(root.Position, targetPos)
+                else
+                    currentTargetNPC = nil
+                end
+            end
+        end)
         
         -- ==========================================
         -- GODMODE SYSTEM
@@ -522,7 +553,6 @@ return function(Common)
             end
         })
         
-        -- Godmode logic - runs every frame
         task.spawn(function()
             while true do
                 if FarmState.GodModeEnabled and LocalPlayer.Character then
@@ -531,10 +561,7 @@ return function(Common)
                         local hum = char:FindFirstChildOfClass("Humanoid")
                         
                         if hum and hum.Health > 0 then
-                            -- Keep health at max
                             hum.Health = hum.MaxHealth
-                            
-                            -- Update fakehealth value
                             local fakehealth = char:FindFirstChild("fakehealth")
                             if fakehealth then
                                 fakehealth.Value = FarmState.FakeHealthValue
@@ -542,11 +569,10 @@ return function(Common)
                         end
                     end)
                 end
-                task.wait(0.1) -- Check every 100ms for responsiveness
+                task.wait(0.1)
             end
         end)
         
-        -- Godmode status display
         local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({
             Title = "Godmode Status",
             Content = "Initializing..."
@@ -586,11 +612,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED) - WITH M1 ATTACK + POSITION CONTROL
+        -- AUTOFARM (MISSION-BASED) - WITH M1 + UNDERGROUND ATTACK + CONTINUOUS FACING
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "[*] AutoFarm System (FIXED + M1 + POSITION)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks instead of Health=0\n- NEW: Adjustable attack position (distance & behind)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND)",
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -601,6 +627,9 @@ return function(Common)
             FarmState.AutoFarmEnabled = v
             Config.AutoFarmEnabled = v
             ConfigManager.Save(Config)
+            if not v then
+                currentTargetNPC = nil
+            end
         end)
         
         Tabs.Main:AddToggle("AutoFarmUseM1Toggle", {
@@ -634,7 +663,6 @@ return function(Common)
             end
         })
         
-        -- NEW: Attack Position Controls
         Tabs.Main:AddSlider("AutoFarmAttackDistanceSlider", {
             Title = "Attack Distance (Y offset)",
             Description = "How many studs BELOW the NPC to position. Negative = below, 0 = same height. Default: -8",
@@ -660,11 +688,11 @@ return function(Common)
         })
         
         Tabs.Main:AddParagraph({
-            Title = "Position Tips",
-            Content = "- Y offset -8: Good for most NPCs (stay below their hitbox)\n- Y offset -12: Better for tall NPCs or flying enemies\n- Z offset 0: Directly under NPC\n- Z offset 3-5: Slightly behind (safer from counter-attacks)\n- Z offset -3 to -5: In front (closer for M1 range)"
+            Title = "Underground Attack Info",
+            Content = "Player positions UNDER the NPC (Y offset) and looks UP at them.\nM1 attacks are fired while facing upward.\nRenderStepped loop keeps player facing target at all times.\n\nRecommended: Y=-8, Z=0 for most NPCs"
         })
         
-        -- AutoFarm logic with M1 + Position Control
+        -- AutoFarm logic with M1 + Position Control + Continuous Facing
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -674,14 +702,11 @@ return function(Common)
                         local root = char:FindFirstChild("HumanoidRootPart")
                         
                         if hum and root and hum.Health > 0 then
-                            -- Anti-kick
                             hum:ChangeState(11)
                             
-                            -- PRIMARY CHECK: currentmission value (most reliable)
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
                             local hasMission = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
                             
-                            -- SECONDARY CHECK: MissionStory GUI visible
                             local missionGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
                                 and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
@@ -692,6 +717,7 @@ return function(Common)
                             
                             if not hasMission then
                                 -- No mission - find mission giver
+                                currentTargetNPC = nil -- Clear target when seeking mission
                                 local missionGivers = workspace:FindFirstChild("missiongivers")
                                 if missionGivers then
                                     local lvl = LocalPlayer:FindFirstChild("statz") 
@@ -711,7 +737,6 @@ return function(Common)
                                             local shouldAccept = false
                                             
                                             if lvl <= 699 then
-                                                -- Low level: only green missions
                                                 if talk and talk:FindFirstChild("typ") 
                                                     and talk.typ.Value == "defeat"
                                                     and giver.Head.givemission:FindFirstChild("color")
@@ -720,7 +745,6 @@ return function(Common)
                                                     shouldAccept = true
                                                 end
                                             else
-                                                -- High level: green or red missions
                                                 if talk and talk:FindFirstChild("typ") 
                                                     and talk.typ.Value == "defeat"
                                                     and giver.Head.givemission:FindFirstChild("color")
@@ -735,7 +759,6 @@ return function(Common)
                                                 local giverRoot = giver:FindFirstChild("HumanoidRootPart")
                                                 
                                                 if clientTalk and giverRoot then
-                                                    -- Use configurable position for mission giver approach
                                                     local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
                                                     toTarget(root.Position, giverRoot.Position, 
                                                         CFrame.new(giverRoot.Position + offsetVector))
@@ -746,33 +769,35 @@ return function(Common)
                                                         clientTalk:FireServer()
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
-                                                        task.wait(1) -- Wait for mission to register on server
+                                                        task.wait(1)
                                                     end
                                                 end
-                                                break -- Only accept one mission at a time
+                                                break
                                             end
                                         end
                                     end
                                 end
                             else
-                                -- Have mission - kill NPCs with M1 or Health=0
+                                -- Have mission - kill NPCs with M1 from underground
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local killed = false
                                     
                                     for _, npc in pairs(npcs:GetChildren()) do
-                                        -- Filter: only kill mission NPCs (have npctype attribute and "npc" in name)
                                         if npc:IsA("Model") 
                                             and npc:FindFirstChild("HumanoidRootPart")
                                             and npc:FindFirstChild("Humanoid")
                                             and npc.Humanoid.Health > 0
-                                            and npc:FindFirstChild("npctype") -- Must be a mission NPC
-                                            and string.find(npc.Name, "npc") -- Name contains "npc"
-                                            and npc.Head.CFrame.Y > -1000 then -- Not fallen off map
+                                            and npc:FindFirstChild("npctype")
+                                            and string.find(npc.Name, "npc")
+                                            and npc.Head.CFrame.Y > -1000 then
                                             
                                             local npcRoot = npc.HumanoidRootPart
                                             
-                                            -- Use configurable position for NPC attack
+                                            -- Set as current target for continuous facing
+                                            currentTargetNPC = npc
+                                            
+                                            -- Move to underground position
                                             local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
                                             toTarget(root.Position, npcRoot.Position,
                                                 CFrame.new(npcRoot.Position + offsetVector))
@@ -782,16 +807,16 @@ return function(Common)
                                             
                                             if dist < 15 then
                                                 if FarmState.AutoFarmUseM1 then
-                                                    -- Use M1 attack
+                                                    -- Use M1 attack from underground (looking UP)
                                                     local attackCount = 0
                                                     local maxAttacks = 10
                                                     
                                                     while npc.Humanoid.Health > 0 and attackCount < maxAttacks do
+                                                        -- attackM1 now looks UP at target (no Y-axis zeroing)
                                                         attackM1(npcRoot)
                                                         attackCount = attackCount + 1
                                                         task.wait(Config.AutoFarmM1Cooldown or 0.3)
                                                         
-                                                        -- Check if NPC is still valid
                                                         if not npc.Parent or npc.Humanoid.Health <= 0 then
                                                             break
                                                         end
@@ -801,25 +826,26 @@ return function(Common)
                                                         killed = true
                                                     end
                                                 else
-                                                    -- Old method: set Health = 0
                                                     npc.Humanoid.Health = 0
                                                     killed = true
                                                 end
                                             end
-                                            break -- Kill one NPC at a time, then re-check mission status
+                                            break
                                         end
                                     end
                                     
                                     if not killed then
-                                        -- No NPCs found, wait a bit before trying again
+                                        currentTargetNPC = nil
                                         task.wait(0.5)
                                     end
                                 end
                             end
                         end
                     end)
+                else
+                    currentTargetNPC = nil
                 end
-                task.wait(0.5) -- Faster polling (was 1s, now 0.5s)
+                task.wait(0.5)
             end
         end)
         
@@ -840,7 +866,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- Scroll Sniper logic
         task.spawn(function()
             while true do
                 if FarmState.ScrollSniperEnabled and LocalPlayer.Character then
@@ -848,7 +873,6 @@ return function(Common)
                         local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         if not root then return end
                         
-                        -- Check workspace.GLOBALTIME
                         local globalTime = workspace:FindFirstChild("GLOBALTIME")
                         if globalTime then
                             for _, obj in pairs(globalTime:GetChildren()) do
@@ -876,7 +900,6 @@ return function(Common)
                             end
                         end
                         
-                        -- Check workspace directly
                         for _, obj in pairs(workspace:GetChildren()) do
                             if obj:IsA("Model") and obj:FindFirstChild("sh") then
                                 local sh = obj.sh
@@ -931,7 +954,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- War Farm logic
         task.spawn(function()
             while true do
                 if FarmState.WarFarmEnabled and LocalPlayer.Character then
@@ -944,10 +966,8 @@ return function(Common)
                             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                             
                             if root and hum and hum.Health > 0 then
-                                -- Anti-kick
                                 hum:ChangeState(11)
                                 
-                                -- Kill NPCs
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local zetsu = warserver:FindFirstChild("zetsu")
@@ -962,13 +982,11 @@ return function(Common)
                                             local isMegaBoss = npc:FindFirstChild("megaboss") ~= nil
                                             
                                             if isMegaBoss then
-                                                -- Mega boss - teleport and kill
                                                 toTarget(root.Position, npc.HumanoidRootPart.Position,
                                                     CFrame.new(npc.HumanoidRootPart.Position))
                                                 task.wait(0.5)
                                                 npc.Humanoid.Health = 0
                                             else
-                                                -- Normal NPC - instant kill if zetsu active
                                                 if zetsu and zetsu.Value > 0 then
                                                     npc.Humanoid.Health = 0
                                                 else
@@ -981,7 +999,6 @@ return function(Common)
                                         end
                                     end
                                     
-                                    -- Auto-reset after round 21
                                     if Config.WarAutoReset and round and round.Value > 20 then
                                         task.wait(5)
                                         LocalPlayer.Character:BreakJoints()
@@ -1205,7 +1222,6 @@ return function(Common)
             end
         end})
         
-        -- Auto Stats Loop
         task.spawn(function()
             while true do
                 if FarmState.AutoStatsEnabled then
@@ -1213,7 +1229,6 @@ return function(Common)
                         local points = getStatPoints()
                         
                         if points >= (Config.AutoStatsMinPoints or 5) then
-                            -- Distribute points in priority order
                             local statsToDistribute = {}
                             
                             if FarmState.AutoStatsNinEnabled then
@@ -1230,7 +1245,6 @@ return function(Common)
                             end
                             
                             if #statsToDistribute > 0 then
-                                -- Distribute evenly or to first enabled
                                 local pointsPerStat = math.floor(points / #statsToDistribute)
                                 
                                 for _, statName in ipairs(statsToDistribute) do
@@ -1239,11 +1253,10 @@ return function(Common)
                                         if ok then
                                             FarmState.StatsAdded[statName] = (FarmState.StatsAdded[statName] or 0) + pointsPerStat
                                         end
-                                        task.wait(0.2) -- Small delay between stat additions
+                                        task.wait(0.2)
                                     end
                                 end
                                 
-                                -- Add any remaining points to first enabled stat
                                 local remaining = points - (pointsPerStat * #statsToDistribute)
                                 if remaining > 0 and #statsToDistribute > 0 then
                                     addStat(statsToDistribute[1], remaining)
@@ -1263,7 +1276,6 @@ return function(Common)
             end
         end)
         
-        -- Stats Status Display
         local StatsStatusDisplay = Tabs.Stats:AddParagraph({
             Title = "Stats Status",
             Content = "Initializing..."
@@ -1325,7 +1337,6 @@ return function(Common)
             end
         })
         
-        -- Auto Chakra logic
         task.spawn(function()
             while true do
                 if FarmState.AutoChakraEnabled and LocalPlayer.Character then
@@ -1334,7 +1345,6 @@ return function(Common)
                         local hum = char:FindFirstChildOfClass("Humanoid")
                         
                         if hum and hum.Health > 0 then
-                            -- Read chakra from GUI
                             local chakraGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingamearena")
                                 and LocalPlayer.PlayerGui.Main.ingamearena:FindFirstChild("Bar")
@@ -1346,16 +1356,13 @@ return function(Common)
                                 
                                 if chakraValue then
                                     if chakraValue < FarmState.ChakraThreshold then
-                                        -- Charge chakra
                                         char.combat.update:FireServer("key", "c")
                                     else
-                                        -- Release chakra
                                         char.combat.update:FireServer("key", "cend")
                                     end
                                 end
                             end
                             
-                            -- Keep moving while charging
                             if hum.WalkSpeed == 0 then
                                 hum.WalkSpeed = 50
                             end
@@ -1407,7 +1414,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- Auto Rank logic
         task.spawn(function()
             while true do
                 if FarmState.AutoRankEnabled then
@@ -1426,7 +1432,6 @@ return function(Common)
             end
         end)
         
-        -- CharacterAdded handler for WalkSpeed/JumpHeight + Godmode persistence
         LocalPlayer.CharacterAdded:Connect(function(char)
             char:WaitForChild("HumanoidRootPart")
             task.wait(3)
@@ -1435,7 +1440,6 @@ return function(Common)
                 char.Humanoid.JumpHeight = Config.JumpHeight
                 char.Humanoid.UseJumpPower = false
                 
-                -- Re-apply godmode if enabled
                 if FarmState.GodModeEnabled then
                     char.Humanoid.Health = char.Humanoid.MaxHealth
                     local fakehealth = char:FindFirstChild("fakehealth")
@@ -1444,12 +1448,13 @@ return function(Common)
                     end
                 end
             end
+            currentTargetNPC = nil
         end)
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + M1 + Stats + Godmode + Position Control)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing)",
             Duration = 5
         })
     end
