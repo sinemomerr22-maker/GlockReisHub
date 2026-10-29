@@ -1,10 +1,10 @@
 -- // ==========================================
--- // GLOCKREISHUB - COMMON UTILITIES
+-- // GLOCKREISHUB - COMMON UTILITIES (FIXED)
 -- // ==========================================
 
 local Common = {}
 
--- Services
+-- Services - DOĞRUDAN EXPOSE EDİLİYOR
 Common.Players = game:GetService("Players")
 Common.RunService = game:GetService("RunService")
 Common.TweenService = game:GetService("TweenService")
@@ -84,7 +84,7 @@ function Common.setupConfigManager(gameName)
     }
 end
 
--- Fluent UI Loader
+-- Fluent UI Loader - DOĞRUDAN COMMON TABLOSUNA YÜKLÜYOR
 function Common.loadFluentUI(gameDisplayName, placeId)
     local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
     local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
@@ -99,6 +99,13 @@ function Common.loadFluentUI(gameDisplayName, placeId)
         Theme = "Dark",
         MinimizeKey = Enum.KeyCode.LeftControl
     })
+    
+    -- Common tablosuna ekle (modüller doğrudan erişebilsin)
+    Common.Fluent = Fluent
+    Common.SaveManager = SaveManager
+    Common.InterfaceManager = InterfaceManager
+    Common.Window = Window
+    Common.Options = Fluent.Options
     
     return {
         Fluent = Fluent,
