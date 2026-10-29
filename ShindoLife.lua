@@ -801,7 +801,7 @@ return function(Common)
                                             local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
                                             toTarget(root.Position, npcRoot.Position,
                                                 CFrame.new(npcRoot.Position + offsetVector))
-                                            task.wait(0.3)
+                                            task.wait(0.05)
                                             
                                             local dist = (root.Position - npcRoot.Position).Magnitude
                                             
