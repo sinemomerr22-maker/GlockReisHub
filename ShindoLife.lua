@@ -1,6 +1,6 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm Fixed: currentmission.Value check + NPC filtering
+-- // AutoFarm M1 + Stat Auto System
 -- // ==========================================
 
 return function(Common)
@@ -26,11 +26,21 @@ return function(Common)
     else
         DefaultConfig = {
             WalkSpeed = 16, JumpHeight = 7,
-            AutoFarmEnabled = false, AutoFarmSpeed = 500,
+            AutoFarmEnabled = false, AutoFarmSpeed = 500, AutoFarmUseM1 = true,
+            AutoFarmM1Delay = 0.3, AutoFarmM1Count = 3,
             ScrollSniperEnabled = false,
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
-            AutoRankEnabled = false
+            AutoRankEnabled = false,
+            -- STAT AUTO CONFIG
+            AutoStatEnabled = false,
+            AutoStatNIN = true,
+            AutoStatTAI = true,
+            AutoStatCHI = true,
+            AutoStatHP = true,
+            AutoStatDelay = 0.1,
+            AutoStatInterval = 2,
+            AutoStatMaxPoints = 9999
         }
     end
     
@@ -57,6 +67,47 @@ return function(Common)
             end
         end)
         return ok, err
+    end
+    
+    -- M1 attack helper
+    local function doM1Attack(char, count, delay)
+        count = count or 1
+        delay = delay or 0.3
+        for i = 1, count do
+            pcall(function()
+                if char and char:FindFirstChild("combat") then
+                    char.combat.update:FireServer("mouse1", true)
+                end
+            end)
+            if i < count then task.wait(delay) end
+        end
+    end
+    
+    -- Stat upgrade helper
+    local function upgradeStat(statName)
+        pcall(function()
+            if LocalPlayer:FindFirstChild("startevent") then
+                LocalPlayer.startevent:FireServer("upg", statName)
+            end
+        end)
+    end
+    
+    -- Get available stat points
+    local function getStatPoints()
+        local statz = LocalPlayer:FindFirstChild("statz")
+        if not statz then return 0 end
+        local points = statz:FindFirstChild("points")
+        return points and tonumber(points.Value) or 0
+    end
+    
+    -- Get current stat value
+    local function getStatValue(statName)
+        local statz = LocalPlayer:FindFirstChild("statz")
+        if not statz then return 0 end
+        local main = statz:FindFirstChild("main")
+        if not main then return 0 end
+        local stat = main:FindFirstChild(statName)
+        return stat and tonumber(stat.Value) or 0
     end
     
     -- ==========================================
@@ -108,11 +159,11 @@ return function(Common)
                 for _, slot in pairs(Settings.ActiveSlots) do
                     local currentElement = statz.main[slot] and statz.main[slot].Value
                     if currentElement and checkTargetFound(currentElement) then
-                        Settings.Status = "🎯 TARGET FOUND! LOCKING..."
-                        Fluent:Notify({Title = "🎯 TARGET FOUND", Content = "Found " .. currentElement .. " in " .. slot:upper() .. "!", Duration = 10})
+                        Settings.Status = "TARGET FOUND! LOCKING..."
+                        Fluent:Notify({Title = "TARGET FOUND", Content = "Found " .. currentElement .. " in " .. slot:upper() .. "!", Duration = 10})
                         pcall(function() LocalPlayer.startevent:FireServer("band", "Eye") end)
                         task.wait(1)
-                        LocalPlayer:Kick("🎯 Hedef Bulundu: " .. currentElement)
+                        LocalPlayer:Kick("Hedef Bulundu: " .. currentElement)
                         return true
                     end
                 end
@@ -175,11 +226,11 @@ return function(Common)
                     if instantTargetCheck() then return end
                     local sessionAge = tick() - Settings.SessionStartTime
                     if Settings.CurrentSpins >= 0 and Settings.CurrentSpins <= Settings.MinSpinsToRejoin and sessionAge >= 15 then
-                        Settings.Status = "⚠️ Spins depleted. Rejoining..."
+                        Settings.Status = "Spins depleted. Rejoining..."
                         Fluent:Notify({Title = "Spins Depleted", Content = "Spins: " .. Settings.CurrentSpins .. " | Rejoining...", Duration = 3})
                         task.wait(2)
                         TeleportService:Teleport(game.PlaceId, LocalPlayer)
-                    elseif Settings.CurrentSpins == -1 then Settings.Status = "⏳ Waiting for spin data..." end
+                    elseif Settings.CurrentSpins == -1 then Settings.Status = "Waiting for spin data..." end
                 else Settings.Status = "Idle" end
                 task.wait(0.1)
             end
@@ -318,7 +369,7 @@ return function(Common)
             Callback = function(Value)
                 Settings.MinSpinsToRejoin = Value; Config.MinSpinsToRejoin = Value; ConfigManager.Save(Config)
                 if Settings.Enabled and Settings.CurrentSpins >= 0 and Settings.CurrentSpins <= Value then
-                    Settings.Status = "⚠️ Threshold dropped! Rejoining..."
+                    Settings.Status = "Threshold dropped! Rejoining..."
                     Fluent:Notify({Title = "Threshold Changed", Content = "Spins: " .. Settings.CurrentSpins .. " | Rejoining...", Duration = 3})
                     task.wait(1)
                     TeleportService:Teleport(game.PlaceId, LocalPlayer)
@@ -353,6 +404,7 @@ return function(Common)
     -- ==========================================
     else
         Tabs.Main = ui.Window:AddTab({ Title = "AutoFarm", Icon = "target" })
+        Tabs.Stats = ui.Window:AddTab({ Title = "Stat Points", Icon = "bar-chart" })
         Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
@@ -362,20 +414,33 @@ return function(Common)
         -- State variables
         local FarmState = {
             AutoFarmEnabled = Config.AutoFarmEnabled,
+            AutoFarmUseM1 = Config.AutoFarmUseM1,
+            AutoFarmM1Delay = Config.AutoFarmM1Delay,
+            AutoFarmM1Count = Config.AutoFarmM1Count,
             ScrollSniperEnabled = Config.ScrollSniperEnabled,
             WarFarmEnabled = Config.WarFarmEnabled,
             AutoChakraEnabled = Config.AutoChakraEnabled,
             AutoRankEnabled = Config.AutoRankEnabled,
+            AutoStatEnabled = Config.AutoStatEnabled,
+            AutoStatNIN = Config.AutoStatNIN,
+            AutoStatTAI = Config.AutoStatTAI,
+            AutoStatCHI = Config.AutoStatCHI,
+            AutoStatHP = Config.AutoStatHP,
+            AutoStatDelay = Config.AutoStatDelay,
+            AutoStatInterval = Config.AutoStatInterval,
+            AutoStatMaxPoints = Config.AutoStatMaxPoints,
             WarCount = 0,
-            ChakraThreshold = Config.AutoChakraThreshold
+            ChakraThreshold = Config.AutoChakraThreshold,
+            StatUpgradesDone = 0,
+            LastStatCheck = 0
         }
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED) - FIXED VERSION
+        -- AUTOFARM (MISSION-BASED) - WITH M1 ATTACKS
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "[*] AutoFarm System (FIXED)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Title = "[*] AutoFarm System (M1 Enhanced)",
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- M1 punches before killing NPCs\n- Only kills npctype NPCs (filters out players/bosses)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -398,7 +463,41 @@ return function(Common)
             end
         })
         
-        -- AutoFarm logic - FIXED
+        Tabs.Main:AddToggle("AutoFarmM1Toggle", {
+            Title = "Use M1 Attacks",
+            Description = "Punch NPCs before killing them (more realistic)",
+            Default = Config.AutoFarmUseM1
+        }):OnChanged(function(v)
+            FarmState.AutoFarmUseM1 = v
+            Config.AutoFarmUseM1 = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Main:AddSlider("AutoFarmM1CountSlider", {
+            Title = "M1 Punches per NPC",
+            Description = "How many punches to throw before kill",
+            Default = Config.AutoFarmM1Count,
+            Min = 1, Max = 10, Rounding = 0,
+            Callback = function(v)
+                FarmState.AutoFarmM1Count = v
+                Config.AutoFarmM1Count = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Main:AddSlider("AutoFarmM1DelaySlider", {
+            Title = "M1 Attack Delay (seconds)",
+            Description = "Delay between each punch",
+            Default = Config.AutoFarmM1Delay,
+            Min = 0.1, Max = 1, Rounding = 2,
+            Callback = function(v)
+                FarmState.AutoFarmM1Delay = v
+                Config.AutoFarmM1Delay = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        -- AutoFarm logic - FIXED WITH M1
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -487,7 +586,7 @@ return function(Common)
                                     end
                                 end
                             else
-                                -- Have mission - kill NPCs
+                                -- Have mission - kill NPCs WITH M1 ATTACKS
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local killed = false
@@ -508,6 +607,12 @@ return function(Common)
                                             
                                             local dist = (root.Position - npc.HumanoidRootPart.Position).Magnitude
                                             if dist < 15 then
+                                                -- M1 ATTACK: Punch the NPC before killing
+                                                if FarmState.AutoFarmUseM1 then
+                                                    doM1Attack(char, FarmState.AutoFarmM1Count, FarmState.AutoFarmM1Delay)
+                                                end
+                                                
+                                                -- Kill the NPC
                                                 npc.Humanoid.Health = 0
                                                 killed = true
                                             end
@@ -525,6 +630,242 @@ return function(Common)
                     end)
                 end
                 task.wait(0.5) -- Faster polling (was 1s, now 0.5s)
+            end
+        end)
+        
+        -- ==========================================
+        -- STAT POINTS AUTO SYSTEM
+        -- ==========================================
+        Tabs.Stats:AddParagraph({
+            Title = "[S] Auto Stat Distribution",
+            Content = "Automatically distributes stat points when you level up.\n\n- NIN: Ninjutsu (jutsu power)\n- TAI: Taijutsu (physical damage)\n- CHI: Chakra pool size\n- HP: Health points (auto with level)\n\nPoints are spent as soon as they become available."
+        })
+        
+        Tabs.Stats:AddToggle("AutoStatToggle", {
+            Title = "Enable Auto Stat Distribution",
+            Description = "Automatically spend stat points on level up",
+            Default = Config.AutoStatEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoStatEnabled = v
+            Config.AutoStatEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                Fluent:Notify({Title = "Auto Stats Enabled", Content = "Will auto-distribute NIN/TAI/CHI/HP points", Duration = 3})
+            end
+        end)
+        
+        Tabs.Stats:AddToggle("AutoStatNINToggle", {
+            Title = "Auto Upgrade NIN (Ninjutsu)",
+            Description = "Automatically upgrade Ninjutsu stat",
+            Default = Config.AutoStatNIN
+        }):OnChanged(function(v)
+            FarmState.AutoStatNIN = v
+            Config.AutoStatNIN = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Stats:AddToggle("AutoStatTAIToggle", {
+            Title = "Auto Upgrade TAI (Taijutsu)",
+            Description = "Automatically upgrade Taijutsu stat",
+            Default = Config.AutoStatTAI
+        }):OnChanged(function(v)
+            FarmState.AutoStatTAI = v
+            Config.AutoStatTAI = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Stats:AddToggle("AutoStatCHIToggle", {
+            Title = "Auto Upgrade CHI (Chakra)",
+            Description = "Automatically upgrade Chakra stat",
+            Default = Config.AutoStatCHI
+        }):OnChanged(function(v)
+            FarmState.AutoStatCHI = v
+            Config.AutoStatCHI = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Stats:AddToggle("AutoStatHPToggle", {
+            Title = "Auto Upgrade HP (Health)",
+            Description = "Automatically upgrade Health stat",
+            Default = Config.AutoStatHP
+        }):OnChanged(function(v)
+            FarmState.AutoStatHP = v
+            Config.AutoStatHP = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Stats:AddSlider("AutoStatDelaySlider", {
+            Title = "Delay Between Upgrades (seconds)",
+            Description = "Wait time between each stat upgrade",
+            Default = Config.AutoStatDelay,
+            Min = 0.05, Max = 1, Rounding = 2,
+            Callback = function(v)
+                FarmState.AutoStatDelay = v
+                Config.AutoStatDelay = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Stats:AddSlider("AutoStatIntervalSlider", {
+            Title = "Check Interval (seconds)",
+            Description = "How often to check for available points",
+            Default = Config.AutoStatInterval,
+            Min = 0.5, Max = 10, Rounding = 1,
+            Callback = function(v)
+                FarmState.AutoStatInterval = v
+                Config.AutoStatInterval = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Stats:AddSlider("AutoStatMaxPointsSlider", {
+            Title = "Max Points per Stat",
+            Description = "Stop upgrading when stat reaches this value",
+            Default = Config.AutoStatMaxPoints,
+            Min = 100, Max = 9999, Rounding = 0,
+            Callback = function(v)
+                FarmState.AutoStatMaxPoints = v
+                Config.AutoStatMaxPoints = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        -- Manual stat upgrade buttons
+        Tabs.Stats:AddButton({Title = "Manual: Upgrade NIN (+1)", Callback = function()
+            upgradeStat("nin")
+            Fluent:Notify({Title = "Stat Upgraded", Content = "NIN +1", Duration = 2})
+        end})
+        
+        Tabs.Stats:AddButton({Title = "Manual: Upgrade TAI (+1)", Callback = function()
+            upgradeStat("tai")
+            Fluent:Notify({Title = "Stat Upgraded", Content = "TAI +1", Duration = 2})
+        end})
+        
+        Tabs.Stats:AddButton({Title = "Manual: Upgrade CHI (+1)", Callback = function()
+            upgradeStat("chi")
+            Fluent:Notify({Title = "Stat Upgraded", Content = "CHI +1", Duration = 2})
+        end})
+        
+        Tabs.Stats:AddButton({Title = "Manual: Upgrade HP (+1)", Callback = function()
+            upgradeStat("hp")
+            Fluent:Notify({Title = "Stat Upgraded", Content = "HP +1", Duration = 2})
+        end})
+        
+        Tabs.Stats:AddButton({Title = "Upgrade All Stats (10x each)", Callback = function()
+            task.spawn(function()
+                for i = 1, 10 do
+                    upgradeStat("nin")
+                    task.wait(0.1)
+                    upgradeStat("tai")
+                    task.wait(0.1)
+                    upgradeStat("chi")
+                    task.wait(0.1)
+                    upgradeStat("hp")
+                    task.wait(0.1)
+                end
+                Fluent:Notify({Title = "Bulk Upgrade", Content = "Upgraded all stats 10x", Duration = 3})
+            end)
+        end})
+        
+        -- Stat Display
+        local StatStatusDisplay = Tabs.Stats:AddParagraph({
+            Title = "Stat Status",
+            Content = "Loading stats..."
+        })
+        
+        -- Auto Stat logic
+        task.spawn(function()
+            while true do
+                if FarmState.AutoStatEnabled then
+                    local now = tick()
+                    if now - FarmState.LastStatCheck >= FarmState.AutoStatInterval then
+                        FarmState.LastStatCheck = now
+                        
+                        pcall(function()
+                            local points = getStatPoints()
+                            
+                            if points > 0 then
+                                local upgraded = false
+                                
+                                -- Upgrade NIN
+                                if FarmState.AutoStatNIN and getStatValue("nin") < FarmState.AutoStatMaxPoints then
+                                    upgradeStat("nin")
+                                    upgraded = true
+                                    FarmState.StatUpgradesDone = FarmState.StatUpgradesDone + 1
+                                    task.wait(FarmState.AutoStatDelay)
+                                end
+                                
+                                -- Upgrade TAI
+                                if FarmState.AutoStatTAI and getStatValue("tai") < FarmState.AutoStatMaxPoints then
+                                    upgradeStat("tai")
+                                    upgraded = true
+                                    FarmState.StatUpgradesDone = FarmState.StatUpgradesDone + 1
+                                    task.wait(FarmState.AutoStatDelay)
+                                end
+                                
+                                -- Upgrade CHI
+                                if FarmState.AutoStatCHI and getStatValue("chi") < FarmState.AutoStatMaxPoints then
+                                    upgradeStat("chi")
+                                    upgraded = true
+                                    FarmState.StatUpgradesDone = FarmState.StatUpgradesDone + 1
+                                    task.wait(FarmState.AutoStatDelay)
+                                end
+                                
+                                -- Upgrade HP
+                                if FarmState.AutoStatHP and getStatValue("hp") < FarmState.AutoStatMaxPoints then
+                                    upgradeStat("hp")
+                                    upgraded = true
+                                    FarmState.StatUpgradesDone = FarmState.StatUpgradesDone + 1
+                                    task.wait(FarmState.AutoStatDelay)
+                                end
+                                
+                                if upgraded then
+                                    Fluent:Notify({
+                                        Title = "Auto Stat",
+                                        Content = "Upgraded stats. Points remaining: " .. points,
+                                        Duration = 2
+                                    })
+                                end
+                            end
+                        end)
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+        
+        -- Stat status update loop
+        task.spawn(function()
+            while true do
+                pcall(function()
+                    local points = getStatPoints()
+                    local nin = getStatValue("nin")
+                    local tai = getStatValue("tai")
+                    local chi = getStatValue("chi")
+                    local hp = getStatValue("hp")
+                    local lvl = 0
+                    
+                    local statz = LocalPlayer:FindFirstChild("statz")
+                    if statz and statz:FindFirstChild("lvl") and statz.lvl:FindFirstChild("lvl") then
+                        lvl = statz.lvl.lvl.Value
+                    end
+                    
+                    StatStatusDisplay.Content = string.format(
+                        "Status: %s\n\nLevel: %d\nAvailable Points: %d\n\nCurrent Stats:\n- NIN (Ninjutsu): %d %s\n- TAI (Taijutsu): %d %s\n- CHI (Chakra): %d %s\n- HP (Health): %d %s\n\nAuto Upgrades Done: %d\nCheck Interval: %.1fs\nUpgrade Delay: %.2fs\nMax per Stat: %d",
+                        FarmState.AutoStatEnabled and "ACTIVE" or "INACTIVE",
+                        lvl,
+                        points,
+                        nin, FarmState.AutoStatNIN and "[AUTO]" or "[MANUAL]",
+                        tai, FarmState.AutoStatTAI and "[AUTO]" or "[MANUAL]",
+                        chi, FarmState.AutoStatCHI and "[AUTO]" or "[MANUAL]",
+                        hp, FarmState.AutoStatHP and "[AUTO]" or "[MANUAL]",
+                        FarmState.StatUpgradesDone,
+                        FarmState.AutoStatInterval,
+                        FarmState.AutoStatDelay,
+                        FarmState.AutoStatMaxPoints
+                    )
+                end)
+                task.wait(1)
             end
         end)
         
@@ -647,6 +988,7 @@ return function(Common)
                         if warmode and warserver then
                             local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            local char = LocalPlayer.Character
                             
                             if root and hum and hum.Health > 0 then
                                 -- Anti-kick
@@ -667,19 +1009,31 @@ return function(Common)
                                             local isMegaBoss = npc:FindFirstChild("megaboss") ~= nil
                                             
                                             if isMegaBoss then
-                                                -- Mega boss - teleport and kill
+                                                -- Mega boss - teleport and M1 attack
                                                 toTarget(root.Position, npc.HumanoidRootPart.Position,
                                                     CFrame.new(npc.HumanoidRootPart.Position))
                                                 task.wait(0.5)
+                                                if FarmState.AutoFarmUseM1 then
+                                                    doM1Attack(char, 5, 0.2)
+                                                end
                                                 npc.Humanoid.Health = 0
                                             else
                                                 -- Normal NPC - instant kill if zetsu active
                                                 if zetsu and zetsu.Value > 0 then
+                                                    if FarmState.AutoFarmUseM1 then
+                                                        toTarget(root.Position, npc.HumanoidRootPart.Position,
+                                                            CFrame.new(npc.HumanoidRootPart.Position + Vector3.new(0, -8, 0)))
+                                                        task.wait(0.2)
+                                                        doM1Attack(char, 2, 0.15)
+                                                    end
                                                     npc.Humanoid.Health = 0
                                                 else
                                                     toTarget(root.Position, npc.HumanoidRootPart.Position,
                                                         CFrame.new(npc.HumanoidRootPart.Position + Vector3.new(0, -12, 0)))
                                                     task.wait(0.3)
+                                                    if FarmState.AutoFarmUseM1 then
+                                                        doM1Attack(char, 3, 0.2)
+                                                    end
                                                     npc.Humanoid.Health = 0
                                                 end
                                             end
@@ -911,7 +1265,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced)",
+            Content = "Loaded: Shindo Life In-Game (M1 + Stats)",
             Duration = 5
         })
     end
