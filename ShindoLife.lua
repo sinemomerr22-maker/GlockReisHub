@@ -1,7 +1,7 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
--- // Continuous Facing + Underground Attack
+-- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // ==========================================
 
 return function(Common)
@@ -44,7 +44,20 @@ return function(Common)
             AutoStatsInterval = 2,
             AutoStatsMinPoints = 5,
             GodModeEnabled = false,
-            FakeHealthValue = 999999
+            FakeHealthValue = 999999,
+            -- Auto Skill Spammer Config
+            AutoSkillREnabled = false,
+            AutoSkillTEnabled = false,
+            AutoSkillYEnabled = false,
+            AutoSkillFEnabled = false,
+            AutoSkillGEnabled = false,
+            AutoSkillHEnabled = false,
+            AutoSkillVEnabled = false,
+            AutoSkillBEnabled = false,
+            AutoSkillNEnabled = false,
+            AutoSkillQEnabled = false,
+            AutoSkillEEnabled = false,
+            AutoSkillSpamSpeed = 0.2
         }
     end
     
@@ -94,8 +107,6 @@ return function(Common)
         -- Face target - LOOK UP from below (no Y-axis zeroing)
         if targetHRP then
             local targetPos = targetHRP.Position
-            -- CFrame.lookAt makes the player look directly at targetPos
-            -- When player is below NPC, this naturally looks UP
             root.CFrame = CFrame.lookAt(root.Position, targetPos)
         end
         
@@ -455,7 +466,8 @@ return function(Common)
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
         Tabs.Stats = ui.Window:AddTab({ Title = "Auto Stats", Icon = "trending-up" })
-        Tabs.Chakra = ui.Window:AddTab({ Title = "Auto Chakra", Icon = "zap" })
+        Tabs.Skills = ui.Window:AddTab({ Title = "Oto Skill", Icon = "zap" })
+        Tabs.Chakra = ui.Window:AddTab({ Title = "Auto Chakra", Icon = "activity" })
         Tabs.Utilities = ui.Window:AddTab({ Title = "Utilities", Icon = "tool" })
         
         local FarmState = {
@@ -474,15 +486,27 @@ return function(Common)
             AutoStatsHpEnabled = Config.AutoStatsHpEnabled,
             GodModeEnabled = Config.GodModeEnabled,
             FakeHealthValue = Config.FakeHealthValue or 999999,
+            -- Auto Skill Spammer State
+            AutoSkillREnabled = Config.AutoSkillREnabled,
+            AutoSkillTEnabled = Config.AutoSkillTEnabled,
+            AutoSkillYEnabled = Config.AutoSkillYEnabled,
+            AutoSkillFEnabled = Config.AutoSkillFEnabled,
+            AutoSkillGEnabled = Config.AutoSkillGEnabled,
+            AutoSkillHEnabled = Config.AutoSkillHEnabled,
+            AutoSkillVEnabled = Config.AutoSkillVEnabled,
+            AutoSkillBEnabled = Config.AutoSkillBEnabled,
+            AutoSkillNEnabled = Config.AutoSkillNEnabled,
+            AutoSkillQEnabled = Config.AutoSkillQEnabled,
+            AutoSkillEEnabled = Config.AutoSkillEEnabled,
+            AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
-            StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0}
+            StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
+            SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0}
         }
         
         -- ==========================================
-        -- CONTINUOUS FACING LOOP (NEW!)
-        -- Every frame, if AutoFarm is active and we have a target,
-        -- player looks at the target from below (underground attack stance)
+        -- CONTINUOUS FACING LOOP
         -- ==========================================
         RunService.RenderStepped:Connect(function()
             if not FarmState.AutoFarmEnabled then
@@ -495,13 +519,11 @@ return function(Common)
             local root = char:FindFirstChild("HumanoidRootPart")
             if not root then return end
             
-            -- If we have a valid target NPC, face it continuously
             if currentTargetNPC and currentTargetNPC.Parent then
                 local npcRoot = currentTargetNPC:FindFirstChild("HumanoidRootPart")
                 local npcHum = currentTargetNPC:FindFirstChild("Humanoid")
                 
                 if npcRoot and npcHum and npcHum.Health > 0 then
-                    -- Look directly at target (upward from underground position)
                     local targetPos = npcRoot.Position
                     root.CFrame = CFrame.lookAt(root.Position, targetPos)
                 else
@@ -612,7 +634,7 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED) - WITH M1 + UNDERGROUND ATTACK + CONTINUOUS FACING
+        -- AUTOFARM (MISSION-BASED)
         -- ==========================================
         Tabs.Main:AddParagraph({
             Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND)",
@@ -692,7 +714,7 @@ return function(Common)
             Content = "Player positions UNDER the NPC (Y offset) and looks UP at them.\nM1 attacks are fired while facing upward.\nRenderStepped loop keeps player facing target at all times.\n\nRecommended: Y=-8, Z=0 for most NPCs"
         })
         
-        -- AutoFarm logic with M1 + Position Control + Continuous Facing
+        -- AutoFarm logic
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -716,8 +738,7 @@ return function(Common)
                             end
                             
                             if not hasMission then
-                                -- No mission - find mission giver
-                                currentTargetNPC = nil -- Clear target when seeking mission
+                                currentTargetNPC = nil
                                 local missionGivers = workspace:FindFirstChild("missiongivers")
                                 if missionGivers then
                                     local lvl = LocalPlayer:FindFirstChild("statz") 
@@ -778,7 +799,6 @@ return function(Common)
                                     end
                                 end
                             else
-                                -- Have mission - kill NPCs with M1 from underground
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local killed = false
@@ -793,26 +813,21 @@ return function(Common)
                                             and npc.Head.CFrame.Y > -1000 then
                                             
                                             local npcRoot = npc.HumanoidRootPart
-                                            
-                                            -- Set as current target for continuous facing
                                             currentTargetNPC = npc
                                             
-                                            -- Move to underground position
                                             local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
                                             toTarget(root.Position, npcRoot.Position,
                                                 CFrame.new(npcRoot.Position + offsetVector))
-                                            task.wait(0.05)
+                                            task.wait(0.3)
                                             
                                             local dist = (root.Position - npcRoot.Position).Magnitude
                                             
                                             if dist < 15 then
                                                 if FarmState.AutoFarmUseM1 then
-                                                    -- Use M1 attack from underground (looking UP)
                                                     local attackCount = 0
                                                     local maxAttacks = 10
                                                     
                                                     while npc.Humanoid.Health > 0 and attackCount < maxAttacks do
-                                                        -- attackM1 now looks UP at target (no Y-axis zeroing)
                                                         attackM1(npcRoot)
                                                         attackCount = attackCount + 1
                                                         task.wait(Config.AutoFarmM1Cooldown or 0.3)
@@ -1309,6 +1324,165 @@ return function(Common)
         end)
         
         -- ==========================================
+        -- AUTO SKILL SPAMMER (NEW!)
+        -- ==========================================
+        Tabs.Skills:AddParagraph({
+            Title = "[K] Auto Skill Spammer",
+            Content = "Automatically spam skill keys (R,T,Y,F,G,H,V,B,N,Q,E).\n\n- Each key can be enabled/disabled independently\n- Adjustable spam speed (cooldown between presses)\n- Fires 'key' then 'keyend' to simulate hold+release\n- Useful for spamming jutsu/moves repeatedly\n- Works with AutoFarm for maximum DPS"
+        })
+        
+        Tabs.Skills:AddSlider("AutoSkillSpamSpeedSlider", {
+            Title = "Spam Speed (seconds)",
+            Description = "Time between each key press. Lower = faster spam but more detectable.",
+            Default = Config.AutoSkillSpamSpeed,
+            Min = 0.05, Max = 2.0, Rounding = 2,
+            Callback = function(v)
+                FarmState.AutoSkillSpamSpeed = v
+                Config.AutoSkillSpamSpeed = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Skills:AddParagraph({
+            Title = "Skill Toggles",
+            Content = "Enable/disable individual skill keys below."
+        })
+        
+        -- Helper function to create skill toggle
+        local function createSkillToggle(keyName, upperKey)
+            local toggleName = "AutoSkill" .. upperKey .. "Toggle"
+            Tabs.Skills:AddToggle(toggleName, {
+                Title = "Spam " .. upperKey .. " Key",
+                Description = "Automatically press and release " .. upperKey .. " key",
+                Default = Config[toggleName:gsub("Toggle", "Enabled")]
+            }):OnChanged(function(v)
+                FarmState[toggleName:gsub("Toggle", "Enabled")] = v
+                Config[toggleName:gsub("Toggle", "Enabled")] = v
+                ConfigManager.Save(Config)
+            end)
+        end
+        
+        -- Create toggles for all keys
+        createSkillToggle("r", "R")
+        createSkillToggle("t", "T")
+        createSkillToggle("y", "Y")
+        createSkillToggle("f", "F")
+        createSkillToggle("g", "G")
+        createSkillToggle("h", "H")
+        createSkillToggle("v", "V")
+        createSkillToggle("b", "B")
+        createSkillToggle("n", "N")
+        createSkillToggle("q", "Q")
+        createSkillToggle("e", "E")
+        
+        Tabs.Skills:AddButton({
+            Title = "Enable All Skills",
+            Callback = function()
+                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                for _, key in ipairs(keys) do
+                    FarmState["AutoSkill" .. key .. "Enabled"] = true
+                    Config["AutoSkill" .. key .. "Enabled"] = true
+                end
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[K] All Skills Enabled",
+                    Content = "All skill spam toggles activated",
+                    Duration = 2
+                })
+            end
+        })
+        
+        Tabs.Skills:AddButton({
+            Title = "Disable All Skills",
+            Callback = function()
+                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                for _, key in ipairs(keys) do
+                    FarmState["AutoSkill" .. key .. "Enabled"] = false
+                    Config["AutoSkill" .. key .. "Enabled"] = false
+                end
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[K] All Skills Disabled",
+                    Content = "All skill spam toggles deactivated",
+                    Duration = 2
+                })
+            end
+        })
+        
+        -- Generic skill spammer function
+        local function createSkillSpammer(keyName, upperKey)
+            task.spawn(function()
+                while true do
+                    if FarmState["AutoSkill" .. upperKey .. "Enabled"] and LocalPlayer.Character then
+                        pcall(function()
+                            local char = LocalPlayer.Character
+                            local combat = char:FindFirstChild("combat")
+                            
+                            if combat then
+                                -- Press key
+                                combat.update:FireServer("key", keyName)
+                                
+                                -- Wait for configured spam speed
+                                task.wait(FarmState.AutoSkillSpamSpeed or 0.2)
+                                
+                                -- Release key
+                                combat.update:FireServer("key", keyName .. "end")
+                                
+                                -- Update stats
+                                FarmState.SkillStats[keyName] = (FarmState.SkillStats[keyName] or 0) + 1
+                            end
+                        end)
+                    end
+                    task.wait(FarmState.AutoSkillSpamSpeed or 0.2)
+                end
+            end)
+        end
+        
+        -- Create spammer for each key
+        createSkillSpammer("r", "R")
+        createSkillSpammer("t", "T")
+        createSkillSpammer("y", "Y")
+        createSkillSpammer("f", "F")
+        createSkillSpammer("g", "G")
+        createSkillSpammer("h", "H")
+        createSkillSpammer("v", "V")
+        createSkillSpammer("b", "B")
+        createSkillSpammer("n", "N")
+        createSkillSpammer("q", "Q")
+        createSkillSpammer("e", "E")
+        
+        -- Skill Status Display
+        local SkillStatusDisplay = Tabs.Skills:AddParagraph({
+            Title = "Skill Spammer Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local activeSkills = {}
+                local keys = {"r", "t", "y", "f", "g", "h", "v", "b", "n", "q", "e"}
+                local upperKeys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                
+                for i, key in ipairs(keys) do
+                    if FarmState["AutoSkill" .. upperKeys[i] .. "Enabled"] then
+                        table.insert(activeSkills, upperKeys[i] .. ":" .. (FarmState.SkillStats[key] or 0))
+                    end
+                end
+                
+                local activeText = #activeSkills > 0 and table.concat(activeSkills, ", ") or "None"
+                
+                SkillStatusDisplay.Content = string.format(
+                    "Status: %s\n\nSpam Speed: %.2fs\nActive Skills: %d / 11\n\nActive Keys:\n%s\n\nNote: Each key fires 'key' then 'keyend'\nto simulate a full press+release cycle.",
+                    #activeSkills > 0 and "[OK] ACTIVE" or "[X] INACTIVE",
+                    FarmState.AutoSkillSpamSpeed,
+                    #activeSkills,
+                    activeText
+                )
+                task.wait(1)
+            end
+        end)
+        
+        -- ==========================================
         -- AUTO CHAKRA
         -- ==========================================
         Tabs.Chakra:AddParagraph({
@@ -1454,7 +1628,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing + Auto Skill)",
             Duration = 5
         })
     end
