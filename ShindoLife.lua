@@ -1,6 +1,6 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm M1 Attack + Auto Stats + Godmode + Custom Position
+-- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
 -- // ==========================================
 
 return function(Common)
@@ -29,12 +29,8 @@ return function(Common)
             AutoFarmEnabled = false, AutoFarmSpeed = 500,
             AutoFarmUseM1 = true,
             AutoFarmM1Cooldown = 0.3,
-            -- NEW: Custom Attack Position
-            AutoFarmAttackDistance = 15,
-            AutoFarmOffsetX = 0,
-            AutoFarmOffsetY = -8,
-            AutoFarmOffsetZ = 0,
-            AutoFarmAcceptDistance = 10,
+            AutoFarmAttackDistance = -8,  -- Y offset (studs below NPC)
+            AutoFarmAttackBehind = 0,     -- Z offset (studs behind NPC)
             ScrollSniperEnabled = false,
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
@@ -76,14 +72,6 @@ return function(Common)
             end
         end)
         return ok, err
-    end
-    
-    -- Helper: Get attack position with custom offsets
-    local function getAttackPosition(npcPosition)
-        local offsetX = Config.AutoFarmOffsetX or 0
-        local offsetY = Config.AutoFarmOffsetY or -8
-        local offsetZ = Config.AutoFarmOffsetZ or 0
-        return npcPosition + Vector3.new(offsetX, offsetY, offsetZ)
     end
     
     -- M1 Attack Helper
@@ -473,6 +461,8 @@ return function(Common)
         local FarmState = {
             AutoFarmEnabled = Config.AutoFarmEnabled,
             AutoFarmUseM1 = Config.AutoFarmUseM1,
+            AutoFarmAttackDistance = Config.AutoFarmAttackDistance or -8,
+            AutoFarmAttackBehind = Config.AutoFarmAttackBehind or 0,
             ScrollSniperEnabled = Config.ScrollSniperEnabled,
             WarFarmEnabled = Config.WarFarmEnabled,
             AutoChakraEnabled = Config.AutoChakraEnabled,
@@ -596,11 +586,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED) - WITH M1 ATTACK + CUSTOM POSITION
+        -- AUTOFARM (MISSION-BASED) - WITH M1 ATTACK + POSITION CONTROL
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "[*] AutoFarm System (FIXED + M1 + Custom Position)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks instead of Health=0\n- NEW: Customizable attack position (distance + offsets)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Title = "[*] AutoFarm System (FIXED + M1 + POSITION)",
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks instead of Health=0\n- NEW: Adjustable attack position (distance & behind)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -644,146 +634,37 @@ return function(Common)
             end
         })
         
-        -- NEW: Custom Attack Position Section
-        Tabs.Main:AddSection("Attack Position Settings")
-        
-        Tabs.Main:AddParagraph({
-            Title = "[P] Position Configuration",
-            Content = "Customize where your character stands relative to NPCs when attacking.\n\n- Attack Distance: Max range to start attacking (default: 15 studs)\n- Offset X: Left/Right position (positive = right, negative = left)\n- Offset Y: Up/Down position (negative = below NPC, positive = above)\n- Offset Z: Front/Back position (negative = behind NPC, positive = in front)\n- Accept Distance: Max range to accept missions (default: 10 studs)"
-        })
-        
+        -- NEW: Attack Position Controls
         Tabs.Main:AddSlider("AutoFarmAttackDistanceSlider", {
-            Title = "Attack Distance (studs)",
-            Description = "Maximum distance from NPC to start attacking. Default: 15 studs.",
+            Title = "Attack Distance (Y offset)",
+            Description = "How many studs BELOW the NPC to position. Negative = below, 0 = same height. Default: -8",
             Default = Config.AutoFarmAttackDistance,
-            Min = 5, Max = 30, Rounding = 0,
+            Min = -20, Max = 0, Rounding = 0,
             Callback = function(v)
+                FarmState.AutoFarmAttackDistance = v
                 Config.AutoFarmAttackDistance = v
                 ConfigManager.Save(Config)
             end
         })
         
-        Tabs.Main:AddSlider("AutoFarmOffsetXSlider", {
-            Title = "Offset X (Left/Right)",
-            Description = "Horizontal offset. Positive = right of NPC, Negative = left. Default: 0 (centered).",
-            Default = Config.AutoFarmOffsetX,
-            Min = -15, Max = 15, Rounding = 1,
+        Tabs.Main:AddSlider("AutoFarmAttackBehindSlider", {
+            Title = "Attack Behind (Z offset)",
+            Description = "How many studs BEHIND the NPC to position. Positive = behind, negative = in front. Default: 0",
+            Default = Config.AutoFarmAttackBehind,
+            Min = -10, Max = 10, Rounding = 0,
             Callback = function(v)
-                Config.AutoFarmOffsetX = v
+                FarmState.AutoFarmAttackBehind = v
+                Config.AutoFarmAttackBehind = v
                 ConfigManager.Save(Config)
             end
         })
         
-        Tabs.Main:AddSlider("AutoFarmOffsetYSlider", {
-            Title = "Offset Y (Up/Down)",
-            Description = "Vertical offset. Negative = below NPC (under), Positive = above. Default: -8 (8 studs below).",
-            Default = Config.AutoFarmOffsetY,
-            Min = -20, Max = 20, Rounding = 1,
-            Callback = function(v)
-                Config.AutoFarmOffsetY = v
-                ConfigManager.Save(Config)
-            end
+        Tabs.Main:AddParagraph({
+            Title = "Position Tips",
+            Content = "- Y offset -8: Good for most NPCs (stay below their hitbox)\n- Y offset -12: Better for tall NPCs or flying enemies\n- Z offset 0: Directly under NPC\n- Z offset 3-5: Slightly behind (safer from counter-attacks)\n- Z offset -3 to -5: In front (closer for M1 range)"
         })
         
-        Tabs.Main:AddSlider("AutoFarmOffsetZSlider", {
-            Title = "Offset Z (Front/Back)",
-            Description = "Depth offset. Negative = behind NPC, Positive = in front. Default: 0 (same depth).",
-            Default = Config.AutoFarmOffsetZ,
-            Min = -15, Max = 15, Rounding = 1,
-            Callback = function(v)
-                Config.AutoFarmOffsetZ = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.Main:AddSlider("AutoFarmAcceptDistanceSlider", {
-            Title = "Accept Distance (studs)",
-            Description = "Maximum distance to accept missions from NPCs. Default: 10 studs.",
-            Default = Config.AutoFarmAcceptDistance,
-            Min = 5, Max = 20, Rounding = 0,
-            Callback = function(v)
-                Config.AutoFarmAcceptDistance = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        -- Preset buttons for common positions
-        Tabs.Main:AddButton({Title = "Preset: Under NPC (Default)", Callback = function()
-            Config.AutoFarmOffsetX = 0
-            Config.AutoFarmOffsetY = -8
-            Config.AutoFarmOffsetZ = 0
-            Config.AutoFarmAttackDistance = 15
-            ConfigManager.Save(Config)
-            if Fluent.Options.AutoFarmOffsetXSlider then Fluent.Options.AutoFarmOffsetXSlider.Value = 0 end
-            if Fluent.Options.AutoFarmOffsetYSlider then Fluent.Options.AutoFarmOffsetYSlider.Value = -8 end
-            if Fluent.Options.AutoFarmOffsetZSlider then Fluent.Options.AutoFarmOffsetZSlider.Value = 0 end
-            if Fluent.Options.AutoFarmAttackDistanceSlider then Fluent.Options.AutoFarmAttackDistanceSlider.Value = 15 end
-            Fluent:Notify({Title = "Preset Applied", Content = "Position: 8 studs below NPC", Duration = 2})
-        end})
-        
-        Tabs.Main:AddButton({Title = "Preset: Behind NPC", Callback = function()
-            Config.AutoFarmOffsetX = 0
-            Config.AutoFarmOffsetY = 0
-            Config.AutoFarmOffsetZ = -5
-            Config.AutoFarmAttackDistance = 12
-            ConfigManager.Save(Config)
-            if Fluent.Options.AutoFarmOffsetXSlider then Fluent.Options.AutoFarmOffsetXSlider.Value = 0 end
-            if Fluent.Options.AutoFarmOffsetYSlider then Fluent.Options.AutoFarmOffsetYSlider.Value = 0 end
-            if Fluent.Options.AutoFarmOffsetZSlider then Fluent.Options.AutoFarmOffsetZSlider.Value = -5 end
-            if Fluent.Options.AutoFarmAttackDistanceSlider then Fluent.Options.AutoFarmAttackDistanceSlider.Value = 12 end
-            Fluent:Notify({Title = "Preset Applied", Content = "Position: 5 studs behind NPC", Duration = 2})
-        end})
-        
-        Tabs.Main:AddButton({Title = "Preset: Side Attack", Callback = function()
-            Config.AutoFarmOffsetX = 6
-            Config.AutoFarmOffsetY = -3
-            Config.AutoFarmOffsetZ = 0
-            Config.AutoFarmAttackDistance = 15
-            ConfigManager.Save(Config)
-            if Fluent.Options.AutoFarmOffsetXSlider then Fluent.Options.AutoFarmOffsetXSlider.Value = 6 end
-            if Fluent.Options.AutoFarmOffsetYSlider then Fluent.Options.AutoFarmOffsetYSlider.Value = -3 end
-            if Fluent.Options.AutoFarmOffsetZSlider then Fluent.Options.AutoFarmOffsetZSlider.Value = 0 end
-            if Fluent.Options.AutoFarmAttackDistanceSlider then Fluent.Options.AutoFarmAttackDistanceSlider.Value = 15 end
-            Fluent:Notify({Title = "Preset Applied", Content = "Position: 6 studs right, 3 below", Duration = 2})
-        end})
-        
-        Tabs.Main:AddButton({Title = "Preset: Close Combat", Callback = function()
-            Config.AutoFarmOffsetX = 0
-            Config.AutoFarmOffsetY = -2
-            Config.AutoFarmOffsetZ = 3
-            Config.AutoFarmAttackDistance = 10
-            ConfigManager.Save(Config)
-            if Fluent.Options.AutoFarmOffsetXSlider then Fluent.Options.AutoFarmOffsetXSlider.Value = 0 end
-            if Fluent.Options.AutoFarmOffsetYSlider then Fluent.Options.AutoFarmOffsetYSlider.Value = -2 end
-            if Fluent.Options.AutoFarmOffsetZSlider then Fluent.Options.AutoFarmOffsetZSlider.Value = 3 end
-            if Fluent.Options.AutoFarmAttackDistanceSlider then Fluent.Options.AutoFarmAttackDistanceSlider.Value = 10 end
-            Fluent:Notify({Title = "Preset Applied", Content = "Position: Close range (3 studs front, 2 below)", Duration = 2})
-        end})
-        
-        -- Position status display
-        local PositionStatusDisplay = Tabs.Main:AddParagraph({
-            Title = "Current Position",
-            Content = "Initializing..."
-        })
-        
-        task.spawn(function()
-            while true do
-                PositionStatusDisplay.Content = string.format(
-                    "Attack Distance: %d studs\nAccept Distance: %d studs\n\nOffset X (Left/Right): %.1f studs\nOffset Y (Up/Down): %.1f studs\nOffset Z (Front/Back): %.1f studs\n\nPosition relative to NPC:\n- Horizontal: %s\n- Vertical: %s\n- Depth: %s",
-                    Config.AutoFarmAttackDistance,
-                    Config.AutoFarmAcceptDistance,
-                    Config.AutoFarmOffsetX,
-                    Config.AutoFarmOffsetY,
-                    Config.AutoFarmOffsetZ,
-                    Config.AutoFarmOffsetX > 0 and string.format("%.1f right", Config.AutoFarmOffsetX) or (Config.AutoFarmOffsetX < 0 and string.format("%.1f left", -Config.AutoFarmOffsetX) or "centered"),
-                    Config.AutoFarmOffsetY > 0 and string.format("%.1f above", Config.AutoFarmOffsetY) or (Config.AutoFarmOffsetY < 0 and string.format("%.1f below", -Config.AutoFarmOffsetY) or "same height"),
-                    Config.AutoFarmOffsetZ > 0 and string.format("%.1f in front", Config.AutoFarmOffsetZ) or (Config.AutoFarmOffsetZ < 0 and string.format("%.1f behind", -Config.AutoFarmOffsetZ) or "same depth")
-                )
-                task.wait(0.5)
-            end
-        end)
-        
-        -- AutoFarm logic with M1 and custom position
+        -- AutoFarm logic with M1 + Position Control
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -854,13 +735,14 @@ return function(Common)
                                                 local giverRoot = giver:FindFirstChild("HumanoidRootPart")
                                                 
                                                 if clientTalk and giverRoot then
-                                                    -- Use custom position for mission givers too
-                                                    local targetPos = getAttackPosition(giverRoot.Position)
-                                                    toTarget(root.Position, giverRoot.Position, CFrame.new(targetPos))
+                                                    -- Use configurable position for mission giver approach
+                                                    local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
+                                                    toTarget(root.Position, giverRoot.Position, 
+                                                        CFrame.new(giverRoot.Position + offsetVector))
                                                     task.wait(0.5)
                                                     
                                                     local dist = (root.Position - giverRoot.Position).Magnitude
-                                                    if dist < (Config.AutoFarmAcceptDistance or 10) then
+                                                    if dist < 10 then
                                                         clientTalk:FireServer()
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
@@ -890,14 +772,15 @@ return function(Common)
                                             
                                             local npcRoot = npc.HumanoidRootPart
                                             
-                                            -- Move to NPC using custom position
-                                            local targetPos = getAttackPosition(npcRoot.Position)
-                                            toTarget(root.Position, npcRoot.Position, CFrame.new(targetPos))
+                                            -- Use configurable position for NPC attack
+                                            local offsetVector = Vector3.new(0, FarmState.AutoFarmAttackDistance, FarmState.AutoFarmAttackBehind)
+                                            toTarget(root.Position, npcRoot.Position,
+                                                CFrame.new(npcRoot.Position + offsetVector))
                                             task.wait(0.3)
                                             
                                             local dist = (root.Position - npcRoot.Position).Magnitude
                                             
-                                            if dist < (Config.AutoFarmAttackDistance or 15) then
+                                            if dist < 15 then
                                                 if FarmState.AutoFarmUseM1 then
                                                     -- Use M1 attack
                                                     local attackCount = 0
@@ -1180,7 +1063,7 @@ return function(Common)
         end})
         
         -- ==========================================
-        -- AUTO STATS DISTRIBUTION (NEW!)
+        -- AUTO STATS DISTRIBUTION
         -- ==========================================
         Tabs.Stats:AddParagraph({
             Title = "[S] Auto Stats Distribution",
@@ -1566,7 +1449,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + M1 + Stats + Godmode + Custom Position)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + M1 + Stats + Godmode + Position Control)",
             Duration = 5
         })
     end
