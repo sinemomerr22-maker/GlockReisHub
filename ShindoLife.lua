@@ -1,6 +1,6 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm M1 Attack + Auto Stats Distribution
+-- // AutoFarm M1 Attack + Auto Stats + Godmode
 -- // ==========================================
 
 return function(Common)
@@ -40,7 +40,10 @@ return function(Common)
             AutoStatsChiEnabled = false,
             AutoStatsHpEnabled = false,
             AutoStatsInterval = 2,
-            AutoStatsMinPoints = 5
+            AutoStatsMinPoints = 5,
+            -- Godmode Config
+            GodModeEnabled = false,
+            FakeHealthValue = 999999
         }
     end
     
@@ -444,6 +447,7 @@ return function(Common)
     -- ==========================================
     else
         Tabs.Main = ui.Window:AddTab({ Title = "AutoFarm", Icon = "target" })
+        Tabs.Godmode = ui.Window:AddTab({ Title = "Godmode", Icon = "shield" })
         Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
@@ -464,10 +468,118 @@ return function(Common)
             AutoStatsTaiEnabled = Config.AutoStatsTaiEnabled,
             AutoStatsChiEnabled = Config.AutoStatsChiEnabled,
             AutoStatsHpEnabled = Config.AutoStatsHpEnabled,
+            GodModeEnabled = Config.GodModeEnabled,
+            FakeHealthValue = Config.FakeHealthValue or 999999,
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0}
         }
+        
+        -- ==========================================
+        -- GODMODE SYSTEM
+        -- ==========================================
+        Tabs.Godmode:AddParagraph({
+            Title = "[G] Godmode System",
+            Content = "Makes your character invincible.\n\n- Health never drops below max\n- fakehealth value set to " .. FarmState.FakeHealthValue .. "\n- Persists through respawn\n- Anti-kick protection included"
+        })
+        
+        Tabs.Godmode:AddToggle("GodModeToggle", {
+            Title = "Enable Godmode",
+            Description = "Never die - health always at maximum",
+            Default = Config.GodModeEnabled
+        }):OnChanged(function(v)
+            FarmState.GodModeEnabled = v
+            Config.GodModeEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Enabled",
+                    Content = "You are now invincible!",
+                    Duration = 3
+                })
+            else
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Disabled",
+                    Content = "Normal health restored",
+                    Duration = 3
+                })
+            end
+        end)
+        
+        Tabs.Godmode:AddSlider("FakeHealthSlider", {
+            Title = "Fake Health Value",
+            Description = "Value to set fakehealth to (default: 999999)",
+            Default = Config.FakeHealthValue,
+            Min = 100000, Max = 9999999, Rounding = 0,
+            Callback = function(v)
+                FarmState.FakeHealthValue = v
+                Config.FakeHealthValue = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        -- Godmode logic - runs every frame
+        task.spawn(function()
+            while true do
+                if FarmState.GodModeEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        
+                        if hum and hum.Health > 0 then
+                            -- Keep health at max
+                            hum.Health = hum.MaxHealth
+                            
+                            -- Update fakehealth value
+                            local fakehealth = char:FindFirstChild("fakehealth")
+                            if fakehealth then
+                                fakehealth.Value = FarmState.FakeHealthValue
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.1) -- Check every 100ms for responsiveness
+            end
+        end)
+        
+        -- Godmode status display
+        local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({
+            Title = "Godmode Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local fakehealth = char and char:FindFirstChild("fakehealth")
+                
+                local healthStr = "N/A"
+                local maxHealthStr = "N/A"
+                local fakeHealthStr = "N/A"
+                
+                if hum then
+                    healthStr = tostring(math.floor(hum.Health))
+                    maxHealthStr = tostring(math.floor(hum.MaxHealth))
+                end
+                
+                if fakehealth then
+                    fakeHealthStr = tostring(fakehealth.Value)
+                end
+                
+                GodmodeStatusDisplay.Content = string.format(
+                    "Status: %s\n\nHealth: %s / %s\nfakehealth Value: %s\nTarget fakehealth: %d\n\nGodmode: %s\n\nNote: Godmode prevents death by keeping\nhealth at max and fakehealth at %d",
+                    FarmState.GodModeEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+                    healthStr,
+                    maxHealthStr,
+                    fakeHealthStr,
+                    FarmState.FakeHealthValue,
+                    FarmState.GodModeEnabled and "ENABLED" or "DISABLED",
+                    FarmState.FakeHealthValue
+                )
+                task.wait(0.5)
+            end
+        end)
         
         -- ==========================================
         -- AUTOFARM (MISSION-BASED) - WITH M1 ATTACK
@@ -1277,7 +1389,7 @@ return function(Common)
             end
         end)
         
-        -- CharacterAdded handler for WalkSpeed/JumpHeight
+        -- CharacterAdded handler for WalkSpeed/JumpHeight + Godmode persistence
         LocalPlayer.CharacterAdded:Connect(function(char)
             char:WaitForChild("HumanoidRootPart")
             task.wait(3)
@@ -1285,13 +1397,22 @@ return function(Common)
                 char.Humanoid.WalkSpeed = Config.WalkSpeed
                 char.Humanoid.JumpHeight = Config.JumpHeight
                 char.Humanoid.UseJumpPower = false
+                
+                -- Re-apply godmode if enabled
+                if FarmState.GodModeEnabled then
+                    char.Humanoid.Health = char.Humanoid.MaxHealth
+                    local fakehealth = char:FindFirstChild("fakehealth")
+                    if fakehealth then
+                        fakehealth.Value = FarmState.FakeHealthValue
+                    end
+                end
             end
         end)
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + M1 + Stats)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + M1 + Stats + Godmode)",
             Duration = 5
         })
     end
