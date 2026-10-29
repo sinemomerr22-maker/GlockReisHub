@@ -770,7 +770,7 @@ return function(Common)
                                                     and talk.typ.Value == "defeat"
                                                     and giver.Head.givemission:FindFirstChild("color")
                                                     and giver.Head.givemission.color.Visible
-                                                    and (giver.Head.givemission.color.Image == green or giver.Head.givemission.color.Image == red) then
+                                                    and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
                                                 end
                                             end
