@@ -3,7 +3,7 @@
 -- // ==========================================
 
 -- GitHub repo URL'lerini buraya yaz (kendi repo'na göre güncelle)
-local REPO_BASE = "https://raw.githubusercontent.com/USERNAME/REPO/main"
+local REPO_BASE = "https://raw.githubusercontent.com/sinemomerr22-maker/GlockReisHub/refs/heads/main"
 
 local placeId = game.PlaceId
 local commonUrl = REPO_BASE .. "/common.lua"
