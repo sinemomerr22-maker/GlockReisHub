@@ -63,9 +63,8 @@ return function(Common)
         Tabs.Main = ui.Window:AddTab({ Title = "Genkai Sniper", Icon = "target" })
         Tabs.Status = ui.Window:AddTab({ Title = "Status", Icon = "activity" })
         
-        -- [MEVCUT GENKAI SNIPER KODU - DEĞİŞMEDİ]
-        -- Not: Mevcut ana koddaki Shindo Life Menu bölümünü buraya kopyala
-        -- Yaklaşık 300 satır - Auto Sniper, Bloodline targeting, slot selection, vb.
+        -- [MEVCUT GENKAI SNIPER KODU - DEGISMEDI]
+        -- Not: Mevcut ana koddaki Shindo Life Menu bolumunu buraya kopyala
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
@@ -100,8 +99,8 @@ return function(Common)
         -- AUTOFARM (MISSION-BASED)
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "🎯 AutoFarm System",
-            Content = "Automatically accepts and completes missions.\n\n• Level-aware mission selection (699 altı / 700 üstü)\n• Auto-kill NPCs for defeat missions\n• Smart mission giver detection\n• Anti-kick protection"
+            Title = "[*] AutoFarm System",
+            Content = "Automatically accepts and completes missions.\n\n- Level-aware mission selection (699 / 700+)\n- Auto-kill NPCs for defeat missions\n- Smart mission giver detection\n- Anti-kick protection"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -213,8 +212,8 @@ return function(Common)
         -- SCROLL SNIPER
         -- ==========================================
         Tabs.Scroll:AddParagraph({
-            Title = "📜 Scroll Sniper",
-            Content = "Automatically detects and collects spawned scrolls.\n\n• Scans workspace.GLOBALTIME and workspace\n• Instant teleport to scroll location\n• Auto-collect with click detector"
+            Title = "[S] Scroll Sniper",
+            Content = "Automatically detects and collects spawned scrolls.\n\n- Scans workspace.GLOBALTIME and workspace\n- Instant teleport to scroll location\n- Auto-collect with click detector"
         })
         
         Tabs.Scroll:AddToggle("ScrollSniperToggle", {
@@ -246,7 +245,7 @@ return function(Common)
                                         
                                         if invoke and clickDetector then
                                             ui.Fluent:Notify({
-                                                Title = "📜 Scroll Detected!",
+                                                Title = "[S] Scroll Detected!",
                                                 Content = "Teleporting to scroll...",
                                                 Duration = 2
                                             })
@@ -272,7 +271,7 @@ return function(Common)
                                     
                                     if invoke and clickDetector then
                                         ui.Fluent:Notify({
-                                            Title = "📜 Scroll Detected!",
+                                            Title = "[S] Scroll Detected!",
                                             Content = "Teleporting to scroll...",
                                             Duration = 2
                                         })
@@ -296,8 +295,8 @@ return function(Common)
         -- WAR FARM
         -- ==========================================
         Tabs.War:AddParagraph({
-            Title = "⚔️ War Farm",
-            Content = "Automatically participates in war mode.\n\n• Detects warmode activation\n• Auto-kill NPCs and mega bosses\n• Round counter and statistics\n• Auto-reset after round 21 (optional)"
+            Title = "[W] War Farm",
+            Content = "Automatically participates in war mode.\n\n- Detects warmode activation\n- Auto-kill NPCs and mega bosses\n- Round counter and statistics\n- Auto-reset after round 21 (optional)"
         })
         
         Tabs.War:AddToggle("WarFarmToggle", {
@@ -386,8 +385,8 @@ return function(Common)
         -- QUEST MAKER
         -- ==========================================
         Tabs.Quests:AddParagraph({
-            Title = "📋 Quest Maker",
-            Content = "Instantly complete quest requirements.\n\n• Rushes (300x)\n• Jumps (300x)\n• Chakra Charges (500x)\n• Punches (999x)"
+            Title = "[Q] Quest Maker",
+            Content = "Instantly complete quest requirements.\n\n- Rushes (300x)\n- Jumps (300x)\n- Chakra Charges (500x)\n- Punches (999x)"
         })
         
         Tabs.Quests:AddButton({Title = "Complete Rushes (300x)", Callback = function()
@@ -398,7 +397,7 @@ return function(Common)
                     end)
                     task.wait(0.25)
                 end
-                ui.Fluent:Notify({Title = "✅ Quest", Content = "300 Rushes completed!", Duration = 2})
+                ui.Fluent:Notify({Title = "[OK] Quest", Content = "300 Rushes completed!", Duration = 2})
             end)
         end})
         
@@ -410,7 +409,7 @@ return function(Common)
                     end)
                     task.wait(0.25)
                 end
-                ui.Fluent:Notify({Title = "✅ Quest", Content = "300 Jumps completed!", Duration = 2})
+                ui.Fluent:Notify({Title = "[OK] Quest", Content = "300 Jumps completed!", Duration = 2})
             end)
         end})
         
@@ -424,7 +423,7 @@ return function(Common)
                     end)
                     task.wait(0.5)
                 end
-                ui.Fluent:Notify({Title = "✅ Quest", Content = "500 Chakra Charges completed!", Duration = 2})
+                ui.Fluent:Notify({Title = "[OK] Quest", Content = "500 Chakra Charges completed!", Duration = 2})
             end)
         end})
         
@@ -436,7 +435,7 @@ return function(Common)
                     end)
                     task.wait(0.3)
                 end
-                ui.Fluent:Notify({Title = "✅ Quest", Content = "999 Punches completed!", Duration = 2})
+                ui.Fluent:Notify({Title = "[OK] Quest", Content = "999 Punches completed!", Duration = 2})
             end)
         end})
         
@@ -444,8 +443,8 @@ return function(Common)
         -- AUTO CHAKRA
         -- ==========================================
         Tabs.Chakra:AddParagraph({
-            Title = "⚡ Auto Chakra Management",
-            Content = "Automatically charges chakra when below threshold.\n\n• Monitors chakra level in real-time\n• Auto-charge when below threshold\n• Auto-release when above threshold\n• Move while charging (optional)"
+            Title = "[C] Auto Chakra Management",
+            Content = "Automatically charges chakra when below threshold.\n\n- Monitors chakra level in real-time\n- Auto-charge when below threshold\n- Auto-release when above threshold\n- Move while charging (optional)"
         })
         
         Tabs.Chakra:AddToggle("AutoChakraToggle", {
@@ -514,7 +513,7 @@ return function(Common)
         -- UTILITIES
         -- ==========================================
         Tabs.Utilities:AddParagraph({
-            Title = "🛠️ Utilities",
+            Title = "[U] Utilities",
             Content = "Teleport and miscellaneous features."
         })
         
@@ -525,7 +524,7 @@ return function(Common)
                     local log = npc:FindFirstChild("logtraining")
                     if log and log:FindFirstChild("HumanoidRootPart") then
                         LocalPlayer.Character.HumanoidRootPart.CFrame = log.HumanoidRootPart.CFrame
-                        ui.Fluent:Notify({Title = "✅ Teleport", Content = "Teleported to Training Log", Duration = 2})
+                        ui.Fluent:Notify({Title = "[OK] Teleport", Content = "Teleported to Training Log", Duration = 2})
                     end
                 end
             end)
@@ -536,7 +535,7 @@ return function(Common)
                 local spawn = workspace:FindFirstChild("spawn") or workspace:FindFirstChild("Spawn")
                 if spawn and spawn:FindFirstChild("HumanoidRootPart") then
                     LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.HumanoidRootPart.CFrame
-                    ui.Fluent:Notify({Title = "✅ Teleport", Content = "Teleported to Spawn", Duration = 2})
+                    ui.Fluent:Notify({Title = "[OK] Teleport", Content = "Teleported to Spawn", Duration = 2})
                 end
             end)
         end})
@@ -562,7 +561,7 @@ return function(Common)
                         
                         if lvl and lvl.Value == 1000 then
                             LocalPlayer.startevent:FireServer("rankup")
-                            ui.Fluent:Notify({Title = "🎉 Rank Up!", Content = "Attempting to rank up...", Duration = 3})
+                            ui.Fluent:Notify({Title = "[!] Rank Up!", Content = "Attempting to rank up...", Duration = 3})
                         end
                     end)
                 end
