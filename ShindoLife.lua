@@ -905,7 +905,7 @@ return function(Common)
                                             })
                                             
                                             toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
-                                            task.wait(0.5)
+                                            task.wait(0.1)
                                             
                                             invoke:FireServer(LocalPlayer)
                                             fireclickdetector(clickDetector)
@@ -930,7 +930,7 @@ return function(Common)
                                         })
                                         
                                         toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
-                                        task.wait(0.5)
+                                        task.wait(0.1)
                                         
                                         invoke:FireServer(LocalPlayer)
                                         fireclickdetector(clickDetector)
