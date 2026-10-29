@@ -1,5 +1,6 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
+-- // AutoFarm Fixed: currentmission.Value check + NPC filtering
 -- // ==========================================
 
 return function(Common)
@@ -370,11 +371,11 @@ return function(Common)
         }
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED)
+        -- AUTOFARM (MISSION-BASED) - FIXED VERSION
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "[*] AutoFarm System",
-            Content = "Automatically accepts and completes missions.\n\n- Level-aware mission selection (699 / 700+)\n- Auto-kill NPCs for defeat missions\n- Smart mission giver detection\n- Anti-kick protection"
+            Title = "[*] AutoFarm System (FIXED)",
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -397,7 +398,7 @@ return function(Common)
             end
         })
         
-        -- AutoFarm logic
+        -- AutoFarm logic - FIXED
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -410,12 +411,20 @@ return function(Common)
                             -- Anti-kick
                             hum:ChangeState(11)
                             
-                            -- Check if we have a mission
+                            -- PRIMARY CHECK: currentmission value (most reliable)
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            local hasMission = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
+                            
+                            -- SECONDARY CHECK: MissionStory GUI visible
                             local missionGui = LocalPlayer.PlayerGui:FindFirstChild("Main")
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
                                 and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
                             
-                            if not missionGui or not missionGui.Visible then
+                            if missionGui and missionGui.Visible then
+                                hasMission = true
+                            end
+                            
+                            if not hasMission then
                                 -- No mission - find mission giver
                                 local missionGivers = workspace:FindFirstChild("missiongivers")
                                 if missionGivers then
@@ -424,30 +433,55 @@ return function(Common)
                                         and LocalPlayer.statz.lvl:FindFirstChild("lvl")
                                         and LocalPlayer.statz.lvl.lvl.Value or 0
                                     
+                                    local green = "http://www.roblox.com/asset/?id=5459241648"
+                                    local red = "http://www.roblox.com/asset/?id=5459241799"
+                                    
                                     for _, giver in pairs(missionGivers:GetChildren()) do
                                         if giver:FindFirstChild("Head")
                                             and giver.Head:FindFirstChild("givemission")
                                             and giver.Head.givemission.Enabled then
                                             
                                             local talk = giver:FindFirstChild("Talk")
-                                            if talk and talk:FindFirstChild("typ")
-                                                and talk.typ.Value == "defeat" then
-                                                
-                                                -- Accept mission
+                                            local shouldAccept = false
+                                            
+                                            if lvl <= 699 then
+                                                -- Low level: only green missions
+                                                if talk and talk:FindFirstChild("typ")
+                                                    and talk.typ.Value == "defeat"
+                                                    and giver.Head.givemission:FindFirstChild("color")
+                                                    and giver.Head.givemission.color.Visible
+                                                    and giver.Head.givemission.color.Image == green then
+                                                    shouldAccept = true
+                                                end
+                                            else
+                                                -- High level: green or red missions
+                                                if talk and talk:FindFirstChild("typ")
+                                                    and talk.typ.Value == "defeat"
+                                                    and giver.Head.givemission:FindFirstChild("color")
+                                                    and giver.Head.givemission.color.Visible
+                                                    and (giver.Head.givemission.color.Image == green or giver.Head.givemission.color.Image == red) then
+                                                    shouldAccept = true
+                                                end
+                                            end
+                                            
+                                            if shouldAccept then
                                                 local clientTalk = giver:FindFirstChild("CLIENTTALK")
-                                                if clientTalk then
-                                                    toTarget(root.Position, giver.HumanoidRootPart.Position,
-                                                        CFrame.new(giver.HumanoidRootPart.Position + Vector3.new(0, -8, 0)))
+                                                local giverRoot = giver:FindFirstChild("HumanoidRootPart")
+                                                
+                                                if clientTalk and giverRoot then
+                                                    toTarget(root.Position, giverRoot.Position,
+                                                        CFrame.new(giverRoot.Position + Vector3.new(0, -8, 0)))
                                                     task.wait(0.5)
                                                     
-                                                    local dist = (root.Position - giver.HumanoidRootPart.Position).Magnitude
+                                                    local dist = (root.Position - giverRoot.Position).Magnitude
                                                     if dist < 10 then
                                                         clientTalk:FireServer()
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
+                                                        task.wait(1) -- Wait for mission to register on server
                                                     end
                                                 end
-                                                break
+                                                break -- Only accept one mission at a time
                                             end
                                         end
                                     end
@@ -456,11 +490,17 @@ return function(Common)
                                 -- Have mission - kill NPCs
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
+                                    local killed = false
+                                    
                                     for _, npc in pairs(npcs:GetChildren()) do
+                                        -- Filter: only kill mission NPCs (have npctype attribute and "npc" in name)
                                         if npc:IsA("Model")
                                             and npc:FindFirstChild("HumanoidRootPart")
                                             and npc:FindFirstChild("Humanoid")
-                                            and npc.Humanoid.Health > 0 then
+                                            and npc.Humanoid.Health > 0
+                                            and npc:FindFirstChild("npctype") -- Must be a mission NPC
+                                            and string.find(npc.Name, "npc") -- Name contains "npc"
+                                            and npc.Head.CFrame.Y > -1000 then -- Not fallen off map
                                             
                                             toTarget(root.Position, npc.HumanoidRootPart.Position,
                                                 CFrame.new(npc.HumanoidRootPart.Position + Vector3.new(0, -8, 0)))
@@ -469,16 +509,22 @@ return function(Common)
                                             local dist = (root.Position - npc.HumanoidRootPart.Position).Magnitude
                                             if dist < 15 then
                                                 npc.Humanoid.Health = 0
+                                                killed = true
                                             end
-                                            break
+                                            break -- Kill one NPC at a time, then re-check mission status
                                         end
+                                    end
+                                    
+                                    if not killed then
+                                        -- No NPCs found, wait a bit before trying again
+                                        task.wait(0.5)
                                     end
                                 end
                             end
                         end
                     end)
                 end
-                task.wait(1)
+                task.wait(0.5) -- Faster polling (was 1s, now 0.5s)
             end
         end)
         
