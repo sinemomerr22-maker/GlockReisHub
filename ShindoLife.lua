@@ -90,7 +90,7 @@ return function(Common)
         
         -- Face target
         if targetHRP then
-            local dir = (targetHRP.Position - root.Position) * Vector3.new(1, 0, 1)
+            local dir = (targetHRP.Position - root.Position) * Vector3.new(1, 3, 1)
             if dir.Magnitude > 0.1 then
                 root.CFrame = CFrame.lookAt(root.Position, root.Position + dir.Unit)
             end
