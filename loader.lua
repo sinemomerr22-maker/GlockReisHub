@@ -28,16 +28,16 @@ local moduleUrl = nil
 
 if placeId == 537413528 then
     currentGame = "BuildABoat"
-    moduleUrl = REPO_BASE .. "/modules/BuildABoat.lua"
+    moduleUrl = REPO_BASE .. "/BuildABoat.lua"
 elseif placeId == 4616652839 or table.find(shindoInGamePlaces, placeId) then
     currentGame = "ShindoLife"
-    moduleUrl = REPO_BASE .. "/modules/ShindoLife.lua"
+    moduleUrl = REPO_BASE .. "/ShindoLife.lua"
 elseif table.find(bloxFruitsPlaces, placeId) then
     currentGame = "BloxFruits"
-    moduleUrl = REPO_BASE .. "/modules/BloxFruits.lua"
+    moduleUrl = REPO_BASE .. "/BloxFruits.lua"
 elseif table.find(criminalityPlaces, placeId) then
     currentGame = "Criminality"
-    moduleUrl = REPO_BASE .. "/modules/Criminality.lua"
+    moduleUrl = REPO_BASE .. "/Criminality.lua"
 else
     currentGame = "Universal"
 end
