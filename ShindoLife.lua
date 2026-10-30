@@ -2,8 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + KillAura (FORCE KILL v2) + AutoFarm Boss (NPC ANCHOR v3)
--- // Boss Farm v3: Objective GUI tracking + Full workspace NPC scan + Anchored
+-- // Mission Protection + InstaKill (FORCE KILL v2)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -55,16 +54,12 @@ return function(Common)
             AutoSkillVEnabled = false, AutoSkillBEnabled = false,
             AutoSkillNEnabled = false, AutoSkillQEnabled = false,
             AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
-            AutoFarmBossEnabled = false,
-            AutoFarmBossSelected = {},
-            AutoFarmBossSpeed = 800,
-            AutoFarmBossTimeout = 15,
-            KillAuraEnabled = false,
-            KillAuraRange = 500,
-            KillAuraSpeed = 0.01,
-            KillAuraTargetNPCs = true,
-            KillAuraTargetPlayers = true,
-            KillAuraForceKill = true,
+            InstaKillEnabled = false,
+            InstaKillRange = 500,
+            InstaKillSpeed = 0.01,
+            InstaKillTargetNPCs = true,
+            InstaKillTargetPlayers = true,
+            InstaKillForceKill = true,
             AntiRagdollEnabled = false,
             AntiKnockbackEnabled = false,
             ESPEnabled = false,
@@ -169,60 +164,8 @@ return function(Common)
     end
     
     -- ==========================================
-    -- 🆕 OBJECTIVE GUI SCANNER (Universal mission detection)
-    -- ==========================================
-    local function hasObjectiveInGUI()
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return false end
-        
-        local function scanForObjective(instance)
-            if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-                local text = instance.Text or ""
-                if string.find(string.lower(text), "objective", 1, true) then
-                    if instance.Visible then
-                        return true
-                    end
-                end
-            end
-            for _, child in ipairs(instance:GetChildren()) do
-                if scanForObjective(child) then
-                    return true
-                end
-            end
-            return false
-        end
-        
-        return scanForObjective(playerGui)
-    end
-    
-    -- ==========================================
-    -- 🆕 MISSION STATUS CHECKER (Combined: currentmission + Objective GUI)
-    -- ==========================================
-    local function isMissionActive()
-        -- Method 1: currentmission value
-        local currentmission = LocalPlayer:FindFirstChild("currentmission")
-        if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
-            return true
-        end
-        
-        -- Method 2: Objective in GUI
-        if hasObjectiveInGUI() then
-            return true
-        end
-        
-        -- Method 3: MissionStory GUI visible
-        local missionGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
-            and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
-            and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
-        if missionGui and missionGui.Visible then
-            return true
-        end
-        
-        return false
-    end
-    
-    -- ==========================================
     -- 🆕 FORCE KILL FUNCTION (Multi-method guaranteed kill)
+    -- Used by InstaKill system
     -- ==========================================
     local function forceKillNPC(npc, npcRoot, npcHum)
         if not npc or not npc.Parent then return false end
@@ -563,7 +506,7 @@ return function(Common)
     -- ==========================================
     else
         Tabs.Main = ui.Window:AddTab({ Title = "AutoFarm", Icon = "target" })
-        Tabs.BossFarm = ui.Window:AddTab({ Title = "Boss Farm", Icon = "crown" })
+        Tabs.InstaKill = ui.Window:AddTab({ Title = "InstaKill", Icon = "skull" })
         Tabs.Godmode = ui.Window:AddTab({ Title = "Godmode", Icon = "shield" })
         Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
@@ -602,19 +545,12 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
-            AutoFarmBossEnabled = Config.AutoFarmBossEnabled,
-            AutoFarmBossSelected = Config.AutoFarmBossSelected or {},
-            AutoFarmBossSpeed = Config.AutoFarmBossSpeed or 800,
-            AutoFarmBossTimeout = Config.AutoFarmBossTimeout or 15,
-            BossFarmStatus = "Idle",
-            BossFarmCurrent = "",
-            BossFarmCompleted = 0,
-            KillAuraEnabled = Config.KillAuraEnabled,
-            KillAuraRange = Config.KillAuraRange or 500,
-            KillAuraSpeed = Config.KillAuraSpeed or 0.01,
-            KillAuraTargetNPCs = Config.KillAuraTargetNPCs,
-            KillAuraTargetPlayers = Config.KillAuraTargetPlayers,
-            KillAuraForceKill = Config.KillAuraForceKill,
+            InstaKillEnabled = Config.InstaKillEnabled,
+            InstaKillRange = Config.InstaKillRange or 500,
+            InstaKillSpeed = Config.InstaKillSpeed or 0.01,
+            InstaKillTargetNPCs = Config.InstaKillTargetNPCs,
+            InstaKillTargetPlayers = Config.InstaKillTargetPlayers,
+            InstaKillForceKill = Config.InstaKillForceKill,
             AntiRagdollEnabled = Config.AntiRagdollEnabled,
             AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
             ESPEnabled = Config.ESPEnabled,
@@ -637,33 +573,8 @@ return function(Common)
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
             SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0},
-            KillAuraKills = 0
+            InstaKillKills = 0
         }
-        
-        -- !cancel command helper
-        local function sendCancelCommand()
-            pcall(function()
-                local TextChatService = game:GetService("TextChatService")
-                if TextChatService then
-                    local channel = TextChatService:WaitForChild("TextChannels", 2)
-                    if channel then
-                        local rbxGeneral = channel:FindFirstChild("RBXGeneral")
-                        if rbxGeneral then
-                            rbxGeneral:SendAsync("!cancel")
-                        end
-                    end
-                end
-            end)
-            pcall(function()
-                local vc = workspace:FindFirstChild("VC")
-                if vc then
-                    local remote = vc:FindFirstChild("RemoteEvent")
-                    if remote then
-                        remote:FireServer("!cancel")
-                    end
-                end
-            end)
-        end
         
         -- ==========================================
         -- CONTINUOUS FACING LOOP
@@ -706,9 +617,17 @@ return function(Common)
             Config.GodModeEnabled = v
             ConfigManager.Save(Config)
             if v then
-                ui.Fluent:Notify({Title = "[G] Godmode Enabled", Content = "You are now invincible!", Duration = 3})
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Enabled",
+                    Content = "You are now invincible!",
+                    Duration = 3
+                })
             else
-                ui.Fluent:Notify({Title = "[G] Godmode Disabled", Content = "Normal health restored", Duration = 3})
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Disabled",
+                    Content = "Normal health restored",
+                    Duration = 3
+                })
             end
         end)
         
@@ -861,7 +780,14 @@ return function(Common)
                         if hum and root and hum.Health > 0 then
                             hum:ChangeState(11)
                             
-                            local hasMission = isMissionActive()
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            local hasMission = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
+                            
+                            local missionGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
+                                and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
+                                and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
+                            
+                            if missionGui and missionGui.Visible then hasMission = true end
                             
                             if not hasMission then
                                 currentTargetNPC = nil
@@ -933,7 +859,23 @@ return function(Common)
                                                                     Content = "Non-green mission detected! Cancelling...",
                                                                     Duration = 3
                                                                 })
-                                                                sendCancelCommand()
+                                                                pcall(function()
+                                                                    local TextChatService = game:GetService("TextChatService")
+                                                                    if TextChatService then
+                                                                        local channel = TextChatService:WaitForChild("TextChannels", 2)
+                                                                        if channel then
+                                                                            local rbxGeneral = channel:FindFirstChild("RBXGeneral")
+                                                                            if rbxGeneral then rbxGeneral:SendAsync("!cancel") end
+                                                                        end
+                                                                    end
+                                                                end)
+                                                                pcall(function()
+                                                                    local vc = workspace:FindFirstChild("VC")
+                                                                    if vc then
+                                                                        local remote = vc:FindFirstChild("RemoteEvent")
+                                                                        if remote then remote:FireServer("!cancel") end
+                                                                    end
+                                                                end)
                                                                 task.wait(1)
                                                             end
                                                         end
@@ -1003,654 +945,261 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM BOSS v3 (NPC ANCHOR + OBJECTIVE GUI + FULL WORKSPACE SCAN)
+        -- INSTAKILL SYSTEM (NEW TAB - Force Kill v2)
         -- ==========================================
-        Tabs.BossFarm:AddParagraph({
-            Title = "[B] AutoFarm Boss System (v3 - ANCHOR + OBJECTIVE GUI)",
-            Content = "Automatically farm boss drop missions.\n\n" ..
-                "- Scans workspace.bossdropmission.missions\n" ..
-                "- Cycles through selected bosses in order\n" ..
-                "- Teleports to missiongiver and accepts quest\n" ..
-                "- 🆕 OBJECTIVE GUI: Uses 'Objective' text to track mission status\n" ..
-                "- 🆕 FULL WORKSPACE SCAN: Finds ALL models with 'npc' in name\n" ..
-                "- 🆕 NPC ANCHOR: HumanoidRootPart is anchored (no falling)\n" ..
-                "- 🆕 BEHIND + ABOVE: Teleports behind and above each NPC\n" ..
-                "- 🆕 FORCE KILL: 5-method guaranteed kill\n" ..
-                "- Kills NPCs one by one until mission completes\n" ..
-                "- Moves to next boss after completion\n\n" ..
-                "NOTE: Disable regular AutoFarm while using Boss Farm!"
+        Tabs.InstaKill:AddParagraph({
+            Title = "[💀] InstaKill System (FORCE KILL)",
+            Content = "Instantly kills ALL humanoids within range using 5-method force kill.\n\n" ..
+                "- 🆕 ANCHOR: Prevents dead NPCs from falling\n" ..
+                "- 🆕 FORCE KILL: 5 methods guarantee death\n" ..
+                "- 🆕 RETRY: 10 attempts per target\n" ..
+                "- Targets ALL NPCs in workspace (missions, training, etc)\n" ..
+                "- Can target players (PVP mode)\n" ..
+                "- Ultra-fast cycle (0.01s = 100 kills/sec)\n\n" ..
+                "⚠️ WARNING: Very detectable! Use only in private servers!"
         })
         
-        -- 🆕 FULL WORKSPACE NPC SCANNER - finds ALL models with "npc" in name
-        local function findAllNPCsInWorkspace()
-            local npcList = {}
-            
-            -- Scan workspace.npc folder
-            local npcsFolder = workspace:FindFirstChild("npc")
-            if npcsFolder then
-                for _, npc in pairs(npcsFolder:GetChildren()) do
-                    if npc:IsA("Model") then
-                        local nameLower = npc.Name:lower()
-                        if string.find(nameLower, "npc") then
-                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-                            local npcHum = npc:FindFirstChildOfClass("Humanoid")
-                            if npcRoot and npcHum and npcHum.Health > 0 then
-                                table.insert(npcList, {
-                                    model = npc,
-                                    root = npcRoot,
-                                    hum = npcHum,
-                                    name = npc.Name,
-                                    source = "npc folder"
-                                })
-                            end
-                        end
-                    end
-                end
-                
-                -- Also scan descendants
-                for _, descendant in pairs(npcsFolder:GetDescendants()) do
-                    if descendant:IsA("Model") then
-                        local alreadyAdded = false
-                        for _, existing in ipairs(npcList) do
-                            if existing.model == descendant then
-                                alreadyAdded = true
-                                break
-                            end
-                        end
-                        
-                        if not alreadyAdded then
-                            local nameLower = descendant.Name:lower()
-                            if string.find(nameLower, "npc") then
-                                local npcRoot = descendant:FindFirstChild("HumanoidRootPart")
-                                local npcHum = descendant:FindFirstChildOfClass("Humanoid")
-                                if npcRoot and npcHum and npcHum.Health > 0 then
-                                    table.insert(npcList, {
-                                        model = descendant,
-                                        root = npcRoot,
-                                        hum = npcHum,
-                                        name = descendant.Name,
-                                        source = "npc folder descendant"
-                                    })
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- Scan workspace.bossdropmission folder for boss NPCs
-            local bossFolder = workspace:FindFirstChild("bossdropmission")
-            if bossFolder then
-                for _, descendant in pairs(bossFolder:GetDescendants()) do
-                    if descendant:IsA("Model") then
-                        local nameLower = descendant.Name:lower()
-                        if string.find(nameLower, "npc") then
-                            local npcRoot = descendant:FindFirstChild("HumanoidRootPart")
-                            local npcHum = descendant:FindFirstChildOfClass("Humanoid")
-                            if npcRoot and npcHum and npcHum.Health > 0 then
-                                -- Check if already added
-                                local alreadyAdded = false
-                                for _, existing in ipairs(npcList) do
-                                    if existing.model == descendant then
-                                        alreadyAdded = true
-                                        break
-                                    end
-                                end
-                                if not alreadyAdded then
-                                    table.insert(npcList, {
-                                        model = descendant,
-                                        root = npcRoot,
-                                        hum = npcHum,
-                                        name = descendant.Name,
-                                        source = "bossdropmission"
-                                    })
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- Scan entire workspace for any model with "npc" in name
-            for _, obj in pairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and obj.Name ~= "npc" then
-                    local nameLower = obj.Name:lower()
-                    if string.find(nameLower, "npc") then
-                        local npcRoot = obj:FindFirstChild("HumanoidRootPart")
-                        local npcHum = obj:FindFirstChildOfClass("Humanoid")
-                        if npcRoot and npcHum and npcHum.Health > 0 then
-                            -- Check if already added
-                            local alreadyAdded = false
-                            for _, existing in ipairs(npcList) do
-                                if existing.model == obj then
-                                    alreadyAdded = true
-                                    break
-                                end
-                            end
-                            if not alreadyAdded then
-                                table.insert(npcList, {
-                                    model = obj,
-                                    root = npcRoot,
-                                    hum = npcHum,
-                                    name = obj.Name,
-                                    source = "workspace root"
-                                })
-                            end
-                        end
-                    end
-                end
-            end
-            
-            return npcList
-        end
-        
-        -- Get available bosses from workspace
-        local function getAvailableBosses()
-            local bosses = {}
-            local missionsFolder = workspace:FindFirstChild("bossdropmission")
-            if missionsFolder then
-                local missionsSubFolder = missionsFolder:FindFirstChild("missions")
-                if missionsSubFolder then
-                    for _, folder in pairs(missionsSubFolder:GetChildren()) do
-                        if folder:IsA("Folder") or folder:IsA("Model") then
-                            table.insert(bosses, folder.Name)
-                        end
-                    end
-                end
-            end
-            table.sort(bosses)
-            return bosses
-        end
-        
-        local availableBosses = getAvailableBosses()
-        if #availableBosses == 0 then
-            availableBosses = {"(No bosses found - check workspace.bossdropmission.missions)"}
-        end
-        
-        -- Validate selected bosses
-        local validBosses = {}
-        for _, v in ipairs(FarmState.AutoFarmBossSelected) do
-            if table.find(availableBosses, v) then
-                table.insert(validBosses, v)
-            end
-        end
-        
-        local defaultBossDict = {}
-        for _, v in ipairs(validBosses) do defaultBossDict[v] = true end
-        
-        Tabs.BossFarm:AddToggle("AutoFarmBossToggle", {
-            Title = "Enable AutoFarm Boss",
-            Description = "Automatically cycle through selected bosses and farm them",
-            Default = Config.AutoFarmBossEnabled
+        Tabs.InstaKill:AddToggle("InstaKillToggle", {
+            Title = "Enable InstaKill",
+            Description = "ULTRA FAST: 5-method guaranteed kill on ALL nearby Humanoids",
+            Default = Config.InstaKillEnabled
         }):OnChanged(function(v)
-            FarmState.AutoFarmBossEnabled = v
-            Config.AutoFarmBossEnabled = v
+            FarmState.InstaKillEnabled = v
+            Config.InstaKillEnabled = v
             ConfigManager.Save(Config)
             if v then
                 ui.Fluent:Notify({
-                    Title = "[B] Boss Farm Enabled",
-                    Content = "Starting boss cycle...",
+                    Title = "[💀] InstaKill ACTIVATED",
+                    Content = "Ultra-fast force-kill mode enabled!",
                     Duration = 3
                 })
             else
-                FarmState.BossFarmStatus = "Idle"
-                FarmState.BossFarmCurrent = ""
-            end
-        end)
-        
-        local BossDropdown = Tabs.BossFarm:AddDropdown("BossSelectionDropdown", {
-            Title = "Select Bosses to Farm",
-            Description = "Choose which bosses to cycle through (multi-select)",
-            Values = availableBosses,
-            Multi = true,
-            Default = defaultBossDict,
-            Flag = "BossSelectionFlag"
-        })
-        
-        BossDropdown:OnChanged(function(Value)
-            local parsed = {}
-            if type(Value) == "table" then
-                for k, v in pairs(Value) do
-                    if type(k) == "string" and v == true then
-                        table.insert(parsed, k)
-                    elseif type(k) == "number" and type(v) == "string" then
-                        table.insert(parsed, v)
-                    end
-                end
-            end
-            table.sort(parsed)
-            FarmState.AutoFarmBossSelected = parsed
-            Config.AutoFarmBossSelected = parsed
-            ConfigManager.Save(Config)
-            ui.Fluent:Notify({
-                Title = "[B] Boss List Updated",
-                Content = "Selected: " .. (#parsed > 0 and table.concat(parsed, ", ") or "NONE"),
-                Duration = 3
-            })
-        end)
-        
-        Tabs.BossFarm:AddSlider("AutoFarmBossSpeedSlider", {
-            Title = "Boss Tween Speed (studs/sec)",
-            Description = "Speed when traveling to boss missiongiver and NPCs",
-            Default = Config.AutoFarmBossSpeed,
-            Min = 200, Max = 2500, Rounding = 0,
-            Callback = function(v)
-                FarmState.AutoFarmBossSpeed = v
-                Config.AutoFarmBossSpeed = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.BossFarm:AddSlider("AutoFarmBossTimeoutSlider", {
-            Title = "Quest Accept Timeout (seconds)",
-            Description = "How long to wait for quest acceptance before skipping",
-            Default = Config.AutoFarmBossTimeout,
-            Min = 5, Max = 60, Rounding = 0,
-            Callback = function(v)
-                FarmState.AutoFarmBossTimeout = v
-                Config.AutoFarmBossTimeout = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.BossFarm:AddButton({
-            Title = "Refresh Boss List",
-            Callback = function()
-                availableBosses = getAvailableBosses()
-                if #availableBosses == 0 then
-                    availableBosses = {"(No bosses found)"}
-                end
                 ui.Fluent:Notify({
-                    Title = "[B] Boss List Refreshed",
-                    Content = "Found " .. #availableBosses .. " boss(es)",
+                    Title = "[💀] InstaKill DEACTIVATED",
+                    Content = "Total kills: " .. FarmState.InstaKillKills,
                     Duration = 3
                 })
             end
+        end)
+        
+        Tabs.InstaKill:AddSlider("InstaKillRangeSlider", {
+            Title = "InstaKill Range (studs)",
+            Description = "Maximum distance to target enemies (default: 500)",
+            Default = Config.InstaKillRange,
+            Min = 50, Max = 1000, Rounding = 0,
+            Callback = function(v)
+                FarmState.InstaKillRange = v
+                Config.InstaKillRange = v
+                ConfigManager.Save(Config)
+            end
         })
         
-        Tabs.BossFarm:AddParagraph({
-            Title = "Boss Farm Cycle Info (v3)",
-            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - 🆕 Wait for NPCs to spawn (up to 10s)\n   - 🆕 Scan ENTIRE workspace for 'npc' models\n   - 🆕 ANCHOR each NPC's HumanoidRootPart\n   - 🆕 Teleport BEHIND + ABOVE each NPC\n   - 🆕 FORCE KILL with 5 methods\n   - Wait for mission completion (Objective GUI)\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
+        Tabs.InstaKill:AddSlider("InstaKillSpeedSlider", {
+            Title = "InstaKill Speed (seconds)",
+            Description = "Time between kill cycles. Lower = more aggressive (min: 0.01s)",
+            Default = Config.InstaKillSpeed,
+            Min = 0.01, Max = 0.5, Rounding = 2,
+            Callback = function(v)
+                FarmState.InstaKillSpeed = v
+                Config.InstaKillSpeed = v
+                ConfigManager.Save(Config)
+            end
         })
         
-        -- Boss Farm Logic - v3 WITH NPC ANCHOR + OBJECTIVE GUI + FULL SCAN
+        Tabs.InstaKill:AddToggle("InstaKillNPCToggle", {
+            Title = "Target ALL NPCs",
+            Description = "Kill all NPCs in range (missions, training, war mode, etc)",
+            Default = Config.InstaKillTargetNPCs
+        }):OnChanged(function(v)
+            FarmState.InstaKillTargetNPCs = v
+            Config.InstaKillTargetNPCs = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.InstaKill:AddToggle("InstaKillPlayerToggle", {
+            Title = "Target Players (PVP)",
+            Description = "Kill other players in range",
+            Default = Config.InstaKillTargetPlayers
+        }):OnChanged(function(v)
+            FarmState.InstaKillTargetPlayers = v
+            Config.InstaKillTargetPlayers = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.InstaKill:AddToggle("InstaKillForceKillToggle", {
+            Title = "Force Kill Mode (REQUIRED)",
+            Description = "5-method guaranteed kill (Health=0 + Dead state + BreakJoints + Anchor + NoCollide)",
+            Default = Config.InstaKillForceKill
+        }):OnChanged(function(v)
+            FarmState.InstaKillForceKill = v
+            Config.InstaKillForceKill = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.InstaKill:AddParagraph({
+            Title = "InstaKill Info",
+            Content = "INSTAKILL MODE:\n" ..
+                "- Scans ALL Humanoids in workspace (not just npc folder)\n" ..
+                "- 0.01 second cycle (100 kills/sec potential)\n" ..
+                "- 500 stud default range\n" ..
+                "- 🆕 FORCE KILL: 5 methods guarantee death\n" ..
+                "  1. Health = 0\n" ..
+                "  2. HumanoidStateType.Dead\n" ..
+                "  3. BreakJoints()\n" ..
+                "  4. Anchor root (no falling)\n" ..
+                "  5. CanCollide = false (no physics)\n" ..
+                "- 🆕 ANTI-FALL: Dead NPCs stay anchored\n" ..
+                "- No M1 attacks, no cooldowns\n\n" ..
+                "⚠️ WARNING: Very detectable! Use only in private servers!"
+        })
+        
+        -- INSTAKILL LOGIC - ULTRA FAST AGGRESSIVE FORCE KILL
         task.spawn(function()
-            local currentBossIndex = 1
-            
             while true do
-                if FarmState.AutoFarmBossEnabled and LocalPlayer.Character then
-                    local selectedBosses = FarmState.AutoFarmBossSelected
-                    if #selectedBosses == 0 then
-                        FarmState.BossFarmStatus = "No bosses selected"
-                        task.wait(1)
-                        continue
-                    end
-                    
-                    -- Cycle through bosses
-                    if currentBossIndex > #selectedBosses then
-                        currentBossIndex = 1
-                    end
-                    
-                    local bossName = selectedBosses[currentBossIndex]
-                    FarmState.BossFarmCurrent = bossName
-                    FarmState.BossFarmStatus = "Traveling to " .. bossName
-                    
+                if FarmState.InstaKillEnabled and LocalPlayer.Character then
                     pcall(function()
                         local char = LocalPlayer.Character
-                        local root = char and char:FindFirstChild("HumanoidRootPart")
-                        local hum = char and char:FindFirstChildOfClass("Humanoid")
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        local hum = char:FindFirstChildOfClass("Humanoid")
                         
-                        if not root or not hum or hum.Health <= 0 then
-                            task.wait(1)
-                            return
-                        end
-                        
-                        -- Find boss mission folder
-                        local missionsFolder = workspace:FindFirstChild("bossdropmission")
-                        if not missionsFolder then
-                            FarmState.BossFarmStatus = "bossdropmission folder not found"
-                            task.wait(2)
-                            return
-                        end
-                        
-                        local missionsSubFolder = missionsFolder:FindFirstChild("missions")
-                        if not missionsSubFolder then
-                            FarmState.BossFarmStatus = "missions subfolder not found"
-                            task.wait(2)
-                            return
-                        end
-                        
-                        local bossFolder = missionsSubFolder:FindFirstChild(bossName)
-                        if not bossFolder then
-                            FarmState.BossFarmStatus = "Boss folder not found: " .. bossName
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        -- Find missiongiver model inside boss folder
-                        local missiongiver = bossFolder:FindFirstChild("missiongiver")
-                        if not missiongiver then
-                            -- Try to find any model with HumanoidRootPart
-                            for _, child in pairs(bossFolder:GetChildren()) do
-                                if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
-                                    missiongiver = child
-                                    break
-                                end
-                            end
-                        end
-                        
-                        if not missiongiver then
-                            FarmState.BossFarmStatus = "missiongiver not found in " .. bossName
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        local giverRoot = missiongiver:FindFirstChild("HumanoidRootPart")
-                        if not giverRoot then
-                            FarmState.BossFarmStatus = "HumanoidRootPart not found in missiongiver"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        -- Teleport to missiongiver
-                        FarmState.BossFarmStatus = "Teleporting to " .. bossName .. " missiongiver"
-                        local targetCFrame = CFrame.new(giverRoot.Position + Vector3.new(0, -5, 0))
-                        
-                        local info = TweenInfo.new(
-                            (giverRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
-                            Enum.EasingStyle.Linear
-                        )
-                        local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
-                        tween:Play()
-                        tween.Completed:Wait()
-                        
-                        task.wait(1)
-                        
-                        -- Try to accept quest (15 second timeout)
-                        FarmState.BossFarmStatus = "Trying to accept " .. bossName .. " quest..."
-                        local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
-                        local questAccepted = false
-                        local startTime = tick()
-                        
-                        while tick() - startTime < FarmState.AutoFarmBossTimeout do
-                            if not FarmState.AutoFarmBossEnabled then break end
+                        if root and hum and hum.Health > 0 then
+                            local killCount = 0
                             
-                            -- 🆕 Check if mission is already active (using combined checker)
-                            if isMissionActive() then
-                                questAccepted = true
-                                break
-                            end
-                            
-                            -- Try to accept
-                            if clientTalk then
-                                pcall(function()
-                                    clientTalk:FireServer()
-                                    task.wait(0.3)
-                                    clientTalk:FireServer("accept")
-                                end)
-                            end
-                            
-                            task.wait(1)
-                        end
-                        
-                        -- Final check
-                        if not questAccepted then
-                            if isMissionActive() then
-                                questAccepted = true
-                            end
-                        end
-                        
-                        if not questAccepted then
-                            FarmState.BossFarmStatus = "Failed to accept " .. bossName .. " quest (timeout)"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        FarmState.BossFarmStatus = "Quest accepted! Waiting for NPCs to spawn..."
-                        task.wait(2) -- Initial wait for NPCs to spawn
-                        
-                        -- 🆕 WAIT FOR NPCs WITH RETRY (up to 10 seconds)
-                        local npcList = {}
-                        local npcSearchStartTime = tick()
-                        local maxNPCWaitTime = 10
-                        
-                        while tick() - npcSearchStartTime < maxNPCWaitTime do
-                            if not FarmState.AutoFarmBossEnabled then break end
-                            
-                            -- Check if mission is still active
-                            if not isMissionActive() then
-                                break -- Mission completed before NPCs spawned
-                            end
-                            
-                            npcList = findAllNPCsInWorkspace()
-                            
-                            if #npcList > 0 then
-                                break -- Found NPCs!
-                            end
-                            
-                            FarmState.BossFarmStatus = "Waiting for NPCs... (" .. math.floor(tick() - npcSearchStartTime) .. "s/" .. maxNPCWaitTime .. "s)"
-                            task.wait(1)
-                        end
-                        
-                        -- Check if mission completed during wait
-                        if not isMissionActive() then
-                            FarmState.BossFarmStatus = bossName .. " mission completed (no NPCs needed)!"
-                            FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
-                            ui.Fluent:Notify({
-                                Title = "[B] Boss Completed",
-                                Content = bossName .. " finished without NPCs!",
-                                Duration = 3
-                            })
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        if #npcList == 0 then
-                            FarmState.BossFarmStatus = "No NPCs found after " .. maxNPCWaitTime .. "s - skipping boss"
-                            ui.Fluent:Notify({
-                                Title = "[!] Boss Farm",
-                                Content = "No NPCs found for " .. bossName .. " - moving to next boss",
-                                Duration = 3
-                            })
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        FarmState.BossFarmStatus = "Found " .. #npcList .. " NPC(s). Starting ANCHOR + KILL cycle..."
-                        ui.Fluent:Notify({
-                            Title = "[B] NPCs Found",
-                            Content = "Killing " .. #npcList .. " NPC(s) for " .. bossName,
-                            Duration = 3
-                        })
-                        
-                        -- Kill each NPC in order WITH ANCHOR
-                        for i, npcData in ipairs(npcList) do
-                            -- Check if boss farm is still enabled
-                            if not FarmState.AutoFarmBossEnabled then break end
-                            
-                            -- 🆕 Check if mission is still active (using combined checker)
-                            if not isMissionActive() then
-                                -- Mission completed!
-                                break
-                            end
-                            
-                            -- Check if character is still alive
-                            local char2 = LocalPlayer.Character
-                            local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
-                            if not hum2 or hum2.Health <= 0 then
-                                break
-                            end
-                            
-                            -- Re-check if NPC is still alive
-                            if not npcData.hum or npcData.hum.Health <= 0 or not npcData.root.Parent then
-                                continue
-                            end
-                            
-                            FarmState.BossFarmStatus = "Killing " .. npcData.name .. " (" .. i .. "/" .. #npcList .. ") [ANCHORED]"
-                            
-                            -- 🆕 ANCHOR the NPC's HumanoidRootPart (prevent falling)
-                            pcall(function()
-                                npcData.root.Anchored = true
-                                npcData.root.AssemblyLinearVelocity = Vector3.zero
-                                npcData.root.AssemblyAngularVelocity = Vector3.zero
-                            end)
-                            
-                            -- Get current root position
-                            local currentRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if not currentRoot then break end
-                            
-                            -- 🆕 Teleport to NPC BEHIND + ABOVE (using LookVector)
-                            local npcBehindOffset = -npcData.root.CFrame.LookVector * 3 + Vector3.new(0, 5, 0)
-                            local targetCF = CFrame.new(npcData.root.Position + npcBehindOffset)
-                            local info2 = TweenInfo.new(
-                                (npcData.root.Position - currentRoot.Position).Magnitude / FarmState.AutoFarmBossSpeed,
-                                Enum.EasingStyle.Linear
-                            )
-                            local tween2 = TweenService:Create(currentRoot, info2, {CFrame = targetCF})
-                            tween2:Play()
-                            tween2.Completed:Wait()
-                            task.wait(0.5)
-                            
-                            -- Wait until NPC dies or mission completes
-                            local killStartTime = tick()
-                            local killTimeout = 60 -- 60 saniye timeout per NPC
-                            
-                            while npcData.hum.Health > 0 and FarmState.AutoFarmBossEnabled do
-                                -- 🆕 Check if mission is still active
-                                if not isMissionActive() then
-                                    break -- Mission completed
-                                end
-                                
-                                -- Check if character is still alive
-                                local char3 = LocalPlayer.Character
-                                local hum3 = char3 and char3:FindFirstChildOfClass("Humanoid")
-                                if not hum3 or hum3.Health <= 0 then
-                                    break
-                                end
-                                
-                                -- Check if NPC still exists
-                                if not npcData.root.Parent or not npcData.hum.Parent then
-                                    break
-                                end
-                                
-                                -- 🆕 Keep NPC anchored (in case game unanchors it)
-                                pcall(function()
-                                    if not npcData.root.Anchored then
-                                        npcData.root.Anchored = true
+                            -- SCAN ALL HUMANOIDs IN WORKSPACE (not just npc folder)
+                            if FarmState.InstaKillTargetNPCs then
+                                -- Scan workspace.npc folder
+                                local npcs = workspace:FindFirstChild("npc")
+                                if npcs then
+                                    for _, npc in pairs(npcs:GetChildren()) do
+                                        if npc:IsA("Model") then
+                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
+                                            local npcHum = npc:FindFirstChildOfClass("Humanoid")
+                                            
+                                            if npcRoot and npcHum and npcHum.Health > 0 then
+                                                local dist = (root.Position - npcRoot.Position).Magnitude
+                                                
+                                                if dist <= FarmState.InstaKillRange then
+                                                    if FarmState.InstaKillForceKill then
+                                                        -- 🆕 FORCE KILL: Use multi-method kill
+                                                        local killed = forceKillNPC(npc, npcRoot, npcHum)
+                                                        if killed then
+                                                            killCount = killCount + 1
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
                                     end
-                                    npcData.root.AssemblyLinearVelocity = Vector3.zero
-                                    npcData.root.AssemblyAngularVelocity = Vector3.zero
-                                end)
-                                
-                                -- Stay near NPC (behind+above)
-                                local currentRoot2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                if currentRoot2 and npcData.root.Parent then
-                                    local behindOffset2 = -npcData.root.CFrame.LookVector * 3 + Vector3.new(0, 5, 0)
-                                    currentRoot2.CFrame = CFrame.new(npcData.root.Position + behindOffset2)
                                 end
                                 
-                                -- 🆕 FORCE KILL: Use multi-method kill
-                                if npcData.hum.Health > 0 then
-                                    forceKillNPC(npcData.model, npcData.root, npcData.hum)
+                                -- Also scan workspace.bossdropmission for bosses
+                                local bossFolder = workspace:FindFirstChild("bossdropmission")
+                                if bossFolder then
+                                    for _, descendant in pairs(bossFolder:GetDescendants()) do
+                                        if descendant:IsA("Humanoid") and descendant.Health > 0 then
+                                            local model = descendant.Parent
+                                            if model and model:IsA("Model") then
+                                                local modelRoot = model:FindFirstChild("HumanoidRootPart")
+                                                if modelRoot then
+                                                    local dist = (root.Position - modelRoot.Position).Magnitude
+                                                    if dist <= FarmState.InstaKillRange then
+                                                        if FarmState.InstaKillForceKill then
+                                                            -- 🆕 FORCE KILL
+                                                            local killed = forceKillNPC(model, modelRoot, descendant)
+                                                            if killed then
+                                                                killCount = killCount + 1
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
                                 end
                                 
-                                task.wait(0.3)
-                                
-                                -- Timeout after 60 seconds per NPC
-                                if tick() - killStartTime > killTimeout then
-                                    FarmState.BossFarmStatus = "NPC kill timeout, moving to next..."
-                                    break
+                                -- Scan workspace for any stray Humanoids
+                                for _, obj in pairs(workspace:GetChildren()) do
+                                    if obj:IsA("Model") and obj ~= char then
+                                        local objRoot = obj:FindFirstChild("HumanoidRootPart")
+                                        local objHum = obj:FindFirstChildOfClass("Humanoid")
+                                        
+                                        if objRoot and objHum and objHum.Health > 0 then
+                                            -- Skip players if not targeting them
+                                            local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
+                                            if not isPlayer then
+                                                local dist = (root.Position - objRoot.Position).Magnitude
+                                                if dist <= FarmState.InstaKillRange then
+                                                    if FarmState.InstaKillForceKill then
+                                                        -- 🆕 FORCE KILL
+                                                        local killed = forceKillNPC(obj, objRoot, objHum)
+                                                        if killed then
+                                                            killCount = killCount + 1
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
                                 end
                             end
                             
-                            task.wait(1) -- Wait before moving to next NPC
-                        end
-                        
-                        -- Wait for mission to fully complete
-                        FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
-                        local completionWait = 0
-                        local maxCompletionWait = 15
-                        
-                        while FarmState.AutoFarmBossEnabled and completionWait < maxCompletionWait do
-                            -- 🆕 Check if mission is still active
-                            if not isMissionActive() then
-                                -- Mission completed!
-                                break
+                            -- KILL ALL PLAYERS IN RANGE
+                            if FarmState.InstaKillTargetPlayers then
+                                for _, player in pairs(Players:GetPlayers()) do
+                                    if player ~= LocalPlayer and player.Character then
+                                        local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                        local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
+                                        
+                                        if playerRoot and playerHum and playerHum.Health > 0 then
+                                            local dist = (root.Position - playerRoot.Position).Magnitude
+                                            
+                                            if dist <= FarmState.InstaKillRange then
+                                                if FarmState.InstaKillForceKill then
+                                                    -- 🆕 FORCE KILL
+                                                    local killed = forceKillNPC(player.Character, playerRoot, playerHum)
+                                                    if killed then
+                                                        killCount = killCount + 1
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
                             end
-                            task.wait(1)
-                            completionWait = completionWait + 1
+                            
+                            FarmState.InstaKillKills = FarmState.InstaKillKills + killCount
                         end
-                        
-                        if FarmState.AutoFarmBossEnabled then
-                            FarmState.BossFarmStatus = bossName .. " mission completed!"
-                            FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
-                            ui.Fluent:Notify({
-                                Title = "[B] Boss Completed",
-                                Content = bossName .. " mission finished!",
-                                Duration = 3
-                            })
-                            task.wait(2)
-                        end
-                        
-                        currentBossIndex = currentBossIndex + 1
                     end)
-                else
-                    FarmState.BossFarmStatus = "Disabled"
-                    currentBossIndex = 1
                 end
-                
-                task.wait(0.5)
+                task.wait(FarmState.InstaKillSpeed or 0.01)
             end
         end)
         
-        -- Boss Farm Status Display
-        local BossStatusDisplay = Tabs.BossFarm:AddParagraph({
-            Title = "Boss Farm Status (v3)",
+        -- InstaKill Status Display
+        local InstaKillStatusDisplay = Tabs.InstaKill:AddParagraph({
+            Title = "InstaKill Status",
             Content = "Initializing..."
         })
         
         task.spawn(function()
             while true do
-                local selectedText = #FarmState.AutoFarmBossSelected > 0 
-                    and table.concat(FarmState.AutoFarmBossSelected, ", ") 
-                    or "None"
-                
-                local objectiveStatus = hasObjectiveInGUI() and "YES" or "NO"
-                local missionActive = isMissionActive() and "YES" or "NO"
-                
-                BossStatusDisplay.Content = string.format(
+                InstaKillStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
-                    "Current Boss: %s\n" ..
-                    "Missions Completed: %d\n\n" ..
-                    "Mission Detection:\n" ..
-                    "- Mission Active: %s\n" ..
-                    "- Objective in GUI: %s\n\n" ..
-                    "Selected Bosses (%d):\n%s\n\n" ..
-                    "Settings:\n" ..
-                    "- Tween Speed: %d studs/s\n" ..
-                    "- Timeout: %d seconds\n\n" ..
-                    "🆕 v3 Features:\n" ..
-                    "- NPC Anchor: HumanoidRootPart anchored\n" ..
-                    "- Full Workspace Scan: All 'npc' models\n" ..
-                    "- Behind + Above: Safe teleport position\n" ..
-                    "- Objective GUI: Fallback mission detection\n" ..
-                    "- Force Kill: 5 methods guaranteed\n\n" ..
-                    "Note: Disable regular AutoFarm!",
-                    FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
-                    FarmState.BossFarmCompleted,
-                    missionActive,
-                    objectiveStatus,
-                    #FarmState.AutoFarmBossSelected,
-                    selectedText,
-                    FarmState.AutoFarmBossSpeed,
-                    FarmState.AutoFarmBossTimeout
+                    "Range: %d studs\n" ..
+                    "Cycle Speed: %.2fs\n" ..
+                    "Total Kills: %d\n" ..
+                    "Force Kill: %s (5 methods)\n" ..
+                    "Target NPCs: %s\n" ..
+                    "Target Players: %s\n\n" ..
+                    "🆕 Anti-Fall: Dead NPCs stay anchored\n" ..
+                    "🆕 5-Method Kill: Guaranteed death",
+                    FarmState.InstaKillEnabled and "[💀] ACTIVE" or "[X] INACTIVE",
+                    FarmState.InstaKillRange,
+                    FarmState.InstaKillSpeed,
+                    FarmState.InstaKillKills,
+                    FarmState.InstaKillForceKill and "YES" or "NO",
+                    FarmState.InstaKillTargetNPCs and "YES" or "NO",
+                    FarmState.InstaKillTargetPlayers and "YES" or "NO"
                 )
                 task.wait(0.5)
             end
@@ -2184,213 +1733,12 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES (KILL AURA v2 - FORCE KILL)
+        -- EXPERIMENTAL FEATURES (KillAura removed - now in InstaKill tab)
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
-            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!"
+            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\n💀 Note: InstaKill (force kill) has its own tab now!"
         })
-        
-        -- KILL AURA SECTION - ULTRA FAST FORCE KILL v2
-        Tabs.Experimental:AddSection("KillAura (ULTRA FAST FORCE KILL v2)")
-        
-        Tabs.Experimental:AddToggle("KillAuraToggle", {
-            Title = "Enable KillAura",
-            Description = "ULTRA FAST: 5-method guaranteed kill on ALL nearby Humanoids",
-            Default = Config.KillAuraEnabled
-        }):OnChanged(function(v)
-            FarmState.KillAuraEnabled = v
-            Config.KillAuraEnabled = v
-            ConfigManager.Save(Config)
-            if v then
-                ui.Fluent:Notify({
-                    Title = "[X] KillAura ACTIVATED",
-                    Content = "Ultra-fast force-kill v2 mode enabled!",
-                    Duration = 3
-                })
-            end
-        end)
-        
-        Tabs.Experimental:AddSlider("KillAuraRangeSlider", {
-            Title = "KillAura Range (studs)",
-            Description = "Maximum distance to target enemies (default: 500)",
-            Default = Config.KillAuraRange,
-            Min = 50, Max = 1000, Rounding = 0,
-            Callback = function(v)
-                FarmState.KillAuraRange = v
-                Config.KillAuraRange = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.Experimental:AddSlider("KillAuraSpeedSlider", {
-            Title = "KillAura Speed (seconds)",
-            Description = "Time between kill cycles. Lower = more aggressive (min: 0.01s)",
-            Default = Config.KillAuraSpeed,
-            Min = 0.01, Max = 0.5, Rounding = 2,
-            Callback = function(v)
-                FarmState.KillAuraSpeed = v
-                Config.KillAuraSpeed = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.Experimental:AddToggle("KillAuraNPCToggle", {
-            Title = "Target ALL NPCs",
-            Description = "Kill all NPCs in range (missions, bosses, training)",
-            Default = Config.KillAuraTargetNPCs
-        }):OnChanged(function(v)
-            FarmState.KillAuraTargetNPCs = v
-            Config.KillAuraTargetNPCs = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddToggle("KillAuraPlayerToggle", {
-            Title = "Target Players (PVP)",
-            Description = "Kill other players in range",
-            Default = Config.KillAuraTargetPlayers
-        }):OnChanged(function(v)
-            FarmState.KillAuraTargetPlayers = v
-            Config.KillAuraTargetPlayers = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddToggle("KillAuraForceKillToggle", {
-            Title = "Force Kill Mode (REQUIRED)",
-            Description = "5-method guaranteed kill (Health=0 + Dead state + BreakJoints + Anchor + NoCollide)",
-            Default = Config.KillAuraForceKill
-        }):OnChanged(function(v)
-            FarmState.KillAuraForceKill = v
-            Config.KillAuraForceKill = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddParagraph({
-            Title = "KillAura v2 Info",
-            Content = "ULTRA FAST MODE v2:\n- Scans ALL Humanoids in workspace (not just npc folder)\n- 0.01 second cycle (100 kills/sec potential)\n- 500 stud default range\n- 🆕 FORCE KILL: 5 methods guarantee death\n  1. Health = 0\n  2. HumanoidStateType.Dead\n  3. BreakJoints()\n  4. Anchor root (no falling)\n  5. CanCollide = false (no physics)\n- 🆕 ANTI-FALL: Dead NPCs stay anchored\n- No M1 attacks, no cooldowns\n\nWARNING: Very detectable! Use only in private servers!"
-        })
-        
-        -- KILL AURA LOGIC - ULTRA FAST AGGRESSIVE FORCE KILL v2
-        task.spawn(function()
-            while true do
-                if FarmState.KillAuraEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        
-                        if root and hum and hum.Health > 0 then
-                            local killCount = 0
-                            
-                            -- SCAN ALL HUMANOIDs IN WORKSPACE (not just npc folder)
-                            if FarmState.KillAuraTargetNPCs then
-                                -- Scan workspace.npc folder
-                                local npcs = workspace:FindFirstChild("npc")
-                                if npcs then
-                                    for _, npc in pairs(npcs:GetChildren()) do
-                                        if npc:IsA("Model") then
-                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-                                            local npcHum = npc:FindFirstChildOfClass("Humanoid")
-                                            
-                                            if npcRoot and npcHum and npcHum.Health > 0 then
-                                                local dist = (root.Position - npcRoot.Position).Magnitude
-                                                
-                                                if dist <= FarmState.KillAuraRange then
-                                                    if FarmState.KillAuraForceKill then
-                                                        -- 🆕 FORCE KILL: Use multi-method kill
-                                                        local killed = forceKillNPC(npc, npcRoot, npcHum)
-                                                        if killed then
-                                                            killCount = killCount + 1
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                -- Also scan workspace.bossdropmission for bosses
-                                local bossFolder = workspace:FindFirstChild("bossdropmission")
-                                if bossFolder then
-                                    for _, descendant in pairs(bossFolder:GetDescendants()) do
-                                        if descendant:IsA("Humanoid") and descendant.Health > 0 then
-                                            local model = descendant.Parent
-                                            if model and model:IsA("Model") then
-                                                local modelRoot = model:FindFirstChild("HumanoidRootPart")
-                                                if modelRoot then
-                                                    local dist = (root.Position - modelRoot.Position).Magnitude
-                                                    if dist <= FarmState.KillAuraRange then
-                                                        if FarmState.KillAuraForceKill then
-                                                            -- 🆕 FORCE KILL
-                                                            local killed = forceKillNPC(model, modelRoot, descendant)
-                                                            if killed then
-                                                                killCount = killCount + 1
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                -- Scan workspace for any stray Humanoids
-                                for _, obj in pairs(workspace:GetChildren()) do
-                                    if obj:IsA("Model") and obj ~= char then
-                                        local objRoot = obj:FindFirstChild("HumanoidRootPart")
-                                        local objHum = obj:FindFirstChildOfClass("Humanoid")
-                                        
-                                        if objRoot and objHum and objHum.Health > 0 then
-                                            -- Skip players if not targeting them
-                                            local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
-                                            if not isPlayer then
-                                                local dist = (root.Position - objRoot.Position).Magnitude
-                                                if dist <= FarmState.KillAuraRange then
-                                                    if FarmState.KillAuraForceKill then
-                                                        -- 🆕 FORCE KILL
-                                                        local killed = forceKillNPC(obj, objRoot, objHum)
-                                                        if killed then
-                                                            killCount = killCount + 1
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            -- KILL ALL PLAYERS IN RANGE
-                            if FarmState.KillAuraTargetPlayers then
-                                for _, player in pairs(Players:GetPlayers()) do
-                                    if player ~= LocalPlayer and player.Character then
-                                        local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                                        local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
-                                        
-                                        if playerRoot and playerHum and playerHum.Health > 0 then
-                                            local dist = (root.Position - playerRoot.Position).Magnitude
-                                            
-                                            if dist <= FarmState.KillAuraRange then
-                                                if FarmState.KillAuraForceKill then
-                                                    -- 🆕 FORCE KILL
-                                                    local killed = forceKillNPC(player.Character, playerRoot, playerHum)
-                                                    if killed then
-                                                        killCount = killCount + 1
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            FarmState.KillAuraKills = FarmState.KillAuraKills + killCount
-                        end
-                    end)
-                end
-                task.wait(FarmState.KillAuraSpeed or 0.01)
-            end
-        end)
         
         -- ANTI RAGDOLL SECTION
         Tabs.Experimental:AddSection("Anti Ragdoll")
@@ -2778,7 +2126,6 @@ return function(Common)
         task.spawn(function()
             while true do
                 local activeFeatures = {}
-                if FarmState.KillAuraEnabled then table.insert(activeFeatures, "KillAura") end
                 if FarmState.AntiRagdollEnabled then table.insert(activeFeatures, "AntiRagdoll") end
                 if FarmState.AntiKnockbackEnabled then table.insert(activeFeatures, "AntiKnockback") end
                 if FarmState.ESPEnabled then table.insert(activeFeatures, "ESP") end
@@ -2787,12 +2134,8 @@ return function(Common)
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Force Kill: %s (5 methods)\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    "Active Features: %d / 4\n\n%s\n\n💀 InstaKill: Moved to dedicated tab!\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
                     #activeFeatures, activeText,
-                    FarmState.KillAuraRange, FarmState.KillAuraSpeed, FarmState.KillAuraKills,
-                    FarmState.KillAuraForceKill and "YES" or "NO",
-                    FarmState.KillAuraTargetNPCs and "YES" or "NO",
-                    FarmState.KillAuraTargetPlayers and "YES" or "NO",
                     FarmState.ESPMaxDistance,
                     (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
                 )
@@ -2887,7 +2230,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Boss Farm v3 + NPC Anchor + Objective GUI)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill)",
             Duration = 5
         })
     end
