@@ -2,7 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + InstaKill (M1 Spam) 
+-- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -903,12 +903,13 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- INSTAKILL SYSTEM (M1 SPAM - DEDICATED TAB)
+        -- INSTAKILL SYSTEM (M1 SPAM + LOCAL FORCE KILL)
         -- ==========================================
         Tabs.InstaKill:AddParagraph({
-            Title = "[X] InstaKill - M1 Spam Engine",
-            Content = "Ultra-fast melee attack spam.\n\n" ..
+            Title = "[X] InstaKill - M1 Spam + Local Force Kill",
+            Content = "Ultra-fast melee attack spam + stubborn local health reset.\n\n" ..
                 "- Fires M1 (mouse1) hundreds of times per second\n" ..
+                "- 🆕 FORCE LOCAL KILL: Sets Health=0, MaxHealth=0, State=Dead, BreakJoints\n" ..
                 "- Bypasses health checks via rapid server requests\n" ..
                 "- Auto-faces target for maximum hit registration\n" ..
                 "- Optional teleport to target for close-range combat\n" ..
@@ -918,7 +919,7 @@ return function(Common)
         
         Tabs.InstaKill:AddToggle("InstaKillToggle", {
             Title = "Enable InstaKill",
-            Description = "Spam M1 attacks at extreme speed on all targets in range",
+            Description = "Spam M1 attacks + Force Local Kill on all targets in range",
             Default = Config.InstaKillEnabled
         }):OnChanged(function(v)
             FarmState.InstaKillEnabled = v
@@ -927,7 +928,7 @@ return function(Common)
             if v then
                 ui.Fluent:Notify({
                     Title = "[X] InstaKill ACTIVATED",
-                    Content = "M1 spam engine online! " .. math.floor(1/FarmState.InstaKillSpeed) .. " attacks/sec",
+                    Content = "M1 Spam + Local Force Kill online! " .. math.floor(1/FarmState.InstaKillSpeed) .. " attacks/sec",
                     Duration = 3
                 })
             end
@@ -1004,14 +1005,15 @@ return function(Common)
                 "2. Filters by range and target type (NPC/Player)\n" ..
                 "3. Teleports behind target (if enabled)\n" ..
                 "4. Faces target using CFrame.lookAt\n" ..
-                "5. Fires combat.update:FireServer('mouse1', true)\n" ..
-                "6. Waits minimal delay (0.001-0.1s)\n" ..
-                "7. Fires combat.update:FireServer('mouse1', false)\n" ..
-                "8. Repeats at extreme speed\n\n" ..
-                "This overwhelms the server with M1 requests,\ncausing massive damage per second."
+                "5. 🆕 FORCE LOCAL KILL: Sets Health=0, MaxHealth=0, State=Dead, BreakJoints\n" ..
+                "6. Fires combat.update:FireServer('mouse1', true)\n" ..
+                "7. Waits minimal delay (0.001-0.1s)\n" ..
+                "8. Fires combat.update:FireServer('mouse1', false)\n" ..
+                "9. Repeats at extreme speed\n\n" ..
+                "This overwhelms the server with M1 requests AND locally destroys the target's humanoid."
         })
         
-        -- INSTAKILL LOGIC - M1 SPAM ENGINE
+        -- INSTAKILL LOGIC - M1 SPAM ENGINE + LOCAL FORCE KILL
         task.spawn(function()
             while true do
                 if FarmState.InstaKillEnabled and LocalPlayer.Character then
@@ -1104,9 +1106,9 @@ return function(Common)
                             -- Sort by distance (closest first)
                             table.sort(targets, function(a, b) return a.distance < b.distance end)
                             
-                            -- Attack all targets with M1 spam
+                            -- Attack all targets with M1 spam + Local Force Kill
                             for _, target in ipairs(targets) do
-                                if not target.hum or target.hum.Health <= 0 or not target.root.Parent then
+                                if not target.hum or not target.root.Parent then
                                     continue
                                 end
                                 
@@ -1121,6 +1123,14 @@ return function(Common)
                                 if FarmState.InstaKillFaceTarget then
                                     root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
                                 end
+                                
+                                -- 🆕 FORCE LOCAL KILL (Stubborn Health & Humanoid Reset)
+                                pcall(function()
+                                    target.hum.Health = 0
+                                    target.hum.MaxHealth = 0
+                                    target.hum:ChangeState(Enum.HumanoidStateType.Dead)
+                                    target.model:BreakJoints()
+                                end)
                                 
                                 -- SPAM M1 ATTACK
                                 -- Fire mouse1 true (start attack)
@@ -1179,7 +1189,7 @@ return function(Common)
                     FarmState.InstaKillTargetPlayers and "YES" or "NO",
                     FarmState.InstaKillFaceTarget and "YES" or "NO",
                     FarmState.InstaKillTeleportToTarget and "YES" or "NO",
-                    FarmState.InstaKillEnabled and "M1 SPAM ENGINE RUNNING" or "DISABLED"
+                    FarmState.InstaKillEnabled and "M1 SPAM + LOCAL FORCE KILL RUNNING" or "DISABLED"
                 )
                 task.wait(0.5)
             end
@@ -1717,7 +1727,7 @@ return function(Common)
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
-            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam) has been moved to its own dedicated tab."
+            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam + Local Force Kill) has been moved to its own dedicated tab."
         })
         
         -- ANTI RAGDOLL SECTION
@@ -2210,7 +2220,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill M1 Spam)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill M1 Spam + Local Force Kill)",
             Duration = 5
         })
     end
