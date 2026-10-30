@@ -1194,7 +1194,7 @@ return function(Common)
                         end
                         
                         local nearestNPC = nil
-                        local nearestDist = 500 -- Max search distance
+                        local nearestDist = 2500 -- Max search distance
                         
                         for _, npc in pairs(npcs:GetChildren()) do
                             if npc:IsA("Model") then
