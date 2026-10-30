@@ -1,9 +1,8 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm M1 + Auto Stats + Godmode + Position Control
+-- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
--- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
+// Mission Protection: Auto-cancel non-green missions
 -- // ==========================================
 
 return function(Common)
@@ -14,7 +13,6 @@ return function(Common)
     local TweenService = Common.TweenService
     local RunService = Common.RunService
     local UserInputService = Common.UserInputService
-    local Players = Common.Players
     
     local placeId = game.PlaceId
     local isShindoMenu = (placeId == 4616652839)
@@ -48,31 +46,19 @@ return function(Common)
             AutoStatsMinPoints = 5,
             GodModeEnabled = false,
             FakeHealthValue = 999999,
-            AutoSkillREnabled = false, AutoSkillTEnabled = false,
-            AutoSkillYEnabled = false, AutoSkillFEnabled = false,
-            AutoSkillGEnabled = false, AutoSkillHEnabled = false,
-            AutoSkillVEnabled = false, AutoSkillBEnabled = false,
-            AutoSkillNEnabled = false, AutoSkillQEnabled = false,
-            AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
-            -- InstaKill Config
-            InstaKillEnabled = false,
-            InstaKillRange = 60,
-            InstaKillSpeed = 0.003,
-            InstaKillTargetNPCs = true,
-            InstaKillTargetPlayers = true,
-            InstaKillFaceTarget = true,
-            InstaKillTeleportToTarget = false,
-            -- Experimental Config
-            AntiRagdollEnabled = false,
-            AntiKnockbackEnabled = false,
-            ESPEnabled = false,
-            ESPShowNames = true,
-            ESPShowDistance = true,
-            ESPShowHealth = true,
-            ESPMaxDistance = 500,
-            ESPFillColor = {R = 255, G = 0, B = 0},
-            ESPOutlineColor = {R = 255, G = 255, B = 0},
-            StunGrabImmunityEnabled = false
+            -- Auto Skill Spammer Config
+            AutoSkillREnabled = false,
+            AutoSkillTEnabled = false,
+            AutoSkillYEnabled = false,
+            AutoSkillFEnabled = false,
+            AutoSkillGEnabled = false,
+            AutoSkillHEnabled = false,
+            AutoSkillVEnabled = false,
+            AutoSkillBEnabled = false,
+            AutoSkillNEnabled = false,
+            AutoSkillQEnabled = false,
+            AutoSkillEEnabled = false,
+            AutoSkillSpamSpeed = 0.2
         }
     end
     
@@ -103,27 +89,42 @@ return function(Common)
     -- Shared state: current target for continuous facing
     local currentTargetNPC = nil
     
-    -- M1 Attack Helper
+    -- M1 Attack Helper - FIXED: looks UP at target from below
     local lastM1Time = 0
     local function attackM1(targetHRP)
         local char = LocalPlayer.Character
         if not char then return false end
+        
         local root = char:FindFirstChild("HumanoidRootPart")
         local combat = char:FindFirstChild("combat")
         if not root or not combat then return false end
+        
+        -- Check cooldown
         local now = tick()
-        if now - lastM1Time < (Config.AutoFarmM1Cooldown or 0.3) then return false end
+        if now - lastM1Time < (Config.AutoFarmM1Cooldown or 0.3) then
+            return false
+        end
+        
+        -- Face target - LOOK UP from below (no Y-axis zeroing)
         if targetHRP then
             local targetPos = targetHRP.Position
             root.CFrame = CFrame.lookAt(root.Position, targetPos)
         end
-        local ok = pcall(function() combat.update:FireServer("mouse1", true) end)
+        
+        -- Fire M1
+        local ok = pcall(function()
+            combat.update:FireServer("mouse1", true)
+        end)
+        
         if ok then
             lastM1Time = now
             task.delay(0.05, function()
-                pcall(function() combat.update:FireServer("mouse1", false) end)
+                pcall(function()
+                    combat.update:FireServer("mouse1", false)
+                end)
             end)
         end
+        
         return ok
     end
     
@@ -150,6 +151,7 @@ return function(Common)
         if not statz then return 0 end
         local lvl = statz:FindFirstChild("lvl")
         if not lvl then return 0 end
+        
         if statName == "ninjutsu" then
             local nin = lvl:FindFirstChild("nin")
             return nin and nin.Value or 0
@@ -461,14 +463,12 @@ return function(Common)
     else
         Tabs.Main = ui.Window:AddTab({ Title = "AutoFarm", Icon = "target" })
         Tabs.Godmode = ui.Window:AddTab({ Title = "Godmode", Icon = "shield" })
-        Tabs.InstaKill = ui.Window:AddTab({ Title = "InstaKill", Icon = "crosshair" })
         Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
         Tabs.Stats = ui.Window:AddTab({ Title = "Auto Stats", Icon = "trending-up" })
         Tabs.Skills = ui.Window:AddTab({ Title = "Oto Skill", Icon = "zap" })
         Tabs.Chakra = ui.Window:AddTab({ Title = "Auto Chakra", Icon = "activity" })
-        Tabs.Experimental = ui.Window:AddTab({ Title = "Experimental", Icon = "flask-conical" })
         Tabs.Utilities = ui.Window:AddTab({ Title = "Utilities", Icon = "tool" })
         
         local FarmState = {
@@ -487,6 +487,7 @@ return function(Common)
             AutoStatsHpEnabled = Config.AutoStatsHpEnabled,
             GodModeEnabled = Config.GodModeEnabled,
             FakeHealthValue = Config.FakeHealthValue or 999999,
+            -- Auto Skill Spammer State
             AutoSkillREnabled = Config.AutoSkillREnabled,
             AutoSkillTEnabled = Config.AutoSkillTEnabled,
             AutoSkillYEnabled = Config.AutoSkillYEnabled,
@@ -499,64 +500,11 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
-            -- InstaKill State
-            InstaKillEnabled = Config.InstaKillEnabled,
-            InstaKillRange = Config.InstaKillRange or 60,
-            InstaKillSpeed = Config.InstaKillSpeed or 0.003,
-            InstaKillTargetNPCs = Config.InstaKillTargetNPCs,
-            InstaKillTargetPlayers = Config.InstaKillTargetPlayers,
-            InstaKillFaceTarget = Config.InstaKillFaceTarget,
-            InstaKillTeleportToTarget = Config.InstaKillTeleportToTarget,
-            InstaKillKills = 0,
-            -- Experimental State
-            AntiRagdollEnabled = Config.AntiRagdollEnabled,
-            AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
-            ESPEnabled = Config.ESPEnabled,
-            ESPShowNames = Config.ESPShowNames,
-            ESPShowDistance = Config.ESPShowDistance,
-            ESPShowHealth = Config.ESPShowHealth,
-            ESPMaxDistance = Config.ESPMaxDistance or 500,
-            ESPFillColor = Color3.new(
-                (Config.ESPFillColor and Config.ESPFillColor.R or 255)/255,
-                (Config.ESPFillColor and Config.ESPFillColor.G or 0)/255,
-                (Config.ESPFillColor and Config.ESPFillColor.B or 0)/255
-            ),
-            ESPOutlineColor = Color3.new(
-                (Config.ESPOutlineColor and Config.ESPOutlineColor.R or 255)/255,
-                (Config.ESPOutlineColor and Config.ESPOutlineColor.G or 255)/255,
-                (Config.ESPOutlineColor and Config.ESPOutlineColor.B or 0)/255
-            ),
-            StunGrabImmunityEnabled = Config.StunGrabImmunityEnabled,
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
             SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0}
         }
-        
-        -- !cancel command helper
-        local function sendCancelCommand()
-            pcall(function()
-                local TextChatService = game:GetService("TextChatService")
-                if TextChatService then
-                    local channel = TextChatService:WaitForChild("TextChannels", 2)
-                    if channel then
-                        local rbxGeneral = channel:FindFirstChild("RBXGeneral")
-                        if rbxGeneral then
-                            rbxGeneral:SendAsync("!cancel")
-                        end
-                    end
-                end
-            end)
-            pcall(function()
-                local vc = workspace:FindFirstChild("VC")
-                if vc then
-                    local remote = vc:FindFirstChild("RemoteEvent")
-                    if remote then
-                        remote:FireServer("!cancel")
-                    end
-                end
-            end)
-        end
         
         -- ==========================================
         -- CONTINUOUS FACING LOOP
@@ -566,13 +514,16 @@ return function(Common)
                 currentTargetNPC = nil
                 return
             end
+            
             local char = LocalPlayer.Character
             if not char then return end
             local root = char:FindFirstChild("HumanoidRootPart")
             if not root then return end
+            
             if currentTargetNPC and currentTargetNPC.Parent then
                 local npcRoot = currentTargetNPC:FindFirstChild("HumanoidRootPart")
                 local npcHum = currentTargetNPC:FindFirstChild("Humanoid")
+                
                 if npcRoot and npcHum and npcHum.Health > 0 then
                     local targetPos = npcRoot.Position
                     root.CFrame = CFrame.lookAt(root.Position, targetPos)
@@ -599,9 +550,17 @@ return function(Common)
             Config.GodModeEnabled = v
             ConfigManager.Save(Config)
             if v then
-                ui.Fluent:Notify({Title = "[G] Godmode Enabled", Content = "You are now invincible!", Duration = 3})
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Enabled",
+                    Content = "You are now invincible!",
+                    Duration = 3
+                })
             else
-                ui.Fluent:Notify({Title = "[G] Godmode Disabled", Content = "Normal health restored", Duration = 3})
+                ui.Fluent:Notify({
+                    Title = "[G] Godmode Disabled",
+                    Content = "Normal health restored",
+                    Duration = 3
+                })
             end
         end)
         
@@ -623,10 +582,13 @@ return function(Common)
                     pcall(function()
                         local char = LocalPlayer.Character
                         local hum = char:FindFirstChildOfClass("Humanoid")
+                        
                         if hum and hum.Health > 0 then
                             hum.Health = hum.MaxHealth
                             local fakehealth = char:FindFirstChild("fakehealth")
-                            if fakehealth then fakehealth.Value = FarmState.FakeHealthValue end
+                            if fakehealth then
+                                fakehealth.Value = FarmState.FakeHealthValue
+                            end
                         end
                     end)
                 end
@@ -634,25 +596,39 @@ return function(Common)
             end
         end)
         
-        local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({Title = "Godmode Status", Content = "Initializing..."})
+        local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({
+            Title = "Godmode Status",
+            Content = "Initializing..."
+        })
+        
         task.spawn(function()
             while true do
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 local fakehealth = char and char:FindFirstChild("fakehealth")
+                
                 local healthStr = "N/A"
                 local maxHealthStr = "N/A"
                 local fakeHealthStr = "N/A"
+                
                 if hum then
                     healthStr = tostring(math.floor(hum.Health))
                     maxHealthStr = tostring(math.floor(hum.MaxHealth))
                 end
-                if fakehealth then fakeHealthStr = tostring(fakehealth.Value) end
+                
+                if fakehealth then
+                    fakeHealthStr = tostring(fakehealth.Value)
+                end
+                
                 GodmodeStatusDisplay.Content = string.format(
-                    "Status: %s\n\nHealth: %s / %s\nfakehealth Value: %s\nTarget fakehealth: %d\n\nGodmode: %s",
+                    "Status: %s\n\nHealth: %s / %s\nfakehealth Value: %s\nTarget fakehealth: %d\n\nGodmode: %s\n\nNote: Godmode prevents death by keeping\nhealth at max and fakehealth at %d",
                     FarmState.GodModeEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    healthStr, maxHealthStr, fakeHealthStr, FarmState.FakeHealthValue,
-                    FarmState.GodModeEnabled and "ENABLED" or "DISABLED"
+                    healthStr,
+                    maxHealthStr,
+                    fakeHealthStr,
+                    FarmState.FakeHealthValue,
+                    FarmState.GodModeEnabled and "ENABLED" or "DISABLED",
+                    FarmState.FakeHealthValue
                 )
                 task.wait(0.5)
             end
@@ -674,7 +650,9 @@ return function(Common)
             FarmState.AutoFarmEnabled = v
             Config.AutoFarmEnabled = v
             ConfigManager.Save(Config)
-            if not v then currentTargetNPC = nil end
+            if not v then
+                currentTargetNPC = nil
+            end
         end)
         
         Tabs.Main:AddToggle("AutoFarmUseM1Toggle", {
@@ -761,7 +739,9 @@ return function(Common)
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
                                 and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
                             
-                            if missionGui and missionGui.Visible then hasMission = true end
+                            if missionGui and missionGui.Visible then
+                                hasMission = true
+                            end
                             
                             if not hasMission then
                                 currentTargetNPC = nil
@@ -773,6 +753,7 @@ return function(Common)
                                         and LocalPlayer.statz.lvl.lvl.Value or 0
                                     
                                     local green = "http://www.roblox.com/asset/?id=5459241648"
+                                    local red = "http://www.roblox.com/asset/?id=5459241799"
                                     
                                     for _, giver in pairs(missionGivers:GetChildren()) do
                                         if giver:FindFirstChild("Head") 
@@ -781,6 +762,7 @@ return function(Common)
                                             
                                             local talk = giver:FindFirstChild("Talk")
                                             local shouldAccept = false
+                                            local missionColor = nil
                                             
                                             if lvl <= 699 then
                                                 if talk and talk:FindFirstChild("typ") 
@@ -789,6 +771,7 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
+                                                    missionColor = green
                                                 end
                                             else
                                                 if talk and talk:FindFirstChild("typ") 
@@ -797,6 +780,7 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
+                                                    missionColor = green
                                                 end
                                             end
                                             
@@ -816,10 +800,11 @@ return function(Common)
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
                                                         
-                                                        -- MISSION PROTECTION
+                                                        -- MISSION PROTECTION: Check if accepted mission is green
                                                         task.wait(0.5)
                                                         local acceptedMission = LocalPlayer:FindFirstChild("currentmission")
                                                         if acceptedMission and acceptedMission.Value ~= nil and acceptedMission.Value ~= "" then
+                                                            -- Re-check the giver's mission color after acceptance
                                                             local currentColor = nil
                                                             if giver:FindFirstChild("Head") 
                                                                 and giver.Head:FindFirstChild("givemission")
@@ -827,17 +812,44 @@ return function(Common)
                                                                 currentColor = giver.Head.givemission.color.Image
                                                             end
                                                             
+                                                            -- If mission color is NOT green, cancel it
                                                             if currentColor and currentColor ~= green then
                                                                 ui.Fluent:Notify({
                                                                     Title = "[!] Mission Protection",
                                                                     Content = "Non-green mission detected! Cancelling...",
                                                                     Duration = 3
                                                                 })
-                                                                sendCancelCommand()
-                                                                task.wait(1)
+                                                                
+                                                                -- Send !cancel to chat
+                                                                pcall(function()
+                                                                    local TextChatService = game:GetService("TextChatService")
+                                                                    if TextChatService then
+                                                                        local channel = TextChatService:WaitForChild("TextChannels", 2)
+                                                                        if channel then
+                                                                            local rbxGeneral = channel:FindFirstChild("RBXGeneral")
+                                                                            if rbxGeneral then
+                                                                                rbxGeneral:SendAsync("!cancel")
+                                                                            end
+                                                                        end
+                                                                    end
+                                                                end)
+                                                                
+                                                                -- Fallback: try workspace.VC remote
+                                                                pcall(function()
+                                                                    local vc = workspace:FindFirstChild("VC")
+                                                                    if vc then
+                                                                        local remote = vc:FindFirstChild("RemoteEvent")
+                                                                        if remote then
+                                                                            remote:FireServer("!cancel")
+                                                                        end
+                                                                    end
+                                                                end)
+                                                                
+                                                                task.wait(1) -- Wait for cancel to process
                                                             end
                                                         end
-                                                        task.wait(1)
+                                                        
+                                                        task.wait(1) -- Wait for mission to register on server
                                                     end
                                                 end
                                                 break
@@ -849,6 +861,7 @@ return function(Common)
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local killed = false
+                                    
                                     for _, npc in pairs(npcs:GetChildren()) do
                                         if npc:IsA("Model") 
                                             and npc:FindFirstChild("HumanoidRootPart")
@@ -872,13 +885,20 @@ return function(Common)
                                                 if FarmState.AutoFarmUseM1 then
                                                     local attackCount = 0
                                                     local maxAttacks = 10
+                                                    
                                                     while npc.Humanoid.Health > 0 and attackCount < maxAttacks do
                                                         attackM1(npcRoot)
                                                         attackCount = attackCount + 1
                                                         task.wait(Config.AutoFarmM1Cooldown or 0.3)
-                                                        if not npc.Parent or npc.Humanoid.Health <= 0 then break end
+                                                        
+                                                        if not npc.Parent or npc.Humanoid.Health <= 0 then
+                                                            break
+                                                        end
                                                     end
-                                                    if npc.Humanoid.Health <= 0 then killed = true end
+                                                    
+                                                    if npc.Humanoid.Health <= 0 then
+                                                        killed = true
+                                                    end
                                                 else
                                                     npc.Humanoid.Health = 0
                                                     killed = true
@@ -887,6 +907,7 @@ return function(Common)
                                             break
                                         end
                                     end
+                                    
                                     if not killed then
                                         currentTargetNPC = nil
                                         task.wait(0.5)
@@ -898,299 +919,6 @@ return function(Common)
                 else
                     currentTargetNPC = nil
                 end
-                task.wait(0.5)
-            end
-        end)
-        
-        -- ==========================================
-        -- INSTAKILL SYSTEM (M1 SPAM + LOCAL FORCE KILL)
-        -- ==========================================
-        Tabs.InstaKill:AddParagraph({
-            Title = "[X] InstaKill - M1 Spam + Local Force Kill",
-            Content = "Ultra-fast melee attack spam + stubborn local health reset.\n\n" ..
-                "- Fires M1 (mouse1) hundreds of times per second\n" ..
-                "- 🆕 FORCE LOCAL KILL: Sets Health=0, MaxHealth=0, State=Dead, BreakJoints\n" ..
-                "- Bypasses health checks via rapid server requests\n" ..
-                "- Auto-faces target for maximum hit registration\n" ..
-                "- Optional teleport to target for close-range combat\n" ..
-                "- Works on NPCs and/or Players\n\n" ..
-                "WARNING: Extremely detectable! Use only in private servers."
-        })
-        
-        Tabs.InstaKill:AddToggle("InstaKillToggle", {
-            Title = "Enable InstaKill",
-            Description = "Spam M1 attacks + Force Local Kill on all targets in range",
-            Default = Config.InstaKillEnabled
-        }):OnChanged(function(v)
-            FarmState.InstaKillEnabled = v
-            Config.InstaKillEnabled = v
-            ConfigManager.Save(Config)
-            if v then
-                ui.Fluent:Notify({
-                    Title = "[X] InstaKill ACTIVATED",
-                    Content = "M1 Spam + Local Force Kill online! " .. math.floor(1/FarmState.InstaKillSpeed) .. " attacks/sec",
-                    Duration = 3
-                })
-            end
-        end)
-        
-        Tabs.InstaKill:AddSlider("InstaKillRangeSlider", {
-            Title = "InstaKill Range (studs)",
-            Description = "Maximum distance to target enemies (default: 60)",
-            Default = Config.InstaKillRange,
-            Min = 10, Max = 500, Rounding = 0,
-            Callback = function(v)
-                FarmState.InstaKillRange = v
-                Config.InstaKillRange = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.InstaKill:AddSlider("InstaKillSpeedSlider", {
-            Title = "M1 Spam Speed (seconds)",
-            Description = "Delay between M1 attacks. Lower = faster (min: 0.001s = 1000 atk/s)",
-            Default = Config.InstaKillSpeed,
-            Min = 0.001, Max = 0.1, Rounding = 3,
-            Callback = function(v)
-                FarmState.InstaKillSpeed = v
-                Config.InstaKillSpeed = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.InstaKill:AddToggle("InstaKillNPCToggle", {
-            Title = "Target NPCs",
-            Description = "Attack all NPCs in range (missions, bosses, training)",
-            Default = Config.InstaKillTargetNPCs
-        }):OnChanged(function(v)
-            FarmState.InstaKillTargetNPCs = v
-            Config.InstaKillTargetNPCs = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.InstaKill:AddToggle("InstaKillPlayerToggle", {
-            Title = "Target Players (PVP)",
-            Description = "Attack other players in range",
-            Default = Config.InstaKillTargetPlayers
-        }):OnChanged(function(v)
-            FarmState.InstaKillTargetPlayers = v
-            Config.InstaKillTargetPlayers = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.InstaKill:AddToggle("InstaKillFaceToggle", {
-            Title = "Auto-Face Target",
-            Description = "Automatically rotate to face the target (required for M1 hits)",
-            Default = Config.InstaKillFaceTarget
-        }):OnChanged(function(v)
-            FarmState.InstaKillFaceTarget = v
-            Config.InstaKillFaceTarget = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.InstaKill:AddToggle("InstaKillTeleportToggle", {
-            Title = "Teleport to Target",
-            Description = "Instantly teleport behind target before attacking",
-            Default = Config.InstaKillTeleportToTarget
-        }):OnChanged(function(v)
-            FarmState.InstaKillTeleportToTarget = v
-            Config.InstaKillTeleportToTarget = v
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.InstaKill:AddParagraph({
-            Title = "InstaKill Mechanics",
-            Content = "How it works:\n\n" ..
-                "1. Scans all Humanoids in workspace\n" ..
-                "2. Filters by range and target type (NPC/Player)\n" ..
-                "3. Teleports behind target (if enabled)\n" ..
-                "4. Faces target using CFrame.lookAt\n" ..
-                "5. 🆕 FORCE LOCAL KILL: Sets Health=0, MaxHealth=0, State=Dead, BreakJoints\n" ..
-                "6. Fires combat.update:FireServer('mouse1', true)\n" ..
-                "7. Waits minimal delay (0.001-0.1s)\n" ..
-                "8. Fires combat.update:FireServer('mouse1', false)\n" ..
-                "9. Repeats at extreme speed\n\n" ..
-                "This overwhelms the server with M1 requests AND locally destroys the target's humanoid."
-        })
-        
-        -- INSTAKILL LOGIC - M1 SPAM ENGINE + LOCAL FORCE KILL
-        task.spawn(function()
-            while true do
-                if FarmState.InstaKillEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        local combat = char:FindFirstChild("combat")
-                        
-                        if root and hum and combat and hum.Health > 0 then
-                            local killCount = 0
-                            local targets = {}
-                            
-                            -- Collect all valid targets
-                            if FarmState.InstaKillTargetNPCs then
-                                -- Scan workspace.npc folder
-                                local npcs = workspace:FindFirstChild("npc")
-                                if npcs then
-                                    for _, npc in pairs(npcs:GetChildren()) do
-                                        if npc:IsA("Model") then
-                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-                                            local npcHum = npc:FindFirstChildOfClass("Humanoid")
-                                            
-                                            if npcRoot and npcHum and npcHum.Health > 0 then
-                                                local dist = (root.Position - npcRoot.Position).Magnitude
-                                                
-                                                if dist <= FarmState.InstaKillRange then
-                                                    table.insert(targets, {
-                                                        model = npc,
-                                                        root = npcRoot,
-                                                        hum = npcHum,
-                                                        name = npc.Name,
-                                                        distance = dist
-                                                    })
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                -- Scan workspace for any other NPCs
-                                for _, obj in pairs(workspace:GetChildren()) do
-                                    if obj:IsA("Model") and obj ~= char then
-                                        local objRoot = obj:FindFirstChild("HumanoidRootPart")
-                                        local objHum = obj:FindFirstChildOfClass("Humanoid")
-                                        
-                                        if objRoot and objHum and objHum.Health > 0 then
-                                            local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
-                                            if not isPlayer then
-                                                local dist = (root.Position - objRoot.Position).Magnitude
-                                                if dist <= FarmState.InstaKillRange then
-                                                    table.insert(targets, {
-                                                        model = obj,
-                                                        root = objRoot,
-                                                        hum = objHum,
-                                                        name = obj.Name,
-                                                        distance = dist
-                                                    })
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            -- Add players if targeting enabled
-                            if FarmState.InstaKillTargetPlayers then
-                                for _, player in pairs(Players:GetPlayers()) do
-                                    if player ~= LocalPlayer and player.Character then
-                                        local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                                        local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
-                                        
-                                        if playerRoot and playerHum and playerHum.Health > 0 then
-                                            local dist = (root.Position - playerRoot.Position).Magnitude
-                                            
-                                            if dist <= FarmState.InstaKillRange then
-                                                table.insert(targets, {
-                                                    model = player.Character,
-                                                    root = playerRoot,
-                                                    hum = playerHum,
-                                                    name = player.Name,
-                                                    distance = dist
-                                                })
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            -- Sort by distance (closest first)
-                            table.sort(targets, function(a, b) return a.distance < b.distance end)
-                            
-                            -- Attack all targets with M1 spam + Local Force Kill
-                            for _, target in ipairs(targets) do
-                                if not target.hum or not target.root.Parent then
-                                    continue
-                                end
-                                
-                                -- Teleport to target if enabled
-                                if FarmState.InstaKillTeleportToTarget then
-                                    local behindOffset = -target.root.CFrame.LookVector * 3
-                                    local targetCFrame = CFrame.new(target.root.Position + behindOffset)
-                                    root.CFrame = targetCFrame
-                                end
-                                
-                                -- Face the target
-                                if FarmState.InstaKillFaceTarget then
-                                    root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
-                                end
-                                
-                                -- 🆕 FORCE LOCAL KILL (Stubborn Health & Humanoid Reset)
-                                pcall(function()
-                                    target.hum.Health = 0
-                                    target.hum.MaxHealth = 0
-                                    target.hum:ChangeState(Enum.HumanoidStateType.Dead)
-                                    target.model:BreakJoints()
-                                end)
-                                
-                                -- SPAM M1 ATTACK
-                                -- Fire mouse1 true (start attack)
-                                pcall(function()
-                                    combat.update:FireServer("mouse1", true)
-                                end)
-                                
-                                -- Minimal delay
-                                task.wait(FarmState.InstaKillSpeed)
-                                
-                                -- Fire mouse1 false (end attack)
-                                pcall(function()
-                                    combat.update:FireServer("mouse1", false)
-                                end)
-                                
-                                -- Check if target died
-                                if target.hum.Health <= 0 or not target.model.Parent then
-                                    killCount = killCount + 1
-                                end
-                            end
-                            
-                            FarmState.InstaKillKills = FarmState.InstaKillKills + killCount
-                        end
-                    end)
-                end
-                task.wait(FarmState.InstaKillSpeed or 0.003)
-            end
-        end)
-        
-        -- InstaKill Status Display
-        local InstaKillStatusDisplay = Tabs.InstaKill:AddParagraph({
-            Title = "InstaKill Status",
-            Content = "Initializing..."
-        })
-        
-        task.spawn(function()
-            while true do
-                local attacksPerSec = math.floor(1 / (FarmState.InstaKillSpeed or 0.003))
-                
-                InstaKillStatusDisplay.Content = string.format(
-                    "Status: %s\n\n" ..
-                    "Attack Speed: %d attacks/sec\n" ..
-                    "Range: %d studs\n" ..
-                    "Total Kills: %d\n\n" ..
-                    "Settings:\n" ..
-                    "- Target NPCs: %s\n" ..
-                    "- Target Players: %s\n" ..
-                    "- Auto-Face: %s\n" ..
-                    "- Teleport: %s\n\n" ..
-                    "Active: %s",
-                    FarmState.InstaKillEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    attacksPerSec,
-                    FarmState.InstaKillRange,
-                    FarmState.InstaKillKills,
-                    FarmState.InstaKillTargetNPCs and "YES" or "NO",
-                    FarmState.InstaKillTargetPlayers and "YES" or "NO",
-                    FarmState.InstaKillFaceTarget and "YES" or "NO",
-                    FarmState.InstaKillTeleportToTarget and "YES" or "NO",
-                    FarmState.InstaKillEnabled and "M1 SPAM + LOCAL FORCE KILL RUNNING" or "DISABLED"
-                )
                 task.wait(0.5)
             end
         end)
@@ -1234,8 +962,10 @@ return function(Common)
                                                 Content = "Teleporting to scroll...",
                                                 Duration = 2
                                             })
+                                            
                                             toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                             task.wait(0.1)
+                                            
                                             invoke:FireServer(LocalPlayer)
                                             fireclickdetector(clickDetector)
                                         end
@@ -1257,8 +987,10 @@ return function(Common)
                                             Content = "Teleporting to scroll...",
                                             Duration = 2
                                         })
+                                        
                                         toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                         task.wait(0.1)
+                                        
                                         invoke:FireServer(LocalPlayer)
                                         fireclickdetector(clickDetector)
                                     end
@@ -1309,6 +1041,7 @@ return function(Common)
                             
                             if root and hum and hum.Health > 0 then
                                 hum:ChangeState(11)
+                                
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local zetsu = warserver:FindFirstChild("zetsu")
@@ -1445,65 +1178,121 @@ return function(Common)
             end
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsNinToggle", {Title = "Auto NIN (Ninjutsu)", Default = Config.AutoStatsNinEnabled}):OnChanged(function(v)
-            FarmState.AutoStatsNinEnabled = v; Config.AutoStatsNinEnabled = v; ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsNinToggle", {
+            Title = "Auto NIN (Ninjutsu)",
+            Description = "Add points to Ninjutsu stat",
+            Default = Config.AutoStatsNinEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoStatsNinEnabled = v
+            Config.AutoStatsNinEnabled = v
+            ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsTaiToggle", {Title = "Auto TAI (Taijutsu)", Default = Config.AutoStatsTaiEnabled}):OnChanged(function(v)
-            FarmState.AutoStatsTaiEnabled = v; Config.AutoStatsTaiEnabled = v; ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsTaiToggle", {
+            Title = "Auto TAI (Taijutsu)",
+            Description = "Add points to Taijutsu stat",
+            Default = Config.AutoStatsTaiEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoStatsTaiEnabled = v
+            Config.AutoStatsTaiEnabled = v
+            ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsChiToggle", {Title = "Auto CHI (Chakra)", Default = Config.AutoStatsChiEnabled}):OnChanged(function(v)
-            FarmState.AutoStatsChiEnabled = v; Config.AutoStatsChiEnabled = v; ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsChiToggle", {
+            Title = "Auto CHI (Chakra)",
+            Description = "Add points to Chakra stat",
+            Default = Config.AutoStatsChiEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoStatsChiEnabled = v
+            Config.AutoStatsChiEnabled = v
+            ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsHpToggle", {Title = "Auto HP (Health)", Default = Config.AutoStatsHpEnabled}):OnChanged(function(v)
-            FarmState.AutoStatsHpEnabled = v; Config.AutoStatsHpEnabled = v; ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsHpToggle", {
+            Title = "Auto HP (Health)",
+            Description = "Add points to Health stat",
+            Default = Config.AutoStatsHpEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoStatsHpEnabled = v
+            Config.AutoStatsHpEnabled = v
+            ConfigManager.Save(Config)
         end)
         
         Tabs.Stats:AddSlider("AutoStatsIntervalSlider", {
-            Title = "Check Interval (seconds)", Default = Config.AutoStatsInterval,
+            Title = "Check Interval (seconds)",
+            Description = "How often to check for available points",
+            Default = Config.AutoStatsInterval,
             Min = 1, Max = 10, Rounding = 0,
-            Callback = function(v) Config.AutoStatsInterval = v; ConfigManager.Save(Config) end
+            Callback = function(v)
+                Config.AutoStatsInterval = v
+                ConfigManager.Save(Config)
+            end
         })
         
         Tabs.Stats:AddSlider("AutoStatsMinPointsSlider", {
-            Title = "Minimum Points to Spend", Default = Config.AutoStatsMinPoints,
+            Title = "Minimum Points to Spend",
+            Description = "Only spend points when you have at least this many",
+            Default = Config.AutoStatsMinPoints,
             Min = 1, Max = 50, Rounding = 0,
-            Callback = function(v) Config.AutoStatsMinPoints = v; ConfigManager.Save(Config) end
+            Callback = function(v)
+                Config.AutoStatsMinPoints = v
+                ConfigManager.Save(Config)
+            end
         })
         
-        Tabs.Stats:AddButton({Title = "Add All Points to NIN", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Available Points to NIN", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("ninjutsu", points)
-                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to NIN" or "Failed", Duration = 3})
+                if ok then
+                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to NIN", Duration = 3})
+                else
+                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
+                end
             else
-                ui.Fluent:Notify({Title = "[!]", Content = "No points", Duration = 2})
+                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Points to TAI", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Available Points to TAI", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("taijutsu", points)
-                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to TAI" or "Failed", Duration = 3})
+                if ok then
+                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to TAI", Duration = 3})
+                else
+                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
+                end
+            else
+                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Points to CHI", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Available Points to CHI", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("chakra", points)
-                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to CHI" or "Failed", Duration = 3})
+                if ok then
+                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to CHI", Duration = 3})
+                else
+                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
+                end
+            else
+                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Points to HP", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Available Points to HP", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("health", points)
-                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to HP" or "Failed", Duration = 3})
+                if ok then
+                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to HP", Duration = 3})
+                else
+                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
+                end
+            else
+                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
             end
         end})
         
@@ -1512,15 +1301,26 @@ return function(Common)
                 if FarmState.AutoStatsEnabled then
                     pcall(function()
                         local points = getStatPoints()
+                        
                         if points >= (Config.AutoStatsMinPoints or 5) then
                             local statsToDistribute = {}
-                            if FarmState.AutoStatsNinEnabled then table.insert(statsToDistribute, "ninjutsu") end
-                            if FarmState.AutoStatsTaiEnabled then table.insert(statsToDistribute, "taijutsu") end
-                            if FarmState.AutoStatsChiEnabled then table.insert(statsToDistribute, "chakra") end
-                            if FarmState.AutoStatsHpEnabled then table.insert(statsToDistribute, "health") end
+                            
+                            if FarmState.AutoStatsNinEnabled then
+                                table.insert(statsToDistribute, "ninjutsu")
+                            end
+                            if FarmState.AutoStatsTaiEnabled then
+                                table.insert(statsToDistribute, "taijutsu")
+                            end
+                            if FarmState.AutoStatsChiEnabled then
+                                table.insert(statsToDistribute, "chakra")
+                            end
+                            if FarmState.AutoStatsHpEnabled then
+                                table.insert(statsToDistribute, "health")
+                            end
                             
                             if #statsToDistribute > 0 then
                                 local pointsPerStat = math.floor(points / #statsToDistribute)
+                                
                                 for _, statName in ipairs(statsToDistribute) do
                                     if pointsPerStat > 0 then
                                         local ok = addStat(statName, pointsPerStat)
@@ -1530,11 +1330,13 @@ return function(Common)
                                         task.wait(0.2)
                                     end
                                 end
+                                
                                 local remaining = points - (pointsPerStat * #statsToDistribute)
                                 if remaining > 0 and #statsToDistribute > 0 then
                                     addStat(statsToDistribute[1], remaining)
                                     FarmState.StatsAdded[statsToDistribute[1]] = (FarmState.StatsAdded[statsToDistribute[1]] or 0) + remaining
                                 end
+                                
                                 ui.Fluent:Notify({
                                     Title = "[S] Stats Distributed",
                                     Content = "Spent " .. points .. " points across " .. #statsToDistribute .. " stats",
@@ -1548,7 +1350,11 @@ return function(Common)
             end
         end)
         
-        local StatsStatusDisplay = Tabs.Stats:AddParagraph({Title = "Stats Status", Content = "Initializing..."})
+        local StatsStatusDisplay = Tabs.Stats:AddParagraph({
+            Title = "Stats Status",
+            Content = "Initializing..."
+        })
+        
         task.spawn(function()
             while true do
                 local points = getStatPoints()
@@ -1558,17 +1364,19 @@ return function(Common)
                 local hpLvl = getStatLevel("health")
                 
                 StatsStatusDisplay.Content = string.format(
-                    "Status: %s\n\nAvailable Points: %d\nMin to Spend: %d\nCheck Interval: %ds\n\nCurrent Levels:\n- NIN: %d (+%d)\n- TAI: %d (+%d)\n- CHI: %d (+%d)\n- HP: %d (+%d)\n\nEnabled: NIN:%s TAI:%s CHI:%s HP:%s",
-                    FarmState.AutoStatsEnabled and "[OK]" or "[X]",
-                    points, Config.AutoStatsMinPoints, Config.AutoStatsInterval,
+                    "Status: %s\n\nAvailable Points: %d\nMin to Spend: %d\nCheck Interval: %ds\n\nCurrent Levels:\n- NIN: %d (+%d added)\n- TAI: %d (+%d added)\n- CHI: %d (+%d added)\n- HP: %d (+%d added)\n\nEnabled Stats:\n- NIN: %s\n- TAI: %s\n- CHI: %s\n- HP: %s",
+                    FarmState.AutoStatsEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+                    points,
+                    Config.AutoStatsMinPoints,
+                    Config.AutoStatsInterval,
                     ninLvl, FarmState.StatsAdded.ninjutsu or 0,
                     taiLvl, FarmState.StatsAdded.taijutsu or 0,
                     chiLvl, FarmState.StatsAdded.chakra or 0,
                     hpLvl, FarmState.StatsAdded.health or 0,
-                    FarmState.AutoStatsNinEnabled and "Y" or "N",
-                    FarmState.AutoStatsTaiEnabled and "Y" or "N",
-                    FarmState.AutoStatsChiEnabled and "Y" or "N",
-                    FarmState.AutoStatsHpEnabled and "Y" or "N"
+                    FarmState.AutoStatsNinEnabled and "[OK]" or "[X]",
+                    FarmState.AutoStatsTaiEnabled and "[OK]" or "[X]",
+                    FarmState.AutoStatsChiEnabled and "[OK]" or "[X]",
+                    FarmState.AutoStatsHpEnabled and "[OK]" or "[X]"
                 )
                 task.wait(1)
             end
@@ -1579,19 +1387,32 @@ return function(Common)
         -- ==========================================
         Tabs.Skills:AddParagraph({
             Title = "[K] Auto Skill Spammer",
-            Content = "Automatically spam skill keys (R,T,Y,F,G,H,V,B,N,Q,E).\n\n- Each key can be enabled/disabled independently\n- Adjustable spam speed (cooldown between presses)\n- Fires 'key' then 'keyend' to simulate hold+release\n- Useful for spamming jutsu/moves repeatedly"
+            Content = "Automatically spam skill keys (R,T,Y,F,G,H,V,B,N,Q,E).\n\n- Each key can be enabled/disabled independently\n- Adjustable spam speed (cooldown between presses)\n- Fires 'key' then 'keyend' to simulate hold+release\n- Useful for spamming jutsu/moves repeatedly\n- Works with AutoFarm for maximum DPS"
         })
         
         Tabs.Skills:AddSlider("AutoSkillSpamSpeedSlider", {
-            Title = "Spam Speed (seconds)", Default = Config.AutoSkillSpamSpeed,
+            Title = "Spam Speed (seconds)",
+            Description = "Time between each key press. Lower = faster spam but more detectable.",
+            Default = Config.AutoSkillSpamSpeed,
             Min = 0.05, Max = 2.0, Rounding = 2,
-            Callback = function(v) FarmState.AutoSkillSpamSpeed = v; Config.AutoSkillSpamSpeed = v; ConfigManager.Save(Config) end
+            Callback = function(v)
+                FarmState.AutoSkillSpamSpeed = v
+                Config.AutoSkillSpamSpeed = v
+                ConfigManager.Save(Config)
+            end
         })
         
+        Tabs.Skills:AddParagraph({
+            Title = "Skill Toggles",
+            Content = "Enable/disable individual skill keys below."
+        })
+        
+        -- Helper function to create skill toggle
         local function createSkillToggle(keyName, upperKey)
             local toggleName = "AutoSkill" .. upperKey .. "Toggle"
             Tabs.Skills:AddToggle(toggleName, {
                 Title = "Spam " .. upperKey .. " Key",
+                Description = "Automatically press and release " .. upperKey .. " key",
                 Default = Config[toggleName:gsub("Toggle", "Enabled")]
             }):OnChanged(function(v)
                 FarmState[toggleName:gsub("Toggle", "Enabled")] = v
@@ -1600,31 +1421,54 @@ return function(Common)
             end)
         end
         
-        createSkillToggle("r", "R"); createSkillToggle("t", "T"); createSkillToggle("y", "Y")
-        createSkillToggle("f", "F"); createSkillToggle("g", "G"); createSkillToggle("h", "H")
-        createSkillToggle("v", "V"); createSkillToggle("b", "B"); createSkillToggle("n", "N")
-        createSkillToggle("q", "Q"); createSkillToggle("e", "E")
+        -- Create toggles for all keys
+        createSkillToggle("r", "R")
+        createSkillToggle("t", "T")
+        createSkillToggle("y", "Y")
+        createSkillToggle("f", "F")
+        createSkillToggle("g", "G")
+        createSkillToggle("h", "H")
+        createSkillToggle("v", "V")
+        createSkillToggle("b", "B")
+        createSkillToggle("n", "N")
+        createSkillToggle("q", "Q")
+        createSkillToggle("e", "E")
         
-        Tabs.Skills:AddButton({Title = "Enable All Skills", Callback = function()
-            local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
-            for _, key in ipairs(keys) do
-                FarmState["AutoSkill" .. key .. "Enabled"] = true
-                Config["AutoSkill" .. key .. "Enabled"] = true
+        Tabs.Skills:AddButton({
+            Title = "Enable All Skills",
+            Callback = function()
+                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                for _, key in ipairs(keys) do
+                    FarmState["AutoSkill" .. key .. "Enabled"] = true
+                    Config["AutoSkill" .. key .. "Enabled"] = true
+                end
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[K] All Skills Enabled",
+                    Content = "All skill spam toggles activated",
+                    Duration = 2
+                })
             end
-            ConfigManager.Save(Config)
-            ui.Fluent:Notify({Title = "[K] All Skills Enabled", Content = "All activated", Duration = 2})
-        end})
+        })
         
-        Tabs.Skills:AddButton({Title = "Disable All Skills", Callback = function()
-            local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
-            for _, key in ipairs(keys) do
-                FarmState["AutoSkill" .. key .. "Enabled"] = false
-                Config["AutoSkill" .. key .. "Enabled"] = false
+        Tabs.Skills:AddButton({
+            Title = "Disable All Skills",
+            Callback = function()
+                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                for _, key in ipairs(keys) do
+                    FarmState["AutoSkill" .. key .. "Enabled"] = false
+                    Config["AutoSkill" .. key .. "Enabled"] = false
+                end
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[K] All Skills Disabled",
+                    Content = "All skill spam toggles deactivated",
+                    Duration = 2
+                })
             end
-            ConfigManager.Save(Config)
-            ui.Fluent:Notify({Title = "[K] All Skills Disabled", Content = "All deactivated", Duration = 2})
-        end})
+        })
         
+        -- Generic skill spammer function
         local function createSkillSpammer(keyName, upperKey)
             task.spawn(function()
                 while true do
@@ -1632,10 +1476,18 @@ return function(Common)
                         pcall(function()
                             local char = LocalPlayer.Character
                             local combat = char:FindFirstChild("combat")
+                            
                             if combat then
+                                -- Press key
                                 combat.update:FireServer("key", keyName)
+                                
+                                -- Wait for configured spam speed
                                 task.wait(FarmState.AutoSkillSpamSpeed or 0.2)
+                                
+                                -- Release key
                                 combat.update:FireServer("key", keyName .. "end")
+                                
+                                -- Update stats
                                 FarmState.SkillStats[keyName] = (FarmState.SkillStats[keyName] or 0) + 1
                             end
                         end)
@@ -1645,27 +1497,45 @@ return function(Common)
             end)
         end
         
-        createSkillSpammer("r", "R"); createSkillSpammer("t", "T"); createSkillSpammer("y", "Y")
-        createSkillSpammer("f", "F"); createSkillSpammer("g", "G"); createSkillSpammer("h", "H")
-        createSkillSpammer("v", "V"); createSkillSpammer("b", "B"); createSkillSpammer("n", "N")
-        createSkillSpammer("q", "Q"); createSkillSpammer("e", "E")
+        -- Create spammer for each key
+        createSkillSpammer("r", "R")
+        createSkillSpammer("t", "T")
+        createSkillSpammer("y", "Y")
+        createSkillSpammer("f", "F")
+        createSkillSpammer("g", "G")
+        createSkillSpammer("h", "H")
+        createSkillSpammer("v", "V")
+        createSkillSpammer("b", "B")
+        createSkillSpammer("n", "N")
+        createSkillSpammer("q", "Q")
+        createSkillSpammer("e", "E")
         
-        local SkillStatusDisplay = Tabs.Skills:AddParagraph({Title = "Skill Spammer Status", Content = "Initializing..."})
+        -- Skill Status Display
+        local SkillStatusDisplay = Tabs.Skills:AddParagraph({
+            Title = "Skill Spammer Status",
+            Content = "Initializing..."
+        })
+        
         task.spawn(function()
             while true do
                 local activeSkills = {}
                 local keys = {"r", "t", "y", "f", "g", "h", "v", "b", "n", "q", "e"}
                 local upperKeys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+                
                 for i, key in ipairs(keys) do
                     if FarmState["AutoSkill" .. upperKeys[i] .. "Enabled"] then
                         table.insert(activeSkills, upperKeys[i] .. ":" .. (FarmState.SkillStats[key] or 0))
                     end
                 end
+                
                 local activeText = #activeSkills > 0 and table.concat(activeSkills, ", ") or "None"
+                
                 SkillStatusDisplay.Content = string.format(
-                    "Status: %s\n\nSpam Speed: %.2fs\nActive: %d / 11\n\n%s",
-                    #activeSkills > 0 and "[OK]" or "[X]",
-                    FarmState.AutoSkillSpamSpeed, #activeSkills, activeText
+                    "Status: %s\n\nSpam Speed: %.2fs\nActive Skills: %d / 11\n\nActive Keys:\n%s\n\nNote: Each key fires 'key' then 'keyend'\nto simulate a full press+release cycle.",
+                    #activeSkills > 0 and "[OK] ACTIVE" or "[X] INACTIVE",
+                    FarmState.AutoSkillSpamSpeed,
+                    #activeSkills,
+                    activeText
                 )
                 task.wait(1)
             end
@@ -1680,15 +1550,24 @@ return function(Common)
         })
         
         Tabs.Chakra:AddToggle("AutoChakraToggle", {
-            Title = "Enable Auto Chakra", Default = Config.AutoChakraEnabled
+            Title = "Enable Auto Chakra",
+            Default = Config.AutoChakraEnabled
         }):OnChanged(function(v)
-            FarmState.AutoChakraEnabled = v; Config.AutoChakraEnabled = v; ConfigManager.Save(Config)
+            FarmState.AutoChakraEnabled = v
+            Config.AutoChakraEnabled = v
+            ConfigManager.Save(Config)
         end)
         
         Tabs.Chakra:AddSlider("ChakraThresholdSlider", {
-            Title = "Charge Threshold", Default = Config.AutoChakraThreshold,
+            Title = "Charge Threshold",
+            Description = "Start charging when chakra drops below this value",
+            Default = Config.AutoChakraThreshold,
             Min = 30000, Max = 250000, Rounding = 0,
-            Callback = function(v) FarmState.ChakraThreshold = v; Config.AutoChakraThreshold = v; ConfigManager.Save(Config) end
+            Callback = function(v)
+                FarmState.ChakraThreshold = v
+                Config.AutoChakraThreshold = v
+                ConfigManager.Save(Config)
+            end
         })
         
         task.spawn(function()
@@ -1697,6 +1576,7 @@ return function(Common)
                     pcall(function()
                         local char = LocalPlayer.Character
                         local hum = char:FindFirstChildOfClass("Humanoid")
+                        
                         if hum and hum.Health > 0 then
                             local chakraGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingamearena")
@@ -1706,6 +1586,7 @@ return function(Common)
                             if chakraGui and chakraGui.Text then
                                 local chakraText = chakraGui.Text
                                 local chakraValue = tonumber(string.match(chakraText, "CHA: (%d+)"))
+                                
                                 if chakraValue then
                                     if chakraValue < FarmState.ChakraThreshold then
                                         char.combat.update:FireServer("key", "c")
@@ -1714,421 +1595,13 @@ return function(Common)
                                     end
                                 end
                             end
-                            if hum.WalkSpeed == 0 then hum.WalkSpeed = 50 end
-                        end
-                    end)
-                end
-                task.wait(0.5)
-            end
-        end)
-        
-        -- ==========================================
-        -- EXPERIMENTAL FEATURES (NO KILLAURA - MOVED TO INSTAKILL TAB)
-        -- ==========================================
-        Tabs.Experimental:AddParagraph({
-            Title = "[X] EXPERIMENTAL FEATURES",
-            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam + Local Force Kill) has been moved to its own dedicated tab."
-        })
-        
-        -- ANTI RAGDOLL SECTION
-        Tabs.Experimental:AddSection("Anti Ragdoll")
-        
-        Tabs.Experimental:AddToggle("AntiRagdollToggle", {
-            Title = "Enable Anti Ragdoll",
-            Description = "Prevents character from going into ragdoll state",
-            Default = Config.AntiRagdollEnabled
-        }):OnChanged(function(v)
-            FarmState.AntiRagdollEnabled = v
-            Config.AntiRagdollEnabled = v
-            ConfigManager.Save(Config)
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.AntiRagdollEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum then
-                            local state = hum:GetState()
-                            if state == Enum.HumanoidStateType.Physics 
-                                or state == Enum.HumanoidStateType.Ragdoll
-                                or state == Enum.HumanoidStateType.FallingDown then
-                                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                                task.wait(0.1)
-                                hum:ChangeState(Enum.HumanoidStateType.Running)
-                            end
-                            local ragdoll = char:GetAttribute("Ragdoll")
-                            if ragdoll and ragdoll ~= 0 then
-                                char:SetAttribute("Ragdoll", 0)
+                            
+                            if hum.WalkSpeed == 0 then
+                                hum.WalkSpeed = 50
                             end
                         end
                     end)
                 end
-                task.wait(0.1)
-            end
-        end)
-        
-        -- ANTI KNOCKBACK SECTION
-        Tabs.Experimental:AddSection("Anti Knockback")
-        
-        Tabs.Experimental:AddToggle("AntiKnockbackToggle", {
-            Title = "Enable Anti Knockback",
-            Description = "Prevents character from being pushed/knocked back",
-            Default = Config.AntiKnockbackEnabled
-        }):OnChanged(function(v)
-            FarmState.AntiKnockbackEnabled = v
-            Config.AntiKnockbackEnabled = v
-            ConfigManager.Save(Config)
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.AntiKnockbackEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        
-                        if root and hum and hum.Health > 0 then
-                            for _, v in pairs(char:GetDescendants()) do
-                                if v:IsA("BodyVelocity") and v.Name ~= "AntiKB" then
-                                    pcall(function() v:Destroy() end)
-                                elseif v:IsA("BodyForce") then
-                                    pcall(function() v:Destroy() end)
-                                elseif v:IsA("BodyThrust") then
-                                    pcall(function() v:Destroy() end)
-                                end
-                            end
-                            
-                            local vel = root.AssemblyLinearVelocity
-                            if vel.Magnitude > 100 then
-                                root.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
-                            end
-                        end
-                    end)
-                end
-                task.wait(0.05)
-            end
-        end)
-        
-        -- ESP SECTION
-        Tabs.Experimental:AddSection("ESP (Extra Sensory Perception)")
-        
-        Tabs.Experimental:AddToggle("ESPToggle", {
-            Title = "Enable ESP", Default = Config.ESPEnabled
-        }):OnChanged(function(v)
-            FarmState.ESPEnabled = v; Config.ESPEnabled = v; ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddToggle("ESPNamesToggle", {
-            Title = "Show Names", Default = Config.ESPShowNames
-        }):OnChanged(function(v)
-            FarmState.ESPShowNames = v; Config.ESPShowNames = v; ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddToggle("ESPDistanceToggle", {
-            Title = "Show Distance", Default = Config.ESPShowDistance
-        }):OnChanged(function(v)
-            FarmState.ESPShowDistance = v; Config.ESPShowDistance = v; ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddToggle("ESPHealthToggle", {
-            Title = "Show Health", Default = Config.ESPShowHealth
-        }):OnChanged(function(v)
-            FarmState.ESPShowHealth = v; Config.ESPShowHealth = v; ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddSlider("ESPRangeSlider", {
-            Title = "ESP Max Distance (studs)", Default = Config.ESPMaxDistance,
-            Min = 50, Max = 2000, Rounding = 0,
-            Callback = function(v) FarmState.ESPMaxDistance = v; Config.ESPMaxDistance = v; ConfigManager.Save(Config) end
-        })
-        
-        Tabs.Experimental:AddColorpicker("ESPFillColorPicker", {
-            Title = "ESP Fill Color", Default = FarmState.ESPFillColor
-        }):OnChanged(function(color)
-            FarmState.ESPFillColor = color
-            Config.ESPFillColor = {R = math.floor(color.R * 255), G = math.floor(color.G * 255), B = math.floor(color.B * 255)}
-            ConfigManager.Save(Config)
-        end)
-        
-        Tabs.Experimental:AddColorpicker("ESPOutlineColorPicker", {
-            Title = "ESP Outline Color", Default = FarmState.ESPOutlineColor
-        }):OnChanged(function(color)
-            FarmState.ESPOutlineColor = color
-            Config.ESPOutlineColor = {R = math.floor(color.R * 255), G = math.floor(color.G * 255), B = math.floor(color.B * 255)}
-            ConfigManager.Save(Config)
-        end)
-        
-        -- ESP Storage
-        local ESPHighlights = {}
-        local ESPBillboards = {}
-        
-        local function createESPForPlayer(player)
-            if player == LocalPlayer then return end
-            if not player.Character then return end
-            
-            if ESPHighlights[player] then
-                pcall(function() ESPHighlights[player]:Destroy() end)
-                ESPHighlights[player] = nil
-            end
-            if ESPBillboards[player] then
-                pcall(function() ESPBillboards[player]:Destroy() end)
-                ESPBillboards[player] = nil
-            end
-            
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "GlockESP"
-            highlight.FillColor = FarmState.ESPFillColor
-            highlight.FillTransparency = 0.7
-            highlight.OutlineColor = FarmState.ESPOutlineColor
-            highlight.OutlineTransparency = 0
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Adornee = player.Character
-            highlight.Parent = player.Character
-            
-            local getUI = gethui or function() return game:GetService("CoreGui") end
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "GlockESP_Billboard"
-            billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
-            billboard.Size = UDim2.new(0, 200, 0, 80)
-            billboard.StudsOffset = Vector3.new(0, 3, 0)
-            billboard.AlwaysOnTop = true
-            billboard.LightInfluence = 0
-            billboard.ResetOnSpawn = false
-            
-            pcall(function() billboard.Parent = getUI() end)
-            if not billboard.Parent then
-                billboard.Parent = LocalPlayer:WaitForChild("PlayerGui")
-            end
-            
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Name = "NameLabel"
-            nameLabel.Size = UDim2.new(1, 0, 0, 20)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.Text = player.DisplayName or player.Name
-            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            nameLabel.Font = Enum.Font.GothamBold
-            nameLabel.TextSize = 14
-            nameLabel.TextStrokeTransparency = 0
-            nameLabel.Parent = billboard
-            
-            local distLabel = Instance.new("TextLabel")
-            distLabel.Name = "DistLabel"
-            distLabel.Size = UDim2.new(1, 0, 0, 16)
-            distLabel.Position = UDim2.new(0, 0, 0, 20)
-            distLabel.BackgroundTransparency = 1
-            distLabel.Text = "0m"
-            distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            distLabel.Font = Enum.Font.Gotham
-            distLabel.TextSize = 12
-            distLabel.TextStrokeTransparency = 0
-            distLabel.Parent = billboard
-            
-            local healthLabel = Instance.new("TextLabel")
-            healthLabel.Name = "HealthLabel"
-            healthLabel.Size = UDim2.new(1, 0, 0, 16)
-            healthLabel.Position = UDim2.new(0, 0, 0, 36)
-            healthLabel.BackgroundTransparency = 1
-            healthLabel.Text = "100 HP"
-            healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-            healthLabel.Font = Enum.Font.Gotham
-            healthLabel.TextSize = 12
-            healthLabel.TextStrokeTransparency = 0
-            healthLabel.Parent = billboard
-            
-            ESPHighlights[player] = highlight
-            ESPBillboards[player] = billboard
-            
-            highlight.Enabled = FarmState.ESPEnabled
-            billboard.Enabled = FarmState.ESPEnabled
-            nameLabel.Visible = FarmState.ESPShowNames
-            distLabel.Visible = FarmState.ESPShowDistance
-            healthLabel.Visible = FarmState.ESPShowHealth
-        end
-        
-        local function removeESPForPlayer(player)
-            if ESPHighlights[player] then
-                pcall(function() ESPHighlights[player]:Destroy() end)
-                ESPHighlights[player] = nil
-            end
-            if ESPBillboards[player] then
-                pcall(function() ESPBillboards[player]:Destroy() end)
-                ESPBillboards[player] = nil
-            end
-        end
-        
-        task.spawn(function()
-            while true do
-                if FarmState.ESPEnabled then
-                    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    for player, highlight in pairs(ESPHighlights) do
-                        if not player or not player.Parent then
-                            removeESPForPlayer(player)
-                        else
-                            local char = player.Character
-                            local root = char and char:FindFirstChild("HumanoidRootPart")
-                            local hum = char and char:FindFirstChildOfClass("Humanoid")
-                            local billboard = ESPBillboards[player]
-                            
-                            if char and root and hum then
-                                local distance = myRoot and (myRoot.Position - root.Position).Magnitude or 0
-                                
-                                highlight.Enabled = distance <= FarmState.ESPMaxDistance
-                                if billboard then
-                                    billboard.Enabled = distance <= FarmState.ESPMaxDistance
-                                    
-                                    local nameLabel = billboard:FindFirstChild("NameLabel")
-                                    local distLabel = billboard:FindFirstChild("DistLabel")
-                                    local healthLabel = billboard:FindFirstChild("HealthLabel")
-                                    
-                                    if nameLabel then
-                                        nameLabel.Visible = FarmState.ESPShowNames
-                                        nameLabel.Text = player.DisplayName or player.Name
-                                    end
-                                    if distLabel then
-                                        distLabel.Visible = FarmState.ESPShowDistance
-                                        distLabel.Text = string.format("[%.0fm]", distance)
-                                    end
-                                    if healthLabel then
-                                        healthLabel.Visible = FarmState.ESPShowHealth
-                                        healthLabel.Text = string.format("%.0f/%.0f HP", hum.Health, hum.MaxHealth)
-                                        
-                                        local healthPercent = hum.Health / hum.MaxHealth
-                                        if healthPercent > 0.5 then
-                                            healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                                        elseif healthPercent > 0.25 then
-                                            healthLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-                                        else
-                                            healthLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-                                        end
-                                    end
-                                end
-                                
-                                highlight.FillColor = FarmState.ESPFillColor
-                                highlight.OutlineColor = FarmState.ESPOutlineColor
-                            else
-                                highlight.Enabled = false
-                                if billboard then billboard.Enabled = false end
-                            end
-                        end
-                    end
-                else
-                    for player, highlight in pairs(ESPHighlights) do
-                        highlight.Enabled = false
-                        local billboard = ESPBillboards[player]
-                        if billboard then billboard.Enabled = false end
-                    end
-                end
-                task.wait(0.1)
-            end
-        end)
-        
-        Players.PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function()
-                task.wait(0.5)
-                if FarmState.ESPEnabled then createESPForPlayer(player) end
-            end)
-            if player.Character and FarmState.ESPEnabled then createESPForPlayer(player) end
-        end)
-        
-        Players.PlayerRemoving:Connect(function(player) removeESPForPlayer(player) end)
-        
-        for _, player in pairs(Players:GetPlayers()) do
-            if player.Character and FarmState.ESPEnabled then createESPForPlayer(player) end
-        end
-        
-        -- STUN/GRAB IMMUNITY SECTION
-        Tabs.Experimental:AddSection("Stun/Grab Immunity")
-        
-        Tabs.Experimental:AddToggle("StunGrabImmunityToggle", {
-            Title = "Enable Stun/Grab Immunity",
-            Description = "Prevents being stunned, grabbed, or held by enemies",
-            Default = Config.StunGrabImmunityEnabled
-        }):OnChanged(function(v)
-            FarmState.StunGrabImmunityEnabled = v
-            Config.StunGrabImmunityEnabled = v
-            ConfigManager.Save(Config)
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.StunGrabImmunityEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        
-                        if char and hum and root and hum.Health > 0 then
-                            local stunObjects = {"Stun", "Grab", "Grabbed", "Hold", "Carry", "Knockback", "Ragdoll"}
-                            for _, objName in ipairs(stunObjects) do
-                                local obj = char:FindFirstChild(objName)
-                                if obj then pcall(function() obj:Destroy() end) end
-                            end
-                            
-                            local stunAttrs = {"Stunned", "Grabbed", "Held", "Ragdoll", "Knockback"}
-                            for _, attrName in ipairs(stunAttrs) do
-                                local val = char:GetAttribute(attrName)
-                                if val and val ~= 0 and val ~= false then
-                                    char:SetAttribute(attrName, 0)
-                                end
-                            end
-                            
-                            local state = hum:GetState()
-                            if state == Enum.HumanoidStateType.Physics 
-                                or state == Enum.HumanoidStateType.Ragdoll
-                                or state == Enum.HumanoidStateType.FallingDown
-                                or state == Enum.HumanoidStateType.PlatformStanding then
-                                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                                task.wait(0.05)
-                                hum:ChangeState(Enum.HumanoidStateType.Running)
-                            end
-                            
-                            if not hum.AutoRotate then hum.AutoRotate = true end
-                            
-                            for _, v in pairs(char:GetDescendants()) do
-                                if v:IsA("Weld") or v:IsA("WeldConstraint") then
-                                    local p0, p1 = v.Part0, v.Part1
-                                    if p0 and p1 then
-                                        local p0Char = p0:FindFirstAncestorOfClass("Model")
-                                        local p1Char = p1:FindFirstAncestorOfClass("Model")
-                                        if p0Char ~= char and p1Char ~= char then
-                                            pcall(function() v:Destroy() end)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                end
-                task.wait(0.05)
-            end
-        end)
-        
-        -- EXPERIMENTAL STATUS DISPLAY
-        local ExperimentalStatusDisplay = Tabs.Experimental:AddParagraph({
-            Title = "Experimental Features Status",
-            Content = "Initializing..."
-        })
-        
-        task.spawn(function()
-            while true do
-                local activeFeatures = {}
-                if FarmState.AntiRagdollEnabled then table.insert(activeFeatures, "AntiRagdoll") end
-                if FarmState.AntiKnockbackEnabled then table.insert(activeFeatures, "AntiKnockback") end
-                if FarmState.ESPEnabled then table.insert(activeFeatures, "ESP") end
-                if FarmState.StunGrabImmunityEnabled then table.insert(activeFeatures, "StunImmunity") end
-                
-                local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
-                
-                ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 4\n\n%s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
-                    #activeFeatures, activeText,
-                    FarmState.ESPMaxDistance,
-                    (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
-                )
                 task.wait(0.5)
             end
         end)
@@ -2203,24 +1676,18 @@ return function(Common)
                 if FarmState.GodModeEnabled then
                     char.Humanoid.Health = char.Humanoid.MaxHealth
                     local fakehealth = char:FindFirstChild("fakehealth")
-                    if fakehealth then fakehealth.Value = FarmState.FakeHealthValue end
-                end
-            end
-            currentTargetNPC = nil
-            
-            if FarmState.ESPEnabled then
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        createESPForPlayer(player)
+                    if fakehealth then
+                        fakehealth.Value = FarmState.FakeHealthValue
                     end
                 end
             end
+            currentTargetNPC = nil
         end)
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill M1 Spam + Local Force Kill)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing + Auto Skill + Mission Protection)",
             Duration = 5
         })
     end
