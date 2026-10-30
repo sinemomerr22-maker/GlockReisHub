@@ -2,8 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + KillAura (FORCE KILL v2) + AutoFarm Boss (NPC STICK v2)
--- // Objective GUI Scanner + Anti-Fall NPC Guard
+-- // Mission Protection + KillAura (FORCE KILL v2) + AutoFarm Boss (NPC ANCHOR + RETRY)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -169,60 +168,15 @@ return function(Common)
     end
     
     -- ==========================================
-    -- 🆕 OBJECTIVE GUI SCANNER (Universal mission detection)
+    -- 🆕 FORCE KILL FUNCTION (Multi-method guaranteed kill with retry)
     -- ==========================================
-    local function hasObjectiveInGUI()
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return false end
+    local function forceKillNPC(npc, npcRoot, npcHum, maxRetries)
+        maxRetries = maxRetries or 10
         
-        -- Recursive scan for "Objective" text
-        local function scanForObjective(instance)
-            if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-                local text = instance.Text or ""
-                if string.find(string.lower(text), "objective", 1, true) then
-                    -- Check if visible
-                    if instance.Visible then
-                        return true
-                    end
-                end
-            end
-            
-            for _, child in ipairs(instance:GetChildren()) do
-                if scanForObjective(child) then
-                    return true
-                end
-            end
-            return false
-        end
-        
-        return scanForObjective(playerGui)
-    end
-    
-    -- ==========================================
-    -- 🆕 FORCE KILL FUNCTION (Multi-method guaranteed kill)
-    -- ==========================================
-    local function forceKillNPC(npc, npcRoot, npcHum)
         if not npc or not npc.Parent then return false end
         if not npcHum or npcHum.Health <= 0 then return true end
         
-        local killSuccess = false
-        
-        -- Method 1: Set Health to 0
-        pcall(function()
-            npcHum.Health = 0
-        end)
-        
-        -- Method 2: Change state to Dead
-        pcall(function()
-            npcHum:ChangeState(Enum.HumanoidStateType.Dead)
-        end)
-        
-        -- Method 3: BreakJoints (disconnects all parts)
-        pcall(function()
-            npc:BreakJoints()
-        end)
-        
-        -- Method 4: Anchor the root to prevent falling
+        -- 🆕 ANCHOR the NPC to prevent falling
         if npcRoot and npcRoot.Parent then
             pcall(function()
                 npcRoot.Anchored = true
@@ -231,19 +185,55 @@ return function(Common)
             end)
         end
         
-        -- Method 5: Set CanCollide = false on all parts
-        pcall(function()
-            for _, part in ipairs(npc:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end)
+        local killSuccess = false
         
-        -- Verify death
-        task.wait(0.1)
-        if not npcHum or npcHum.Health <= 0 or not npc.Parent then
-            killSuccess = true
+        -- 🆕 RETRY LOOP: Keep trying until dead or max retries
+        for attempt = 1, maxRetries do
+            if not npcHum or npcHum.Health <= 0 or not npc.Parent then
+                killSuccess = true
+                break
+            end
+            
+            -- Method 1: Set Health to 0
+            pcall(function()
+                npcHum.Health = 0
+            end)
+            
+            -- Method 2: Change state to Dead
+            pcall(function()
+                npcHum:ChangeState(Enum.HumanoidStateType.Dead)
+            end)
+            
+            -- Small delay between attempts
+            task.wait(0.05)
+            
+            -- Check if dead
+            if npcHum.Health <= 0 or not npc.Parent then
+                killSuccess = true
+                break
+            end
+        end
+        
+        -- Method 3: BreakJoints (last resort if still alive)
+        if not killSuccess and npc and npc.Parent then
+            pcall(function()
+                npc:BreakJoints()
+            end)
+            task.wait(0.1)
+            if not npcHum or npcHum.Health <= 0 or not npc.Parent then
+                killSuccess = true
+            end
+        end
+        
+        -- Method 4: Set CanCollide = false on all parts (prevent physics issues)
+        if killSuccess then
+            pcall(function()
+                for _, part in ipairs(npc:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
         end
         
         return killSuccess
@@ -721,11 +711,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED) WITH MISSION PROTECTION + OBJECTIVE GUI
+        -- AUTOFARM (MISSION-BASED) WITH MISSION PROTECTION
         -- ==========================================
         Tabs.Main:AddParagraph({
             Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND + PROTECTION)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- 🆕 Scans GUI for 'Objective' text (fallback check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- NEW: MISSION PROTECTION - Auto-cancels non-green missions\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- NEW: MISSION PROTECTION - Auto-cancels non-green missions\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -804,7 +794,7 @@ return function(Common)
             Content = "If a non-green mission is accidentally accepted,\nthe script will automatically send '!cancel'\nto the chat to abort the mission.\n\nThis prevents getting stuck on red/other color missions."
         })
         
-        -- AutoFarm logic with mission protection + Objective GUI scanner
+        -- AutoFarm logic with mission protection
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -816,16 +806,9 @@ return function(Common)
                         if hum and root and hum.Health > 0 then
                             hum:ChangeState(11)
                             
-                            -- 🆕 PRIMARY CHECK: currentmission value
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
                             local hasMission = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
                             
-                            -- 🆕 FALLBACK CHECK: Objective in GUI
-                            if not hasMission then
-                                hasMission = hasObjectiveInGUI()
-                            end
-                            
-                            -- SECONDARY CHECK: MissionStory GUI visible
                             local missionGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
                                 and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
@@ -988,97 +971,20 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM BOSS (NPC STICK v2 - NO FALL + FORCE KILL)
+        -- AUTOFARM BOSS (ENHANCED - NPC ANCHOR + FORCE KILL WITH RETRY)
         -- ==========================================
         Tabs.BossFarm:AddParagraph({
-            Title = "[B] AutoFarm Boss System (NPC STICK v2)",
+            Title = "[B] AutoFarm Boss System (NPC ANCHOR + FORCE KILL)",
             Content = "Automatically farm boss drop missions.\n\n" ..
                 "- Scans workspace.bossdropmission.missions\n" ..
                 "- Cycles through selected bosses in order\n" ..
                 "- Teleports to missiongiver and accepts quest\n" ..
-                "- 🆕 NPC STICK v2: NPC'yi oyuncunun önüne YAPIŞTIRIR\n" ..
-                "- 🆕 ANTI-FALL: Öldürülen NPC'ler düşmez (Anchored)\n" ..
-                "- 🆕 FORCE KILL: 5 farklı method ile kesin öldürme\n" ..
-                "- 🆕 OBJECTIVE GUI: 'Objective' kelimesi taranır\n" ..
+                "- 🆕 NPC ANCHOR: Boss NPC'yi öldürmeden ÖNCE sabitle (düşmeyi önle)\n" ..
+                "- 🆕 FORCE KILL: 10 kez deneme, ölünceye kadar devam\n" ..
                 "- Kills NPCs one by one until mission completes\n" ..
                 "- Moves to next boss after completion\n\n" ..
                 "NOTE: Disable regular AutoFarm while using Boss Farm!"
         })
-        
-        -- Boss Stick state
-        local bossStickNPC = nil
-        local bossStickConnection = nil
-        
-        -- 🆕 Boss Stick function v2: NPC'yi oyuncunun önüne yapıştır + düşmeyi engelle
-        local function startBossStick(npc)
-            -- Stop previous stick if any
-            if bossStickConnection then
-                bossStickConnection:Disconnect()
-                bossStickConnection = nil
-            end
-            
-            bossStickNPC = npc
-            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-            if not npcRoot then return end
-            
-            -- Her frame'de NPC'yi oyuncunun önüne ışınla
-            bossStickConnection = RunService.Heartbeat:Connect(function()
-                if not bossStickNPC or not bossStickNPC.Parent then
-                    if bossStickConnection then
-                        bossStickConnection:Disconnect()
-                        bossStickConnection = nil
-                    end
-                    bossStickNPC = nil
-                    return
-                end
-                
-                local char = LocalPlayer.Character
-                if not char then return end
-                local playerRoot = char:FindFirstChild("HumanoidRootPart")
-                if not playerRoot then return end
-                
-                local currentNpcRoot = bossStickNPC:FindFirstChild("HumanoidRootPart")
-                if not currentNpcRoot then return end
-                
-                local npcHum = bossStickNPC:FindFirstChildOfClass("Humanoid")
-                
-                -- 🆕 ANTI-FALL: NPC'yi düşmekten koru
-                -- Eğer NPC Y < -100 ise (map altına düşüyorsa), geri getir
-                if currentNpcRoot.Position.Y < -100 then
-                    currentNpcRoot.CFrame = CFrame.new(playerRoot.Position + playerRoot.CFrame.LookVector * 3)
-                    currentNpcRoot.AssemblyLinearVelocity = Vector3.zero
-                    currentNpcRoot.AssemblyAngularVelocity = Vector3.zero
-                end
-                
-                -- NPC öldüyse veya ragdoll olduysa, Anchored yap (düşmesin)
-                if npcHum and (npcHum.Health <= 0 or npcHum:GetState() == Enum.HumanoidStateType.Physics) then
-                    pcall(function()
-                        currentNpcRoot.Anchored = true
-                        currentNpcRoot.AssemblyLinearVelocity = Vector3.zero
-                        currentNpcRoot.AssemblyAngularVelocity = Vector3.zero
-                    end)
-                else
-                    -- Canlı NPC'yi oyuncunun ÖNÜNE yerleştir (oyuncu arkasında kalır)
-                    local playerLook = playerRoot.CFrame.LookVector
-                    local stickPosition = playerRoot.Position + playerLook * 3
-                    
-                    -- NPC'yi aşırı hızlı ışınla (anında)
-                    pcall(function()
-                        currentNpcRoot.CFrame = CFrame.new(stickPosition)
-                        currentNpcRoot.AssemblyLinearVelocity = Vector3.zero
-                        currentNpcRoot.AssemblyAngularVelocity = Vector3.zero
-                    end)
-                end
-            end)
-        end
-        
-        local function stopBossStick()
-            if bossStickConnection then
-                bossStickConnection:Disconnect()
-                bossStickConnection = nil
-            end
-            bossStickNPC = nil
-        end
         
         -- Get available bosses from workspace
         local function getAvailableBosses()
@@ -1131,7 +1037,6 @@ return function(Common)
             else
                 FarmState.BossFarmStatus = "Idle"
                 FarmState.BossFarmCurrent = ""
-                stopBossStick()
             end
         end)
         
@@ -1207,10 +1112,10 @@ return function(Common)
         
         Tabs.BossFarm:AddParagraph({
             Title = "Boss Farm Cycle Info",
-            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: find ALL NPCs with 'npc' in name\n   - 🆕 STICK NPC in front of player (prevents falling)\n   - 🆕 FORCE KILL with 5 methods (guaranteed death)\n   - 🆕 ANTI-FALL: Dead NPCs stay anchored\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
+            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: find ALL NPCs with 'npc' in name\n   - 🆕 ANCHOR NPC (prevent falling)\n   - 🆕 FORCE KILL with 10 retries (guaranteed death)\n   - Kill NPCs one by one\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
         })
         
-        -- Boss Farm Logic - ENHANCED WITH NPC STICK v2 + FORCE KILL
+        -- Boss Farm Logic - ENHANCED WITH NPC ANCHOR + FORCE KILL RETRY
         task.spawn(function()
             local currentBossIndex = 1
             
@@ -1315,17 +1220,10 @@ return function(Common)
                         while tick() - startTime < FarmState.AutoFarmBossTimeout do
                             if not FarmState.AutoFarmBossEnabled then break end
                             
-                            -- Check if already have mission (currentmission)
+                            -- Check if already have mission
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
                             if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
                                 questAccepted = true
-                                break
-                            end
-                            
-                            -- 🆕 FALLBACK: Check Objective in GUI
-                            if hasObjectiveInGUI() then
-                                questAccepted = true
-                                FarmState.BossFarmStatus = "Quest detected via Objective GUI!"
                                 break
                             end
                             
@@ -1342,15 +1240,10 @@ return function(Common)
                         end
                         
                         if not questAccepted then
-                            -- Final check: currentmission
+                            -- Check one more time
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
                             if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
                                 questAccepted = true
-                            else
-                                -- Final check: Objective GUI
-                                if hasObjectiveInGUI() then
-                                    questAccepted = true
-                                end
                             end
                         end
                         
@@ -1433,32 +1326,17 @@ return function(Common)
                             return
                         end
                         
-                        FarmState.BossFarmStatus = "Found " .. #npcList .. " NPC(s). Starting kill cycle with STICK v2..."
+                        FarmState.BossFarmStatus = "Found " .. #npcList .. " NPC(s). Starting kill cycle with ANCHOR + FORCE KILL..."
                         
-                        -- Kill each NPC in order WITH NPC STICK v2 + FORCE KILL
+                        -- Kill each NPC in order WITH ANCHOR + FORCE KILL
                         for i, npcData in ipairs(npcList) do
                             -- Check if boss farm is still enabled
-                            if not FarmState.AutoFarmBossEnabled then 
-                                stopBossStick()
-                                break 
-                            end
+                            if not FarmState.AutoFarmBossEnabled then break end
                             
-                            -- Check if mission is still active (multiple methods)
-                            local missionActive = false
-                            
+                            -- Check if mission is still active
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
-                                missionActive = true
-                            end
-                            
-                            -- 🆕 FALLBACK: Objective GUI check
-                            if not missionActive and hasObjectiveInGUI() then
-                                missionActive = true
-                            end
-                            
-                            if not missionActive then
+                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
                                 -- Mission completed!
-                                stopBossStick()
                                 break
                             end
                             
@@ -1466,7 +1344,6 @@ return function(Common)
                             local char2 = LocalPlayer.Character
                             local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
                             if not hum2 or hum2.Health <= 0 then
-                                stopBossStick()
                                 break
                             end
                             
@@ -1475,33 +1352,30 @@ return function(Common)
                                 continue
                             end
                             
-                            FarmState.BossFarmStatus = "Killing " .. npcData.name .. " (" .. i .. "/" .. #npcList .. ") [STICK v2 ACTIVE]"
-                            
-                            -- 🆕 START NPC STICK v2 - NPC'yi oyuncunun önüne yapıştır + düşmeyi engelle
-                            startBossStick(npcData.model)
+                            FarmState.BossFarmStatus = "Killing " .. npcData.name .. " (" .. i .. "/" .. #npcList .. ") [ANCHOR + FORCE KILL]"
                             
                             -- Get current root position
                             local currentRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if not currentRoot then 
-                                stopBossStick()
-                                break 
-                            end
+                            if not currentRoot then break end
+                            
+                            -- Teleport to NPC (behind + slightly above for safety)
+                            local npcBehindOffset = -npcData.root.CFrame.LookVector * 3 + Vector3.new(0, 5, 0)
+                            local targetCF = CFrame.new(npcData.root.Position + npcBehindOffset)
+                            local info2 = TweenInfo.new(
+                                (npcData.root.Position - currentRoot.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                                Enum.EasingStyle.Linear
+                            )
+                            local tween2 = TweenService:Create(currentRoot, info2, {CFrame = targetCF})
+                            tween2:Play()
+                            tween2.Completed:Wait()
+                            task.wait(0.5)
                             
                             -- Wait until NPC dies or mission completes
                             local killStartTime = tick()
-                            local killTimeout = 60 -- 60 saniye timeout per NPC
-                            
                             while npcData.hum.Health > 0 and FarmState.AutoFarmBossEnabled do
                                 -- Check if mission is still active
                                 local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                                local missionStillActive = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
-                                
-                                -- 🆕 FALLBACK: Objective GUI
-                                if not missionStillActive and hasObjectiveInGUI() then
-                                    missionStillActive = true
-                                end
-                                
-                                if not missionStillActive then
+                                if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
                                     break -- Mission completed
                                 end
                                 
@@ -1517,35 +1391,24 @@ return function(Common)
                                     break
                                 end
                                 
-                                -- 🆕 FORCE KILL: Use multi-method kill
+                                -- 🆕 FORCE KILL: Use multi-method kill with ANCHOR
                                 if npcData.hum.Health > 0 then
-                                    forceKillNPC(npcData.model, npcData.root, npcData.hum)
+                                    local killed = forceKillNPC(npcData.model, npcData.root, npcData.hum, 10)
+                                    if killed then
+                                        break -- NPC is dead, move to next
+                                    end
                                 end
                                 
                                 task.wait(0.3)
                                 
                                 -- Timeout after 60 seconds per NPC
-                                if tick() - killStartTime > killTimeout then
+                                if tick() - killStartTime > 60 then
                                     FarmState.BossFarmStatus = "NPC kill timeout, moving to next..."
                                     break
                                 end
                             end
                             
-                            -- 🆕 STOP NPC STICK after this NPC is dead
-                            stopBossStick()
-                            
-                            -- Wait a bit before moving to next NPC
-                            task.wait(1)
-                            
-                            -- Check if mission completed after killing this NPC
-                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            local missionDone = not currentmission or currentmission.Value == nil or currentmission.Value == ""
-                            
-                            -- 🆕 FALLBACK: No Objective in GUI = mission done
-                            if missionDone and not hasObjectiveInGUI() then
-                                -- Mission completed!
-                                break
-                            end
+                            task.wait(1) -- Wait before moving to next NPC
                         end
                         
                         -- Wait for mission to fully complete
@@ -1553,14 +1416,7 @@ return function(Common)
                         local completionWait = 0
                         while FarmState.AutoFarmBossEnabled and completionWait < 15 do
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            local missionActive = currentmission and currentmission.Value ~= nil and currentmission.Value ~= ""
-                            
-                            -- 🆕 FALLBACK: Objective GUI
-                            if not missionActive and hasObjectiveInGUI() then
-                                missionActive = true
-                            end
-                            
-                            if not missionActive then
+                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
                                 -- Mission completed!
                                 break
                             end
@@ -1584,7 +1440,6 @@ return function(Common)
                 else
                     FarmState.BossFarmStatus = "Disabled"
                     currentBossIndex = 1
-                    stopBossStick()
                 end
                 
                 task.wait(0.5)
@@ -1603,28 +1458,21 @@ return function(Common)
                     and table.concat(FarmState.AutoFarmBossSelected, ", ") 
                     or "None"
                 
-                local stickStatus = bossStickNPC and "ACTIVE" or "INACTIVE"
-                local objectiveStatus = hasObjectiveInGUI() and "YES" or "NO"
-                
                 BossStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
                     "Current Boss: %s\n" ..
-                    "Missions Completed: %d\n" ..
-                    "NPC Stick: %s\n" ..
-                    "Objective in GUI: %s\n\n" ..
+                    "Missions Completed: %d\n\n" ..
                     "Selected Bosses (%d):\n%s\n\n" ..
                     "Settings:\n" ..
                     "- Tween Speed: %d studs/s\n" ..
                     "- Timeout: %d seconds\n\n" ..
-                    "🆕 NPC Stick v2: Anti-fall + Anchored\n" ..
-                    "🆕 Force Kill: 5 methods guaranteed\n" ..
-                    "🆕 Objective GUI: Fallback detection\n\n" ..
+                    "🆕 NPC Anchor: Prevents falling\n" ..
+                    "🆕 Force Kill: 10 retries guaranteed\n" ..
+                    "🆕 Multi-method: Health=0 + Dead state + BreakJoints\n\n" ..
                     "Note: Disable regular AutoFarm!",
                     FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
                     FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
                     FarmState.BossFarmCompleted,
-                    stickStatus,
-                    objectiveStatus,
                     #FarmState.AutoFarmBossSelected,
                     selectedText,
                     FarmState.AutoFarmBossSpeed,
@@ -2162,7 +2010,7 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES (KILL AURA v2 - FORCE KILL)
+        -- EXPERIMENTAL FEATURES (KILL AURA v2 - FORCE KILL WITH RETRY)
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
@@ -2174,7 +2022,7 @@ return function(Common)
         
         Tabs.Experimental:AddToggle("KillAuraToggle", {
             Title = "Enable KillAura",
-            Description = "ULTRA FAST: 5-method guaranteed kill on ALL nearby Humanoids",
+            Description = "ULTRA FAST: 10-retry guaranteed kill on ALL nearby Humanoids + ANCHOR (no falling)",
             Default = Config.KillAuraEnabled
         }):OnChanged(function(v)
             FarmState.KillAuraEnabled = v
@@ -2183,7 +2031,7 @@ return function(Common)
             if v then
                 ui.Fluent:Notify({
                     Title = "[X] KillAura ACTIVATED",
-                    Content = "Ultra-fast force-kill v2 mode enabled!",
+                    Content = "Ultra-fast force-kill v2 mode enabled! (Anchor + 10 retries)",
                     Duration = 3
                 })
             end
@@ -2235,7 +2083,7 @@ return function(Common)
         
         Tabs.Experimental:AddToggle("KillAuraForceKillToggle", {
             Title = "Force Kill Mode (REQUIRED)",
-            Description = "5-method guaranteed kill (Health=0 + Dead state + BreakJoints + Anchor + NoCollide)",
+            Description = "ANCHOR + 10 retries + multi-method (Health=0 + Dead state + BreakJoints)",
             Default = Config.KillAuraForceKill
         }):OnChanged(function(v)
             FarmState.KillAuraForceKill = v
@@ -2245,7 +2093,7 @@ return function(Common)
         
         Tabs.Experimental:AddParagraph({
             Title = "KillAura v2 Info",
-            Content = "ULTRA FAST MODE v2:\n- Scans ALL Humanoids in workspace (not just npc folder)\n- 0.01 second cycle (100 kills/sec potential)\n- 500 stud default range\n- 🆕 FORCE KILL: 5 methods guarantee death\n  1. Health = 0\n  2. HumanoidStateType.Dead\n  3. BreakJoints()\n  4. Anchor root (no falling)\n  5. CanCollide = false (no physics)\n- 🆕 ANTI-FALL: Dead NPCs stay anchored\n- No M1 attacks, no cooldowns\n\nWARNING: Very detectable! Use only in private servers!"
+            Content = "ULTRA FAST MODE v2:\n- Scans ALL Humanoids in workspace (not just npc folder)\n- 0.01 second cycle (100 kills/sec potential)\n- 500 stud default range\n- 🆕 ANCHOR: NPCs don't fall through map\n- 🆕 FORCE KILL: 10 retries guaranteed death\n- 🆕 Multi-method: Health=0 + Dead state + BreakJoints + NoCollide\n- No M1 attacks, no cooldowns\n\nWARNING: Very detectable! Use only in private servers!"
         })
         
         -- KILL AURA LOGIC - ULTRA FAST AGGRESSIVE FORCE KILL v2
@@ -2275,8 +2123,8 @@ return function(Common)
                                                 
                                                 if dist <= FarmState.KillAuraRange then
                                                     if FarmState.KillAuraForceKill then
-                                                        -- 🆕 FORCE KILL: Use multi-method kill
-                                                        local killed = forceKillNPC(npc, npcRoot, npcHum)
+                                                        -- 🆕 FORCE KILL: Use multi-method kill with ANCHOR
+                                                        local killed = forceKillNPC(npc, npcRoot, npcHum, 10)
                                                         if killed then
                                                             killCount = killCount + 1
                                                         end
@@ -2300,7 +2148,7 @@ return function(Common)
                                                     if dist <= FarmState.KillAuraRange then
                                                         if FarmState.KillAuraForceKill then
                                                             -- 🆕 FORCE KILL
-                                                            local killed = forceKillNPC(model, modelRoot, descendant)
+                                                            local killed = forceKillNPC(model, modelRoot, descendant, 10)
                                                             if killed then
                                                                 killCount = killCount + 1
                                                             end
@@ -2326,7 +2174,7 @@ return function(Common)
                                                 if dist <= FarmState.KillAuraRange then
                                                     if FarmState.KillAuraForceKill then
                                                         -- 🆕 FORCE KILL
-                                                        local killed = forceKillNPC(obj, objRoot, objHum)
+                                                        local killed = forceKillNPC(obj, objRoot, objHum, 10)
                                                         if killed then
                                                             killCount = killCount + 1
                                                         end
@@ -2351,7 +2199,7 @@ return function(Common)
                                             if dist <= FarmState.KillAuraRange then
                                                 if FarmState.KillAuraForceKill then
                                                     -- 🆕 FORCE KILL
-                                                    local killed = forceKillNPC(player.Character, playerRoot, playerHum)
+                                                    local killed = forceKillNPC(player.Character, playerRoot, playerHum, 10)
                                                     if killed then
                                                         killCount = killCount + 1
                                                     end
@@ -2765,7 +2613,7 @@ return function(Common)
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Force Kill: %s (5 methods)\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Force Kill: %s (Anchor + 10 retries)\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
                     #activeFeatures, activeText,
                     FarmState.KillAuraRange, FarmState.KillAuraSpeed, FarmState.KillAuraKills,
                     FarmState.KillAuraForceKill and "YES" or "NO",
@@ -2852,7 +2700,6 @@ return function(Common)
                 end
             end
             currentTargetNPC = nil
-            stopBossStick()
             
             if FarmState.ESPEnabled then
                 for _, player in pairs(Players:GetPlayers()) do
@@ -2866,7 +2713,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + NPC Stick v2 + Force Kill v2 + Objective GUI)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + NPC Anchor + Force Kill v2)",
             Duration = 5
         })
     end
