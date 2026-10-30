@@ -2,7 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + KillAura (ULTRA FAST) + AutoFarm Boss
+-- // Mission Protection + KillAura (ULTRA FAST) + AutoFarm Boss (NPC CYCLE)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -49,12 +49,18 @@ return function(Common)
             GodModeEnabled = false,
             FakeHealthValue = 999999,
             -- Auto Skill Spammer Config
-            AutoSkillREnabled = false, AutoSkillTEnabled = false,
-            AutoSkillYEnabled = false, AutoSkillFEnabled = false,
-            AutoSkillGEnabled = false, AutoSkillHEnabled = false,
-            AutoSkillVEnabled = false, AutoSkillBEnabled = false,
-            AutoSkillNEnabled = false, AutoSkillQEnabled = false,
-            AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
+            AutoSkillREnabled = false,
+            AutoSkillTEnabled = false,
+            AutoSkillYEnabled = false,
+            AutoSkillFEnabled = false,
+            AutoSkillGEnabled = false,
+            AutoSkillHEnabled = false,
+            AutoSkillVEnabled = false,
+            AutoSkillBEnabled = false,
+            AutoSkillNEnabled = false,
+            AutoSkillQEnabled = false,
+            AutoSkillEEnabled = false,
+            AutoSkillSpamSpeed = 0.2,
             -- AutoFarm Boss Config
             AutoFarmBossEnabled = false,
             AutoFarmBossSelected = {},
@@ -906,11 +912,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM BOSS (NEW!)
+        -- AUTOFARM BOSS (ENHANCED - NPC CYCLE KILL)
         -- ==========================================
         Tabs.BossFarm:AddParagraph({
-            Title = "[B] AutoFarm Boss System",
-            Content = "Automatically farm boss drop missions.\n\n- Scans workspace.bossdropmission.missions\n- Cycles through selected bosses in order\n- Teleports to missiongiver and accepts quest\n- Waits 15 seconds for quest acceptance\n- Teleports to nearest NPC and waits for completion\n- Moves to next boss after completion\n\nNOTE: Disable regular AutoFarm while using Boss Farm!"
+            Title = "[B] AutoFarm Boss System (NPC CYCLE)",
+            Content = "Automatically farm boss drop missions.\n\n- Scans workspace.bossdropmission.missions\n- Cycles through selected bosses in order\n- Teleports to missiongiver and accepts quest\n- Waits 15 seconds for quest acceptance\n- NEW: Finds ALL NPCs with 'npc' in name\n- NEW: Teleports to each NPC's HumanoidRootPart\n- NEW: Kills NPCs one by one until mission completes\n- Moves to next boss after all NPCs killed\n\nNOTE: Disable regular AutoFarm while using Boss Farm!"
         })
         
         -- Get available bosses from workspace
@@ -1000,7 +1006,7 @@ return function(Common)
         
         Tabs.BossFarm:AddSlider("AutoFarmBossSpeedSlider", {
             Title = "Boss Tween Speed (studs/sec)",
-            Description = "Speed when traveling to boss missiongiver",
+            Description = "Speed when traveling to boss missiongiver and NPCs",
             Default = Config.AutoFarmBossSpeed,
             Min = 200, Max = 2500, Rounding = 0,
             Callback = function(v)
@@ -1039,10 +1045,10 @@ return function(Common)
         
         Tabs.BossFarm:AddParagraph({
             Title = "Boss Farm Cycle Info",
-            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: teleport to nearest NPC (500 stud range)\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
+            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: find ALL NPCs with 'npc' in name\n   - Teleport to each NPC and kill them one by one\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
         })
         
-        -- Boss Farm Logic
+        -- Boss Farm Logic - ENHANCED WITH NPC CYCLE
         task.spawn(function()
             local currentBossIndex = 1
             
@@ -1181,61 +1187,46 @@ return function(Common)
                             return
                         end
                         
-                        FarmState.BossFarmStatus = "Quest accepted! Finding nearest NPC..."
+                        FarmState.BossFarmStatus = "Quest accepted! Finding NPCs..."
                         task.wait(1)
                         
-                        -- Find nearest NPC (within 500 stud range)
-                        local npcs = workspace:FindFirstChild("npc")
-                        if not npcs then
+                        -- NEW LOGIC: Find ALL NPCs with "npc" in name
+                        local npcsFolder = workspace:FindFirstChild("npc")
+                        if not npcsFolder then
                             FarmState.BossFarmStatus = "npc folder not found"
                             currentBossIndex = currentBossIndex + 1
                             task.wait(2)
                             return
                         end
                         
-                        local nearestNPC = nil
-                        local nearestDist = 2500 -- Max search distance
-                        
-                        for _, npc in pairs(npcs:GetChildren()) do
-                            if npc:IsA("Model") then
+                        -- Collect all valid NPCs
+                        local npcList = {}
+                        for _, npc in pairs(npcsFolder:GetChildren()) do
+                            if npc:IsA("Model") and string.find(npc.Name:lower(), "npc") then
                                 local npcRoot = npc:FindFirstChild("HumanoidRootPart")
                                 local npcHum = npc:FindFirstChild("Humanoid")
                                 
                                 if npcRoot and npcHum and npcHum.Health > 0 then
-                                    local dist = (root.Position - npcRoot.Position).Magnitude
-                                    if dist < nearestDist then
-                                        nearestDist = dist
-                                        nearestNPC = npc
-                                    end
+                                    table.insert(npcList, npc)
                                 end
                             end
                         end
                         
-                        if not nearestNPC then
-                            FarmState.BossFarmStatus = "No NPC found within 500 studs"
+                        if #npcList == 0 then
+                            FarmState.BossFarmStatus = "No NPCs found with 'npc' in name"
                             currentBossIndex = currentBossIndex + 1
                             task.wait(2)
                             return
                         end
                         
-                        -- Teleport to nearest NPC
-                        FarmState.BossFarmStatus = "Teleporting to nearest NPC (" .. math.floor(nearestDist) .. " studs)"
-                        local npcRoot = nearestNPC:FindFirstChild("HumanoidRootPart")
-                        if npcRoot then
-                            local targetCF = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
-                            local info2 = TweenInfo.new(
-                                (npcRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
-                                Enum.EasingStyle.Linear
-                            )
-                            local tween2 = TweenService:Create(root, info2, {CFrame = targetCF})
-                            tween2:Play()
-                            tween2.Completed:Wait()
-                        end
+                        FarmState.BossFarmStatus = "Found " .. #npcList .. " NPCs. Starting kill cycle..."
                         
-                        -- Wait for mission to complete
-                        FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
-                        
-                        while FarmState.AutoFarmBossEnabled do
+                        -- Kill each NPC in order
+                        for i, npc in ipairs(npcList) do
+                            -- Check if boss farm is still enabled
+                            if not FarmState.AutoFarmBossEnabled then break end
+                            
+                            -- Check if mission is still active
                             local currentmission = LocalPlayer:FindFirstChild("currentmission")
                             if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
                                 -- Mission completed!
@@ -1249,7 +1240,78 @@ return function(Common)
                                 break
                             end
                             
+                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
+                            local npcHum = npc:FindFirstChild("Humanoid")
+                            
+                            if npcRoot and npcHum and npcHum.Health > 0 then
+                                FarmState.BossFarmStatus = "Killing NPC " .. i .. "/" .. #npcList .. " (" .. npc.Name .. ")"
+                                
+                                -- Get current root position
+                                local currentRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if not currentRoot then break end
+                                
+                                -- Teleport to NPC
+                                local targetCF = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
+                                local info2 = TweenInfo.new(
+                                    (npcRoot.Position - currentRoot.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                                    Enum.EasingStyle.Linear
+                                )
+                                local tween2 = TweenService:Create(currentRoot, info2, {CFrame = targetCF})
+                                tween2:Play()
+                                tween2.Completed:Wait()
+                                
+                                task.wait(0.5)
+                                
+                                -- Wait until NPC dies or mission completes
+                                local killStartTime = tick()
+                                while npcHum.Health > 0 and FarmState.AutoFarmBossEnabled do
+                                    -- Check if mission is still active
+                                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                                    if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                                        break -- Mission completed
+                                    end
+                                    
+                                    -- Check if character is still alive
+                                    local char3 = LocalPlayer.Character
+                                    local hum3 = char3 and char3:FindFirstChildOfClass("Humanoid")
+                                    if not hum3 or hum3.Health <= 0 then
+                                        break
+                                    end
+                                    
+                                    -- Keep teleporting to NPC (in case they move)
+                                    local currentRoot2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    if currentRoot2 and npcRoot.Parent then
+                                        currentRoot2.CFrame = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
+                                    end
+                                    
+                                    -- Try to kill NPC (force kill)
+                                    if npcHum.Health > 0 then
+                                        npcHum.Health = 0
+                                    end
+                                    
+                                    task.wait(0.5)
+                                    
+                                    -- Timeout after 30 seconds per NPC
+                                    if tick() - killStartTime > 30 then
+                                        break
+                                    end
+                                end
+                                
+                                task.wait(1) -- Wait before moving to next NPC
+                            end
+                        end
+                        
+                        -- Wait for mission to fully complete
+                        FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
+                        local completionWait = 0
+                        while FarmState.AutoFarmBossEnabled and completionWait < 10 do
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                                -- Mission completed!
+                                break
+                            end
                             task.wait(1)
+                            completionWait = completionWait + 1
                         end
                         
                         if FarmState.AutoFarmBossEnabled then
@@ -2519,7 +2581,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Ultra KillAura + Boss Farm)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Boss NPC Cycle + Ultra KillAura)",
             Duration = 5
         })
     end
