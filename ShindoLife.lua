@@ -911,456 +911,483 @@ return function(Common)
             end
         end)
         
-        -- ==========================================
-        -- AUTOFARM BOSS (ENHANCED - NPC CYCLE KILL)
-        -- ==========================================
-        Tabs.BossFarm:AddParagraph({
-            Title = "[B] AutoFarm Boss System (NPC CYCLE)",
-            Content = "Automatically farm boss drop missions.\n\n- Scans workspace.bossdropmission.missions\n- Cycles through selected bosses in order\n- Teleports to missiongiver and accepts quest\n- Waits 15 seconds for quest acceptance\n- NEW: Finds ALL NPCs with 'npc' in name\n- NEW: Teleports to each NPC's HumanoidRootPart\n- NEW: Kills NPCs one by one until mission completes\n- Moves to next boss after all NPCs killed\n\nNOTE: Disable regular AutoFarm while using Boss Farm!"
-        })
-        
-        -- Get available bosses from workspace
-        local function getAvailableBosses()
-            local bosses = {}
-            local missionsFolder = workspace:FindFirstChild("bossdropmission")
-            if missionsFolder then
+       -- ==========================================
+-- AUTOFARM BOSS (FIXED - NPC SEARCH & KILL)
+-- ==========================================
+Tabs.BossFarm:AddParagraph({
+    Title = "[B] AutoFarm Boss System (FIXED)",
+    Content = "Automatically farm boss drop missions.\n\n" ..
+        "- Scans workspace.bossdropmission.missions\n" ..
+        "- Cycles through selected bosses\n" ..
+        "- Teleports to missiongiver and accepts quest\n" ..
+        "- FIXED: Searches ALL NPCs (children + descendants)\n" ..
+        "- FIXED: Waits for NPCs to spawn after quest accept\n" ..
+        "- FIXED: Kills NPCs one by one with re-scan\n" ..
+        "- Moves to next boss after completion\n\n" ..
+        "NOTE: Disable regular AutoFarm while using Boss Farm!"
+})
+
+local function getAvailableBosses()
+    local bosses = {}
+    local missionsFolder = workspace:FindFirstChild("bossdropmission")
+    if missionsFolder then
+        local missionsSubFolder = missionsFolder:FindFirstChild("missions")
+        if missionsSubFolder then
+            for _, folder in pairs(missionsSubFolder:GetChildren()) do
+                if folder:IsA("Folder") or folder:IsA("Model") then
+                    table.insert(bosses, folder.Name)
+                end
+            end
+        end
+    end
+    table.sort(bosses)
+    return bosses
+end
+
+local availableBosses = getAvailableBosses()
+if #availableBosses == 0 then
+    availableBosses = {"(No bosses found)"}
+end
+
+local validBosses = {}
+for _, v in ipairs(FarmState.AutoFarmBossSelected) do
+    if table.find(availableBosses, v) then
+        table.insert(validBosses, v)
+    end
+end
+
+local defaultBossDict = {}
+for _, v in ipairs(validBosses) do defaultBossDict[v] = true end
+
+Tabs.BossFarm:AddToggle("AutoFarmBossToggle", {
+    Title = "Enable AutoFarm Boss",
+    Description = "Automatically cycle through selected bosses",
+    Default = Config.AutoFarmBossEnabled
+}):OnChanged(function(v)
+    FarmState.AutoFarmBossEnabled = v
+    Config.AutoFarmBossEnabled = v
+    ConfigManager.Save(Config)
+    if v then
+        ui.Fluent:Notify({Title = "[B] Boss Farm Enabled", Content = "Starting...", Duration = 3})
+    else
+        FarmState.BossFarmStatus = "Idle"
+        FarmState.BossFarmCurrent = ""
+    end
+end)
+
+local BossDropdown = Tabs.BossFarm:AddDropdown("BossSelectionDropdown", {
+    Title = "Select Bosses to Farm",
+    Values = availableBosses,
+    Multi = true,
+    Default = defaultBossDict,
+    Flag = "BossSelectionFlag"
+})
+
+BossDropdown:OnChanged(function(Value)
+    local parsed = {}
+    if type(Value) == "table" then
+        for k, v in pairs(Value) do
+            if type(k) == "string" and v == true then
+                table.insert(parsed, k)
+            elseif type(k) == "number" and type(v) == "string" then
+                table.insert(parsed, v)
+            end
+        end
+    end
+    table.sort(parsed)
+    FarmState.AutoFarmBossSelected = parsed
+    Config.AutoFarmBossSelected = parsed
+    ConfigManager.Save(Config)
+end)
+
+Tabs.BossFarm:AddSlider("AutoFarmBossSpeedSlider", {
+    Title = "Boss Tween Speed", Default = Config.AutoFarmBossSpeed,
+    Min = 200, Max = 2500, Rounding = 0,
+    Callback = function(v) FarmState.AutoFarmBossSpeed = v; Config.AutoFarmBossSpeed = v; ConfigManager.Save(Config) end
+})
+
+Tabs.BossFarm:AddSlider("AutoFarmBossTimeoutSlider", {
+    Title = "Quest Accept Timeout", Default = Config.AutoFarmBossTimeout,
+    Min = 5, Max = 60, Rounding = 0,
+    Callback = function(v) FarmState.AutoFarmBossTimeout = v; Config.AutoFarmBossTimeout = v; ConfigManager.Save(Config) end
+})
+
+Tabs.BossFarm:AddButton({
+    Title = "Refresh Boss List",
+    Callback = function()
+        availableBosses = getAvailableBosses()
+        if #availableBosses == 0 then availableBosses = {"(No bosses found)"} end
+        ui.Fluent:Notify({Title = "[B] Refreshed", Content = #availableBosses .. " boss(es)", Duration = 3})
+    end
+})
+
+-- FIXED: Comprehensive NPC search function
+local function findAllAliveNPCs()
+    local npcList = {}
+    local npcsFolder = workspace:FindFirstChild("npc")
+    
+    if not npcsFolder then
+        return npcList
+    end
+    
+    -- Search direct children first (most common)
+    for _, npc in pairs(npcsFolder:GetChildren()) do
+        if npc:IsA("Model") then
+            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
+            local npcHum = npc:FindFirstChildOfClass("Humanoid")
+            
+            if npcRoot and npcHum and npcHum.Health > 0 then
+                -- Check if name contains "npc" (case insensitive)
+                local nameLower = npc.Name:lower()
+                if string.find(nameLower, "npc") then
+                    table.insert(npcList, {
+                        model = npc,
+                        root = npcRoot,
+                        hum = npcHum,
+                        name = npc.Name
+                    })
+                end
+            end
+        end
+    end
+    
+    -- ALSO search descendants (NPCs in subfolders)
+    for _, descendant in pairs(npcsFolder:GetDescendants()) do
+        if descendant:IsA("Model") and descendant.Parent ~= npcsFolder then
+            -- Skip if already added (was a direct child)
+            local alreadyAdded = false
+            for _, existing in ipairs(npcList) do
+                if existing.model == descendant then
+                    alreadyAdded = true
+                    break
+                end
+            end
+            
+            if not alreadyAdded then
+                local npcRoot = descendant:FindFirstChild("HumanoidRootPart")
+                local npcHum = descendant:FindFirstChildOfClass("Humanoid")
+                
+                if npcRoot and npcHum and npcHum.Health > 0 then
+                    local nameLower = descendant.Name:lower()
+                    if string.find(nameLower, "npc") then
+                        table.insert(npcList, {
+                            model = descendant,
+                            root = npcRoot,
+                            hum = npcHum,
+                            name = descendant.Name
+                        })
+                    end
+                end
+            end
+        end
+    end
+    
+    return npcList
+end
+
+-- Boss Farm Logic - FIXED
+task.spawn(function()
+    local currentBossIndex = 1
+    
+    while true do
+        if FarmState.AutoFarmBossEnabled and LocalPlayer.Character then
+            local selectedBosses = FarmState.AutoFarmBossSelected
+            if #selectedBosses == 0 then
+                FarmState.BossFarmStatus = "No bosses selected"
+                task.wait(1)
+                continue
+            end
+            
+            if currentBossIndex > #selectedBosses then
+                currentBossIndex = 1
+            end
+            
+            local bossName = selectedBosses[currentBossIndex]
+            FarmState.BossFarmCurrent = bossName
+            
+            pcall(function()
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                
+                if not root or not hum or hum.Health <= 0 then
+                    task.wait(1)
+                    return
+                end
+                
+                -- Find boss folder
+                local missionsFolder = workspace:FindFirstChild("bossdropmission")
+                if not missionsFolder then
+                    FarmState.BossFarmStatus = "bossdropmission not found"
+                    task.wait(2)
+                    return
+                end
+                
                 local missionsSubFolder = missionsFolder:FindFirstChild("missions")
-                if missionsSubFolder then
-                    for _, folder in pairs(missionsSubFolder:GetChildren()) do
-                        if folder:IsA("Folder") or folder:IsA("Model") then
-                            table.insert(bosses, folder.Name)
+                if not missionsSubFolder then
+                    FarmState.BossFarmStatus = "missions folder not found"
+                    task.wait(2)
+                    return
+                end
+                
+                local bossFolder = missionsSubFolder:FindFirstChild(bossName)
+                if not bossFolder then
+                    FarmState.BossFarmStatus = "Boss not found: " .. bossName
+                    currentBossIndex = currentBossIndex + 1
+                    task.wait(2)
+                    return
+                end
+                
+                -- Find missiongiver
+                local missiongiver = bossFolder:FindFirstChild("missiongiver")
+                if not missiongiver then
+                    for _, child in pairs(bossFolder:GetChildren()) do
+                        if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
+                            missiongiver = child
+                            break
                         end
                     end
                 end
-            end
-            table.sort(bosses)
-            return bosses
-        end
-        
-        local availableBosses = getAvailableBosses()
-        if #availableBosses == 0 then
-            availableBosses = {"(No bosses found - check workspace.bossdropmission.missions)"}
-        end
-        
-        -- Validate selected bosses
-        local validBosses = {}
-        for _, v in ipairs(FarmState.AutoFarmBossSelected) do
-            if table.find(availableBosses, v) then
-                table.insert(validBosses, v)
-            end
-        end
-        
-        local defaultBossDict = {}
-        for _, v in ipairs(validBosses) do defaultBossDict[v] = true end
-        
-        Tabs.BossFarm:AddToggle("AutoFarmBossToggle", {
-            Title = "Enable AutoFarm Boss",
-            Description = "Automatically cycle through selected bosses and farm them",
-            Default = Config.AutoFarmBossEnabled
-        }):OnChanged(function(v)
-            FarmState.AutoFarmBossEnabled = v
-            Config.AutoFarmBossEnabled = v
-            ConfigManager.Save(Config)
-            if v then
-                ui.Fluent:Notify({
-                    Title = "[B] Boss Farm Enabled",
-                    Content = "Starting boss cycle...",
-                    Duration = 3
-                })
-            else
-                FarmState.BossFarmStatus = "Idle"
-                FarmState.BossFarmCurrent = ""
-            end
-        end)
-        
-        local BossDropdown = Tabs.BossFarm:AddDropdown("BossSelectionDropdown", {
-            Title = "Select Bosses to Farm",
-            Description = "Choose which bosses to cycle through (multi-select)",
-            Values = availableBosses,
-            Multi = true,
-            Default = defaultBossDict,
-            Flag = "BossSelectionFlag"
-        })
-        
-        BossDropdown:OnChanged(function(Value)
-            local parsed = {}
-            if type(Value) == "table" then
-                for k, v in pairs(Value) do
-                    if type(k) == "string" and v == true then
-                        table.insert(parsed, k)
-                    elseif type(k) == "number" and type(v) == "string" then
-                        table.insert(parsed, v)
+                
+                if not missiongiver then
+                    FarmState.BossFarmStatus = "missiongiver not found"
+                    currentBossIndex = currentBossIndex + 1
+                    task.wait(2)
+                    return
+                end
+                
+                local giverRoot = missiongiver:FindFirstChild("HumanoidRootPart")
+                if not giverRoot then
+                    FarmState.BossFarmStatus = "giver HRP not found"
+                    currentBossIndex = currentBossIndex + 1
+                    task.wait(2)
+                    return
+                end
+                
+                -- Teleport to missiongiver
+                FarmState.BossFarmStatus = "Traveling to " .. bossName
+                local targetCFrame = CFrame.new(giverRoot.Position + Vector3.new(0, -5, 0))
+                local info = TweenInfo.new(
+                    (giverRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                    Enum.EasingStyle.Linear
+                )
+                local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
+                tween:Play()
+                tween.Completed:Wait()
+                task.wait(1)
+                
+                -- Try to accept quest
+                FarmState.BossFarmStatus = "Accepting " .. bossName .. " quest..."
+                local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
+                local questAccepted = false
+                local startTime = tick()
+                
+                while tick() - startTime < FarmState.AutoFarmBossTimeout do
+                    if not FarmState.AutoFarmBossEnabled then break end
+                    
+                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                    if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                        questAccepted = true
+                        break
+                    end
+                    
+                    if clientTalk then
+                        pcall(function()
+                            clientTalk:FireServer()
+                            task.wait(0.3)
+                            clientTalk:FireServer("accept")
+                        end)
+                    end
+                    task.wait(1)
+                end
+                
+                if not questAccepted then
+                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                    if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                        questAccepted = true
                     end
                 end
-            end
-            table.sort(parsed)
-            FarmState.AutoFarmBossSelected = parsed
-            Config.AutoFarmBossSelected = parsed
-            ConfigManager.Save(Config)
-            ui.Fluent:Notify({
-                Title = "[B] Boss List Updated",
-                Content = "Selected: " .. (#parsed > 0 and table.concat(parsed, ", ") or "NONE"),
-                Duration = 3
-            })
-        end)
-        
-        Tabs.BossFarm:AddSlider("AutoFarmBossSpeedSlider", {
-            Title = "Boss Tween Speed (studs/sec)",
-            Description = "Speed when traveling to boss missiongiver and NPCs",
-            Default = Config.AutoFarmBossSpeed,
-            Min = 200, Max = 2500, Rounding = 0,
-            Callback = function(v)
-                FarmState.AutoFarmBossSpeed = v
-                Config.AutoFarmBossSpeed = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.BossFarm:AddSlider("AutoFarmBossTimeoutSlider", {
-            Title = "Quest Accept Timeout (seconds)",
-            Description = "How long to wait for quest acceptance before skipping",
-            Default = Config.AutoFarmBossTimeout,
-            Min = 5, Max = 60, Rounding = 0,
-            Callback = function(v)
-                FarmState.AutoFarmBossTimeout = v
-                Config.AutoFarmBossTimeout = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.BossFarm:AddButton({
-            Title = "Refresh Boss List",
-            Callback = function()
-                availableBosses = getAvailableBosses()
-                if #availableBosses == 0 then
-                    availableBosses = {"(No bosses found)"}
+                
+                if not questAccepted then
+                    FarmState.BossFarmStatus = "Quest accept failed (timeout)"
+                    currentBossIndex = currentBossIndex + 1
+                    task.wait(2)
+                    return
                 end
-                ui.Fluent:Notify({
-                    Title = "[B] Boss List Refreshed",
-                    Content = "Found " .. #availableBosses .. " boss(es)",
-                    Duration = 3
-                })
-            end
-        })
-        
-        Tabs.BossFarm:AddParagraph({
-            Title = "Boss Farm Cycle Info",
-            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: find ALL NPCs with 'npc' in name\n   - Teleport to each NPC and kill them one by one\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
-        })
-        
-        -- Boss Farm Logic - ENHANCED WITH NPC CYCLE
-        task.spawn(function()
-            local currentBossIndex = 1
-            
-            while true do
-                if FarmState.AutoFarmBossEnabled and LocalPlayer.Character then
-                    local selectedBosses = FarmState.AutoFarmBossSelected
-                    if #selectedBosses == 0 then
-                        FarmState.BossFarmStatus = "No bosses selected"
-                        task.wait(1)
+                
+                FarmState.BossFarmStatus = "Quest accepted! Waiting for NPCs..."
+                task.wait(2) -- Wait for NPCs to spawn
+                
+                -- FIXED: Kill NPCs with retry and re-scan
+                local maxRetries = 10
+                local retryCount = 0
+                
+                while FarmState.AutoFarmBossEnabled and retryCount < maxRetries do
+                    -- Check if mission is still active
+                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                    if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                        break -- Mission completed!
+                    end
+                    
+                    -- Check if alive
+                    local char2 = LocalPlayer.Character
+                    local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
+                    if not hum2 or hum2.Health <= 0 then break end
+                    
+                    -- Find all alive NPCs
+                    local npcList = findAllAliveNPCs()
+                    
+                    if #npcList == 0 then
+                        retryCount = retryCount + 1
+                        FarmState.BossFarmStatus = "No NPCs found, waiting... (" .. retryCount .. "/" .. maxRetries .. ")"
+                        task.wait(2)
                         continue
                     end
                     
-                    -- Cycle through bosses
-                    if currentBossIndex > #selectedBosses then
-                        currentBossIndex = 1
-                    end
+                    retryCount = 0 -- Reset on finding NPCs
                     
-                    local bossName = selectedBosses[currentBossIndex]
-                    FarmState.BossFarmCurrent = bossName
-                    FarmState.BossFarmStatus = "Traveling to " .. bossName
+                    FarmState.BossFarmStatus = "Found " .. #npcList .. " NPC(s). Killing..."
                     
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char and char:FindFirstChild("HumanoidRootPart")
-                        local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    -- Kill each NPC one by one
+                    for i, npcData in ipairs(npcList) do
+                        if not FarmState.AutoFarmBossEnabled then break end
                         
-                        if not root or not hum or hum.Health <= 0 then
-                            task.wait(1)
-                            return
+                        -- Re-check mission
+                        local cm = LocalPlayer:FindFirstChild("currentmission")
+                        if not cm or cm.Value == nil or cm.Value == "" then break end
+                        
+                        -- Re-check if NPC is still alive
+                        if not npcData.hum or npcData.hum.Health <= 0 or not npcData.root.Parent then
+                            continue
                         end
                         
-                        -- Find boss mission folder
-                        local missionsFolder = workspace:FindFirstChild("bossdropmission")
-                        if not missionsFolder then
-                            FarmState.BossFarmStatus = "bossdropmission folder not found"
-                            task.wait(2)
-                            return
-                        end
+                        FarmState.BossFarmStatus = "Killing " .. npcData.name .. " (" .. i .. "/" .. #npcList .. ")"
                         
-                        local missionsSubFolder = missionsFolder:FindFirstChild("missions")
-                        if not missionsSubFolder then
-                            FarmState.BossFarmStatus = "missions subfolder not found"
-                            task.wait(2)
-                            return
-                        end
+                        -- Get fresh root
+                        local currentRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if not currentRoot then break end
                         
-                        local bossFolder = missionsSubFolder:FindFirstChild(bossName)
-                        if not bossFolder then
-                            FarmState.BossFarmStatus = "Boss folder not found: " .. bossName
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        -- Find missiongiver model inside boss folder
-                        local missiongiver = bossFolder:FindFirstChild("missiongiver")
-                        if not missiongiver then
-                            -- Try to find any model with HumanoidRootPart
-                            for _, child in pairs(bossFolder:GetChildren()) do
-                                if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
-                                    missiongiver = child
-                                    break
-                                end
-                            end
-                        end
-                        
-                        if not missiongiver then
-                            FarmState.BossFarmStatus = "missiongiver not found in " .. bossName
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        local giverRoot = missiongiver:FindFirstChild("HumanoidRootPart")
-                        if not giverRoot then
-                            FarmState.BossFarmStatus = "HumanoidRootPart not found in missiongiver"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        -- Teleport to missiongiver
-                        FarmState.BossFarmStatus = "Teleporting to " .. bossName .. " missiongiver"
-                        local targetCFrame = CFrame.new(giverRoot.Position + Vector3.new(0, -5, 0))
-                        
-                        local info = TweenInfo.new(
-                            (giverRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                        -- Teleport to NPC
+                        local targetCF = CFrame.new(npcData.root.Position + Vector3.new(0, -8, 0))
+                        local info2 = TweenInfo.new(
+                            (npcData.root.Position - currentRoot.Position).Magnitude / FarmState.AutoFarmBossSpeed,
                             Enum.EasingStyle.Linear
                         )
-                        local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
-                        tween:Play()
-                        tween.Completed:Wait()
+                        local tween2 = TweenService:Create(currentRoot, info2, {CFrame = targetCF})
+                        tween2:Play()
+                        tween2.Completed:Wait()
+                        task.wait(0.5)
                         
-                        task.wait(1)
-                        
-                        -- Try to accept quest (15 second timeout)
-                        FarmState.BossFarmStatus = "Trying to accept " .. bossName .. " quest..."
-                        local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
-                        local questAccepted = false
-                        local startTime = tick()
-                        
-                        while tick() - startTime < FarmState.AutoFarmBossTimeout do
-                            if not FarmState.AutoFarmBossEnabled then break end
+                        -- Kill the NPC (force kill + wait)
+                        local killStart = tick()
+                        while npcData.hum.Health > 0 and FarmState.AutoFarmBossEnabled do
+                            -- Check mission still active
+                            local cm2 = LocalPlayer:FindFirstChild("currentmission")
+                            if not cm2 or cm2.Value == nil or cm2.Value == "" then break end
                             
-                            -- Check if already have mission
-                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
-                                questAccepted = true
-                                break
-                            end
+                            -- Check alive
+                            local char3 = LocalPlayer.Character
+                            local hum3 = char3 and char3:FindFirstChildOfClass("Humanoid")
+                            if not hum3 or hum3.Health <= 0 then break end
                             
-                            -- Try to accept
-                            if clientTalk then
-                                pcall(function()
-                                    clientTalk:FireServer()
-                                    task.wait(0.3)
-                                    clientTalk:FireServer("accept")
-                                end)
+                            -- Stay near NPC
+                            local currentRoot2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if currentRoot2 and npcData.root.Parent then
+                                currentRoot2.CFrame = CFrame.new(npcData.root.Position + Vector3.new(0, -8, 0))
                             end
                             
-                            task.wait(1)
-                        end
-                        
-                        if not questAccepted then
-                            -- Check one more time
-                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
-                                questAccepted = true
-                            end
-                        end
-                        
-                        if not questAccepted then
-                            FarmState.BossFarmStatus = "Failed to accept " .. bossName .. " quest (timeout)"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        FarmState.BossFarmStatus = "Quest accepted! Finding NPCs..."
-                        task.wait(1)
-                        
-                        -- NEW LOGIC: Find ALL NPCs with "npc" in name
-                        local npcsFolder = workspace:FindFirstChild("npc")
-                        if not npcsFolder then
-                            FarmState.BossFarmStatus = "npc folder not found"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        -- Collect all valid NPCs
-                        local npcList = {}
-                        for _, npc in pairs(npcsFolder:GetChildren()) do
-                            if npc:IsA("Model") and string.find(npc.Name:lower(), "npc") then
-                                local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-                                local npcHum = npc:FindFirstChild("Humanoid")
-                                
-                                if npcRoot and npcHum and npcHum.Health > 0 then
-                                    table.insert(npcList, npc)
-                                end
-                            end
-                        end
-                        
-                        if #npcList == 0 then
-                            FarmState.BossFarmStatus = "No NPCs found with 'npc' in name"
-                            currentBossIndex = currentBossIndex + 1
-                            task.wait(2)
-                            return
-                        end
-                        
-                        FarmState.BossFarmStatus = "Found " .. #npcList .. " NPCs. Starting kill cycle..."
-                        
-                        -- Kill each NPC in order
-                        for i, npc in ipairs(npcList) do
-                            -- Check if boss farm is still enabled
-                            if not FarmState.AutoFarmBossEnabled then break end
-                            
-                            -- Check if mission is still active
-                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
-                                -- Mission completed!
-                                break
+                            -- Force kill
+                            if npcData.hum.Health > 0 then
+                                npcData.hum.Health = 0
                             end
                             
-                            -- Check if character is still alive
-                            local char2 = LocalPlayer.Character
-                            local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
-                            if not hum2 or hum2.Health <= 0 then
-                                break
-                            end
+                            task.wait(0.5)
                             
-                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
-                            local npcHum = npc:FindFirstChild("Humanoid")
-                            
-                            if npcRoot and npcHum and npcHum.Health > 0 then
-                                FarmState.BossFarmStatus = "Killing NPC " .. i .. "/" .. #npcList .. " (" .. npc.Name .. ")"
-                                
-                                -- Get current root position
-                                local currentRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                if not currentRoot then break end
-                                
-                                -- Teleport to NPC
-                                local targetCF = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
-                                local info2 = TweenInfo.new(
-                                    (npcRoot.Position - currentRoot.Position).Magnitude / FarmState.AutoFarmBossSpeed,
-                                    Enum.EasingStyle.Linear
-                                )
-                                local tween2 = TweenService:Create(currentRoot, info2, {CFrame = targetCF})
-                                tween2:Play()
-                                tween2.Completed:Wait()
-                                
-                                task.wait(0.5)
-                                
-                                -- Wait until NPC dies or mission completes
-                                local killStartTime = tick()
-                                while npcHum.Health > 0 and FarmState.AutoFarmBossEnabled do
-                                    -- Check if mission is still active
-                                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                                    if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
-                                        break -- Mission completed
-                                    end
-                                    
-                                    -- Check if character is still alive
-                                    local char3 = LocalPlayer.Character
-                                    local hum3 = char3 and char3:FindFirstChildOfClass("Humanoid")
-                                    if not hum3 or hum3.Health <= 0 then
-                                        break
-                                    end
-                                    
-                                    -- Keep teleporting to NPC (in case they move)
-                                    local currentRoot2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                    if currentRoot2 and npcRoot.Parent then
-                                        currentRoot2.CFrame = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
-                                    end
-                                    
-                                    -- Try to kill NPC (force kill)
-                                    if npcHum.Health > 0 then
-                                        npcHum.Health = 0
-                                    end
-                                    
-                                    task.wait(0.5)
-                                    
-                                    -- Timeout after 30 seconds per NPC
-                                    if tick() - killStartTime > 30 then
-                                        break
-                                    end
-                                end
-                                
-                                task.wait(1) -- Wait before moving to next NPC
-                            end
+                            -- Timeout per NPC
+                            if tick() - killStart > 15 then break end
                         end
                         
-                        -- Wait for mission to fully complete
-                        FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
-                        local completionWait = 0
-                        while FarmState.AutoFarmBossEnabled and completionWait < 10 do
-                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
-                                -- Mission completed!
-                                break
-                            end
-                            task.wait(1)
-                            completionWait = completionWait + 1
-                        end
-                        
-                        if FarmState.AutoFarmBossEnabled then
-                            FarmState.BossFarmStatus = bossName .. " mission completed!"
-                            FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
-                            ui.Fluent:Notify({
-                                Title = "[B] Boss Completed",
-                                Content = bossName .. " mission finished!",
-                                Duration = 3
-                            })
-                            task.wait(2)
-                        end
-                        
-                        currentBossIndex = currentBossIndex + 1
-                    end)
-                else
-                    FarmState.BossFarmStatus = "Disabled"
-                    currentBossIndex = 1
+                        task.wait(1) -- Wait before next NPC
+                    end
+                    
+                    -- After killing batch, wait and re-check
+                    task.wait(2)
                 end
                 
-                task.wait(0.5)
-            end
-        end)
-        
-        -- Boss Farm Status Display
-        local BossStatusDisplay = Tabs.BossFarm:AddParagraph({
-            Title = "Boss Farm Status",
-            Content = "Initializing..."
-        })
-        
-        task.spawn(function()
-            while true do
-                local selectedText = #FarmState.AutoFarmBossSelected > 0 
-                    and table.concat(FarmState.AutoFarmBossSelected, ", ") 
-                    or "None"
+                -- Wait for mission completion
+                FarmState.BossFarmStatus = "Waiting for mission completion..."
+                local completionWait = 0
+                while FarmState.AutoFarmBossEnabled and completionWait < 15 do
+                    local cm = LocalPlayer:FindFirstChild("currentmission")
+                    if not cm or cm.Value == nil or cm.Value == "" then
+                        break
+                    end
+                    task.wait(1)
+                    completionWait = completionWait + 1
+                end
                 
-                BossStatusDisplay.Content = string.format(
-                    "Status: %s\n\nCurrent Boss: %s\nMissions Completed: %d\n\nSelected Bosses (%d):\n%s\n\nSettings:\n- Tween Speed: %d studs/s\n- Timeout: %d seconds\n\nNote: Disable regular AutoFarm to avoid conflicts!",
-                    FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
-                    FarmState.BossFarmCompleted,
-                    #FarmState.AutoFarmBossSelected,
-                    selectedText,
-                    FarmState.AutoFarmBossSpeed,
-                    FarmState.AutoFarmBossTimeout
-                )
-                task.wait(0.5)
-            end
+                if FarmState.AutoFarmBossEnabled then
+                    FarmState.BossFarmStatus = bossName .. " completed!"
+                    FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
+                    ui.Fluent:Notify({
+                        Title = "[B] Boss Done",
+                        Content = bossName .. " finished!",
+                        Duration = 3
+                    })
+                    task.wait(2)
+                end
+                
+                currentBossIndex = currentBossIndex + 1
+            end)
+        else
+            FarmState.BossFarmStatus = "Disabled"
+            currentBossIndex = 1
+        end
+        
+        task.wait(0.5)
+    end
+end)
+
+-- Boss Farm Status Display
+local BossStatusDisplay = Tabs.BossFarm:AddParagraph({
+    Title = "Boss Farm Status",
+    Content = "Initializing..."
+})
+
+task.spawn(function()
+    while true do
+        local selectedText = #FarmState.AutoFarmBossSelected > 0 
+            and table.concat(FarmState.AutoFarmBossSelected, ", ") 
+            or "None"
+        
+        local npcCount = 0
+        pcall(function()
+            local npcs = findAllAliveNPCs()
+            npcCount = #npcs
         end)
+        
+        BossStatusDisplay.Content = string.format(
+            "Status: %s\n\n" ..
+            "Current Boss: %s\n" ..
+            "Missions Completed: %d\n" ..
+            "Alive NPCs Found: %d\n\n" ..
+            "Selected Bosses (%d):\n%s\n\n" ..
+            "Settings:\n" ..
+            "- Speed: %d studs/s\n" ..
+            "- Timeout: %ds\n\n" ..
+            "Note: Disable regular AutoFarm!",
+            FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+            FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
+            FarmState.BossFarmCompleted,
+            npcCount,
+            #FarmState.AutoFarmBossSelected,
+            selectedText,
+            FarmState.AutoFarmBossSpeed,
+            FarmState.AutoFarmBossTimeout
+        )
+        task.wait(0.5)
+    end
+end)
         
         -- ==========================================
         -- SCROLL SNIPER
