@@ -2,7 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + InstaKill (FORCE KILL v2)
+-- // Mission Protection + InstaKill (M1 Spam) 
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -54,12 +54,15 @@ return function(Common)
             AutoSkillVEnabled = false, AutoSkillBEnabled = false,
             AutoSkillNEnabled = false, AutoSkillQEnabled = false,
             AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
+            -- InstaKill Config
             InstaKillEnabled = false,
-            InstaKillRange = 500,
-            InstaKillSpeed = 0.01,
+            InstaKillRange = 60,
+            InstaKillSpeed = 0.003,
             InstaKillTargetNPCs = true,
             InstaKillTargetPlayers = true,
-            InstaKillForceKill = true,
+            InstaKillFaceTarget = true,
+            InstaKillTeleportToTarget = false,
+            -- Experimental Config
             AntiRagdollEnabled = false,
             AntiKnockbackEnabled = false,
             ESPEnabled = false,
@@ -161,55 +164,6 @@ return function(Common)
             return hp and hp.Value or 0
         end
         return 0
-    end
-    
-    -- ==========================================
-    -- 🆕 FORCE KILL FUNCTION (Multi-method guaranteed kill)
-    -- Used by InstaKill system
-    -- ==========================================
-    local function forceKillNPC(npc, npcRoot, npcHum)
-        if not npc or not npc.Parent then return false end
-        if not npcHum or npcHum.Health <= 0 then return true end
-        
-        -- Method 1: Anchor the NPC first (prevent falling)
-        if npcRoot and npcRoot.Parent then
-            pcall(function()
-                npcRoot.Anchored = true
-                npcRoot.AssemblyLinearVelocity = Vector3.zero
-                npcRoot.AssemblyAngularVelocity = Vector3.zero
-            end)
-        end
-        
-        -- Method 2: Set Health to 0
-        pcall(function()
-            npcHum.Health = 0
-        end)
-        
-        -- Method 3: Change state to Dead
-        pcall(function()
-            npcHum:ChangeState(Enum.HumanoidStateType.Dead)
-        end)
-        
-        -- Method 4: BreakJoints (disconnects all parts)
-        pcall(function()
-            npc:BreakJoints()
-        end)
-        
-        -- Method 5: Set CanCollide = false on all parts
-        pcall(function()
-            for _, part in ipairs(npc:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end)
-        
-        -- Verify death
-        task.wait(0.1)
-        if not npcHum or npcHum.Health <= 0 or not npc.Parent then
-            return true
-        end
-        return false
     end
     
     -- ==========================================
@@ -506,8 +460,8 @@ return function(Common)
     -- ==========================================
     else
         Tabs.Main = ui.Window:AddTab({ Title = "AutoFarm", Icon = "target" })
-        Tabs.InstaKill = ui.Window:AddTab({ Title = "InstaKill", Icon = "skull" })
         Tabs.Godmode = ui.Window:AddTab({ Title = "Godmode", Icon = "shield" })
+        Tabs.InstaKill = ui.Window:AddTab({ Title = "InstaKill", Icon = "crosshair" })
         Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
@@ -545,12 +499,16 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
+            -- InstaKill State
             InstaKillEnabled = Config.InstaKillEnabled,
-            InstaKillRange = Config.InstaKillRange or 500,
-            InstaKillSpeed = Config.InstaKillSpeed or 0.01,
+            InstaKillRange = Config.InstaKillRange or 60,
+            InstaKillSpeed = Config.InstaKillSpeed or 0.003,
             InstaKillTargetNPCs = Config.InstaKillTargetNPCs,
             InstaKillTargetPlayers = Config.InstaKillTargetPlayers,
-            InstaKillForceKill = Config.InstaKillForceKill,
+            InstaKillFaceTarget = Config.InstaKillFaceTarget,
+            InstaKillTeleportToTarget = Config.InstaKillTeleportToTarget,
+            InstaKillKills = 0,
+            -- Experimental State
             AntiRagdollEnabled = Config.AntiRagdollEnabled,
             AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
             ESPEnabled = Config.ESPEnabled,
@@ -572,9 +530,33 @@ return function(Common)
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
-            SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0},
-            InstaKillKills = 0
+            SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0}
         }
+        
+        -- !cancel command helper
+        local function sendCancelCommand()
+            pcall(function()
+                local TextChatService = game:GetService("TextChatService")
+                if TextChatService then
+                    local channel = TextChatService:WaitForChild("TextChannels", 2)
+                    if channel then
+                        local rbxGeneral = channel:FindFirstChild("RBXGeneral")
+                        if rbxGeneral then
+                            rbxGeneral:SendAsync("!cancel")
+                        end
+                    end
+                end
+            end)
+            pcall(function()
+                local vc = workspace:FindFirstChild("VC")
+                if vc then
+                    local remote = vc:FindFirstChild("RemoteEvent")
+                    if remote then
+                        remote:FireServer("!cancel")
+                    end
+                end
+            end)
+        end
         
         -- ==========================================
         -- CONTINUOUS FACING LOOP
@@ -617,17 +599,9 @@ return function(Common)
             Config.GodModeEnabled = v
             ConfigManager.Save(Config)
             if v then
-                ui.Fluent:Notify({
-                    Title = "[G] Godmode Enabled",
-                    Content = "You are now invincible!",
-                    Duration = 3
-                })
+                ui.Fluent:Notify({Title = "[G] Godmode Enabled", Content = "You are now invincible!", Duration = 3})
             else
-                ui.Fluent:Notify({
-                    Title = "[G] Godmode Disabled",
-                    Content = "Normal health restored",
-                    Duration = 3
-                })
+                ui.Fluent:Notify({Title = "[G] Godmode Disabled", Content = "Normal health restored", Duration = 3})
             end
         end)
         
@@ -859,23 +833,7 @@ return function(Common)
                                                                     Content = "Non-green mission detected! Cancelling...",
                                                                     Duration = 3
                                                                 })
-                                                                pcall(function()
-                                                                    local TextChatService = game:GetService("TextChatService")
-                                                                    if TextChatService then
-                                                                        local channel = TextChatService:WaitForChild("TextChannels", 2)
-                                                                        if channel then
-                                                                            local rbxGeneral = channel:FindFirstChild("RBXGeneral")
-                                                                            if rbxGeneral then rbxGeneral:SendAsync("!cancel") end
-                                                                        end
-                                                                    end
-                                                                end)
-                                                                pcall(function()
-                                                                    local vc = workspace:FindFirstChild("VC")
-                                                                    if vc then
-                                                                        local remote = vc:FindFirstChild("RemoteEvent")
-                                                                        if remote then remote:FireServer("!cancel") end
-                                                                    end
-                                                                end)
+                                                                sendCancelCommand()
                                                                 task.wait(1)
                                                             end
                                                         end
@@ -945,23 +903,22 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- INSTAKILL SYSTEM (NEW TAB - Force Kill v2)
+        -- INSTAKILL SYSTEM (M1 SPAM - DEDICATED TAB)
         -- ==========================================
         Tabs.InstaKill:AddParagraph({
-            Title = "[💀] InstaKill System (FORCE KILL)",
-            Content = "Instantly kills ALL humanoids within range using 5-method force kill.\n\n" ..
-                "- 🆕 ANCHOR: Prevents dead NPCs from falling\n" ..
-                "- 🆕 FORCE KILL: 5 methods guarantee death\n" ..
-                "- 🆕 RETRY: 10 attempts per target\n" ..
-                "- Targets ALL NPCs in workspace (missions, training, etc)\n" ..
-                "- Can target players (PVP mode)\n" ..
-                "- Ultra-fast cycle (0.01s = 100 kills/sec)\n\n" ..
-                "⚠️ WARNING: Very detectable! Use only in private servers!"
+            Title = "[X] InstaKill - M1 Spam Engine",
+            Content = "Ultra-fast melee attack spam.\n\n" ..
+                "- Fires M1 (mouse1) hundreds of times per second\n" ..
+                "- Bypasses health checks via rapid server requests\n" ..
+                "- Auto-faces target for maximum hit registration\n" ..
+                "- Optional teleport to target for close-range combat\n" ..
+                "- Works on NPCs and/or Players\n\n" ..
+                "WARNING: Extremely detectable! Use only in private servers."
         })
         
         Tabs.InstaKill:AddToggle("InstaKillToggle", {
             Title = "Enable InstaKill",
-            Description = "ULTRA FAST: 5-method guaranteed kill on ALL nearby Humanoids",
+            Description = "Spam M1 attacks at extreme speed on all targets in range",
             Default = Config.InstaKillEnabled
         }):OnChanged(function(v)
             FarmState.InstaKillEnabled = v
@@ -969,14 +926,8 @@ return function(Common)
             ConfigManager.Save(Config)
             if v then
                 ui.Fluent:Notify({
-                    Title = "[💀] InstaKill ACTIVATED",
-                    Content = "Ultra-fast force-kill mode enabled!",
-                    Duration = 3
-                })
-            else
-                ui.Fluent:Notify({
-                    Title = "[💀] InstaKill DEACTIVATED",
-                    Content = "Total kills: " .. FarmState.InstaKillKills,
+                    Title = "[X] InstaKill ACTIVATED",
+                    Content = "M1 spam engine online! " .. math.floor(1/FarmState.InstaKillSpeed) .. " attacks/sec",
                     Duration = 3
                 })
             end
@@ -984,9 +935,9 @@ return function(Common)
         
         Tabs.InstaKill:AddSlider("InstaKillRangeSlider", {
             Title = "InstaKill Range (studs)",
-            Description = "Maximum distance to target enemies (default: 500)",
+            Description = "Maximum distance to target enemies (default: 60)",
             Default = Config.InstaKillRange,
-            Min = 50, Max = 1000, Rounding = 0,
+            Min = 10, Max = 500, Rounding = 0,
             Callback = function(v)
                 FarmState.InstaKillRange = v
                 Config.InstaKillRange = v
@@ -995,10 +946,10 @@ return function(Common)
         })
         
         Tabs.InstaKill:AddSlider("InstaKillSpeedSlider", {
-            Title = "InstaKill Speed (seconds)",
-            Description = "Time between kill cycles. Lower = more aggressive (min: 0.01s)",
+            Title = "M1 Spam Speed (seconds)",
+            Description = "Delay between M1 attacks. Lower = faster (min: 0.001s = 1000 atk/s)",
             Default = Config.InstaKillSpeed,
-            Min = 0.01, Max = 0.5, Rounding = 2,
+            Min = 0.001, Max = 0.1, Rounding = 3,
             Callback = function(v)
                 FarmState.InstaKillSpeed = v
                 Config.InstaKillSpeed = v
@@ -1007,8 +958,8 @@ return function(Common)
         })
         
         Tabs.InstaKill:AddToggle("InstaKillNPCToggle", {
-            Title = "Target ALL NPCs",
-            Description = "Kill all NPCs in range (missions, training, war mode, etc)",
+            Title = "Target NPCs",
+            Description = "Attack all NPCs in range (missions, bosses, training)",
             Default = Config.InstaKillTargetNPCs
         }):OnChanged(function(v)
             FarmState.InstaKillTargetNPCs = v
@@ -1018,7 +969,7 @@ return function(Common)
         
         Tabs.InstaKill:AddToggle("InstaKillPlayerToggle", {
             Title = "Target Players (PVP)",
-            Description = "Kill other players in range",
+            Description = "Attack other players in range",
             Default = Config.InstaKillTargetPlayers
         }):OnChanged(function(v)
             FarmState.InstaKillTargetPlayers = v
@@ -1026,34 +977,41 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        Tabs.InstaKill:AddToggle("InstaKillForceKillToggle", {
-            Title = "Force Kill Mode (REQUIRED)",
-            Description = "5-method guaranteed kill (Health=0 + Dead state + BreakJoints + Anchor + NoCollide)",
-            Default = Config.InstaKillForceKill
+        Tabs.InstaKill:AddToggle("InstaKillFaceToggle", {
+            Title = "Auto-Face Target",
+            Description = "Automatically rotate to face the target (required for M1 hits)",
+            Default = Config.InstaKillFaceTarget
         }):OnChanged(function(v)
-            FarmState.InstaKillForceKill = v
-            Config.InstaKillForceKill = v
+            FarmState.InstaKillFaceTarget = v
+            Config.InstaKillFaceTarget = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.InstaKill:AddToggle("InstaKillTeleportToggle", {
+            Title = "Teleport to Target",
+            Description = "Instantly teleport behind target before attacking",
+            Default = Config.InstaKillTeleportToTarget
+        }):OnChanged(function(v)
+            FarmState.InstaKillTeleportToTarget = v
+            Config.InstaKillTeleportToTarget = v
             ConfigManager.Save(Config)
         end)
         
         Tabs.InstaKill:AddParagraph({
-            Title = "InstaKill Info",
-            Content = "INSTAKILL MODE:\n" ..
-                "- Scans ALL Humanoids in workspace (not just npc folder)\n" ..
-                "- 0.01 second cycle (100 kills/sec potential)\n" ..
-                "- 500 stud default range\n" ..
-                "- 🆕 FORCE KILL: 5 methods guarantee death\n" ..
-                "  1. Health = 0\n" ..
-                "  2. HumanoidStateType.Dead\n" ..
-                "  3. BreakJoints()\n" ..
-                "  4. Anchor root (no falling)\n" ..
-                "  5. CanCollide = false (no physics)\n" ..
-                "- 🆕 ANTI-FALL: Dead NPCs stay anchored\n" ..
-                "- No M1 attacks, no cooldowns\n\n" ..
-                "⚠️ WARNING: Very detectable! Use only in private servers!"
+            Title = "InstaKill Mechanics",
+            Content = "How it works:\n\n" ..
+                "1. Scans all Humanoids in workspace\n" ..
+                "2. Filters by range and target type (NPC/Player)\n" ..
+                "3. Teleports behind target (if enabled)\n" ..
+                "4. Faces target using CFrame.lookAt\n" ..
+                "5. Fires combat.update:FireServer('mouse1', true)\n" ..
+                "6. Waits minimal delay (0.001-0.1s)\n" ..
+                "7. Fires combat.update:FireServer('mouse1', false)\n" ..
+                "8. Repeats at extreme speed\n\n" ..
+                "This overwhelms the server with M1 requests,\ncausing massive damage per second."
         })
         
-        -- INSTAKILL LOGIC - ULTRA FAST AGGRESSIVE FORCE KILL
+        -- INSTAKILL LOGIC - M1 SPAM ENGINE
         task.spawn(function()
             while true do
                 if FarmState.InstaKillEnabled and LocalPlayer.Character then
@@ -1061,11 +1019,13 @@ return function(Common)
                         local char = LocalPlayer.Character
                         local root = char:FindFirstChild("HumanoidRootPart")
                         local hum = char:FindFirstChildOfClass("Humanoid")
+                        local combat = char:FindFirstChild("combat")
                         
-                        if root and hum and hum.Health > 0 then
+                        if root and hum and combat and hum.Health > 0 then
                             local killCount = 0
+                            local targets = {}
                             
-                            -- SCAN ALL HUMANOIDs IN WORKSPACE (not just npc folder)
+                            -- Collect all valid targets
                             if FarmState.InstaKillTargetNPCs then
                                 -- Scan workspace.npc folder
                                 local npcs = workspace:FindFirstChild("npc")
@@ -1079,63 +1039,37 @@ return function(Common)
                                                 local dist = (root.Position - npcRoot.Position).Magnitude
                                                 
                                                 if dist <= FarmState.InstaKillRange then
-                                                    if FarmState.InstaKillForceKill then
-                                                        -- 🆕 FORCE KILL: Use multi-method kill
-                                                        local killed = forceKillNPC(npc, npcRoot, npcHum)
-                                                        if killed then
-                                                            killCount = killCount + 1
-                                                        end
-                                                    end
+                                                    table.insert(targets, {
+                                                        model = npc,
+                                                        root = npcRoot,
+                                                        hum = npcHum,
+                                                        name = npc.Name,
+                                                        distance = dist
+                                                    })
                                                 end
                                             end
                                         end
                                     end
                                 end
                                 
-                                -- Also scan workspace.bossdropmission for bosses
-                                local bossFolder = workspace:FindFirstChild("bossdropmission")
-                                if bossFolder then
-                                    for _, descendant in pairs(bossFolder:GetDescendants()) do
-                                        if descendant:IsA("Humanoid") and descendant.Health > 0 then
-                                            local model = descendant.Parent
-                                            if model and model:IsA("Model") then
-                                                local modelRoot = model:FindFirstChild("HumanoidRootPart")
-                                                if modelRoot then
-                                                    local dist = (root.Position - modelRoot.Position).Magnitude
-                                                    if dist <= FarmState.InstaKillRange then
-                                                        if FarmState.InstaKillForceKill then
-                                                            -- 🆕 FORCE KILL
-                                                            local killed = forceKillNPC(model, modelRoot, descendant)
-                                                            if killed then
-                                                                killCount = killCount + 1
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                -- Scan workspace for any stray Humanoids
+                                -- Scan workspace for any other NPCs
                                 for _, obj in pairs(workspace:GetChildren()) do
                                     if obj:IsA("Model") and obj ~= char then
                                         local objRoot = obj:FindFirstChild("HumanoidRootPart")
                                         local objHum = obj:FindFirstChildOfClass("Humanoid")
                                         
                                         if objRoot and objHum and objHum.Health > 0 then
-                                            -- Skip players if not targeting them
                                             local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
                                             if not isPlayer then
                                                 local dist = (root.Position - objRoot.Position).Magnitude
                                                 if dist <= FarmState.InstaKillRange then
-                                                    if FarmState.InstaKillForceKill then
-                                                        -- 🆕 FORCE KILL
-                                                        local killed = forceKillNPC(obj, objRoot, objHum)
-                                                        if killed then
-                                                            killCount = killCount + 1
-                                                        end
-                                                    end
+                                                    table.insert(targets, {
+                                                        model = obj,
+                                                        root = objRoot,
+                                                        hum = objHum,
+                                                        name = obj.Name,
+                                                        distance = dist
+                                                    })
                                                 end
                                             end
                                         end
@@ -1143,7 +1077,7 @@ return function(Common)
                                 end
                             end
                             
-                            -- KILL ALL PLAYERS IN RANGE
+                            -- Add players if targeting enabled
                             if FarmState.InstaKillTargetPlayers then
                                 for _, player in pairs(Players:GetPlayers()) do
                                     if player ~= LocalPlayer and player.Character then
@@ -1154,16 +1088,57 @@ return function(Common)
                                             local dist = (root.Position - playerRoot.Position).Magnitude
                                             
                                             if dist <= FarmState.InstaKillRange then
-                                                if FarmState.InstaKillForceKill then
-                                                    -- 🆕 FORCE KILL
-                                                    local killed = forceKillNPC(player.Character, playerRoot, playerHum)
-                                                    if killed then
-                                                        killCount = killCount + 1
-                                                    end
-                                                end
+                                                table.insert(targets, {
+                                                    model = player.Character,
+                                                    root = playerRoot,
+                                                    hum = playerHum,
+                                                    name = player.Name,
+                                                    distance = dist
+                                                })
                                             end
                                         end
                                     end
+                                end
+                            end
+                            
+                            -- Sort by distance (closest first)
+                            table.sort(targets, function(a, b) return a.distance < b.distance end)
+                            
+                            -- Attack all targets with M1 spam
+                            for _, target in ipairs(targets) do
+                                if not target.hum or target.hum.Health <= 0 or not target.root.Parent then
+                                    continue
+                                end
+                                
+                                -- Teleport to target if enabled
+                                if FarmState.InstaKillTeleportToTarget then
+                                    local behindOffset = -target.root.CFrame.LookVector * 3
+                                    local targetCFrame = CFrame.new(target.root.Position + behindOffset)
+                                    root.CFrame = targetCFrame
+                                end
+                                
+                                -- Face the target
+                                if FarmState.InstaKillFaceTarget then
+                                    root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
+                                end
+                                
+                                -- SPAM M1 ATTACK
+                                -- Fire mouse1 true (start attack)
+                                pcall(function()
+                                    combat.update:FireServer("mouse1", true)
+                                end)
+                                
+                                -- Minimal delay
+                                task.wait(FarmState.InstaKillSpeed)
+                                
+                                -- Fire mouse1 false (end attack)
+                                pcall(function()
+                                    combat.update:FireServer("mouse1", false)
+                                end)
+                                
+                                -- Check if target died
+                                if target.hum.Health <= 0 or not target.model.Parent then
+                                    killCount = killCount + 1
                                 end
                             end
                             
@@ -1171,7 +1146,7 @@ return function(Common)
                         end
                     end)
                 end
-                task.wait(FarmState.InstaKillSpeed or 0.01)
+                task.wait(FarmState.InstaKillSpeed or 0.003)
             end
         end)
         
@@ -1183,23 +1158,28 @@ return function(Common)
         
         task.spawn(function()
             while true do
+                local attacksPerSec = math.floor(1 / (FarmState.InstaKillSpeed or 0.003))
+                
                 InstaKillStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
+                    "Attack Speed: %d attacks/sec\n" ..
                     "Range: %d studs\n" ..
-                    "Cycle Speed: %.2fs\n" ..
-                    "Total Kills: %d\n" ..
-                    "Force Kill: %s (5 methods)\n" ..
-                    "Target NPCs: %s\n" ..
-                    "Target Players: %s\n\n" ..
-                    "🆕 Anti-Fall: Dead NPCs stay anchored\n" ..
-                    "🆕 5-Method Kill: Guaranteed death",
-                    FarmState.InstaKillEnabled and "[💀] ACTIVE" or "[X] INACTIVE",
+                    "Total Kills: %d\n\n" ..
+                    "Settings:\n" ..
+                    "- Target NPCs: %s\n" ..
+                    "- Target Players: %s\n" ..
+                    "- Auto-Face: %s\n" ..
+                    "- Teleport: %s\n\n" ..
+                    "Active: %s",
+                    FarmState.InstaKillEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+                    attacksPerSec,
                     FarmState.InstaKillRange,
-                    FarmState.InstaKillSpeed,
                     FarmState.InstaKillKills,
-                    FarmState.InstaKillForceKill and "YES" or "NO",
                     FarmState.InstaKillTargetNPCs and "YES" or "NO",
-                    FarmState.InstaKillTargetPlayers and "YES" or "NO"
+                    FarmState.InstaKillTargetPlayers and "YES" or "NO",
+                    FarmState.InstaKillFaceTarget and "YES" or "NO",
+                    FarmState.InstaKillTeleportToTarget and "YES" or "NO",
+                    FarmState.InstaKillEnabled and "M1 SPAM ENGINE RUNNING" or "DISABLED"
                 )
                 task.wait(0.5)
             end
@@ -1733,11 +1713,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES (KillAura removed - now in InstaKill tab)
+        -- EXPERIMENTAL FEATURES (NO KILLAURA - MOVED TO INSTAKILL TAB)
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
-            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\n💀 Note: InstaKill (force kill) has its own tab now!"
+            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam) has been moved to its own dedicated tab."
         })
         
         -- ANTI RAGDOLL SECTION
@@ -2134,7 +2114,7 @@ return function(Common)
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 4\n\n%s\n\n💀 InstaKill: Moved to dedicated tab!\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    "Active Features: %d / 4\n\n%s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
                     #activeFeatures, activeText,
                     FarmState.ESPMaxDistance,
                     (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
@@ -2230,7 +2210,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + InstaKill M1 Spam)",
             Duration = 5
         })
     end
