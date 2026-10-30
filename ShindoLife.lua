@@ -2,7 +2,8 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
-// Mission Protection: Auto-cancel non-green missions
+-- // Mission Protection: Auto-cancel non-green missions
+-- // Experimental: KillAura, AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
 return function(Common)
@@ -13,6 +14,7 @@ return function(Common)
     local TweenService = Common.TweenService
     local RunService = Common.RunService
     local UserInputService = Common.UserInputService
+    local Players = Common.Players
     
     local placeId = game.PlaceId
     local isShindoMenu = (placeId == 4616652839)
@@ -58,7 +60,23 @@ return function(Common)
             AutoSkillNEnabled = false,
             AutoSkillQEnabled = false,
             AutoSkillEEnabled = false,
-            AutoSkillSpamSpeed = 0.2
+            AutoSkillSpamSpeed = 0.2,
+            -- Experimental Config
+            KillAuraEnabled = false,
+            KillAuraRange = 25,
+            KillAuraSpeed = 0.08,
+            KillAuraTargetNPCs = true,
+            KillAuraTargetPlayers = false,
+            AntiRagdollEnabled = false,
+            AntiKnockbackEnabled = false,
+            ESPEnabled = false,
+            ESPShowNames = true,
+            ESPShowDistance = true,
+            ESPShowHealth = true,
+            ESPMaxDistance = 500,
+            ESPFillColor = {R = 255, G = 0, B = 0},
+            ESPOutlineColor = {R = 255, G = 255, B = 0},
+            StunGrabImmunityEnabled = false
         }
     end
     
@@ -119,6 +137,39 @@ return function(Common)
         if ok then
             lastM1Time = now
             task.delay(0.05, function()
+                pcall(function()
+                    combat.update:FireServer("mouse1", false)
+                end)
+            end)
+        end
+        
+        return ok
+    end
+    
+    -- Fast M1 for KillAura (bypasses normal cooldown)
+    local function killAuraM1(targetHRP)
+        local char = LocalPlayer.Character
+        if not char then return false end
+        
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local combat = char:FindFirstChild("combat")
+        if not root or not combat then return false end
+        
+        -- Face target
+        if targetHRP then
+            local dir = (targetHRP.Position - root.Position) * Vector3.new(1, 0, 1)
+            if dir.Magnitude > 0.1 then
+                root.CFrame = CFrame.lookAt(root.Position, root.Position + dir.Unit)
+            end
+        end
+        
+        -- Fire M1
+        local ok = pcall(function()
+            combat.update:FireServer("mouse1", true)
+        end)
+        
+        if ok then
+            task.delay(0.03, function()
                 pcall(function()
                     combat.update:FireServer("mouse1", false)
                 end)
@@ -469,6 +520,7 @@ return function(Common)
         Tabs.Stats = ui.Window:AddTab({ Title = "Auto Stats", Icon = "trending-up" })
         Tabs.Skills = ui.Window:AddTab({ Title = "Oto Skill", Icon = "zap" })
         Tabs.Chakra = ui.Window:AddTab({ Title = "Auto Chakra", Icon = "activity" })
+        Tabs.Experimental = ui.Window:AddTab({ Title = "Experimental", Icon = "flask-conical" })
         Tabs.Utilities = ui.Window:AddTab({ Title = "Utilities", Icon = "tool" })
         
         local FarmState = {
@@ -500,10 +552,36 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
+            -- Experimental State
+            KillAuraEnabled = Config.KillAuraEnabled,
+            KillAuraRange = Config.KillAuraRange or 25,
+            KillAuraSpeed = Config.KillAuraSpeed or 0.08,
+            KillAuraTargetNPCs = Config.KillAuraTargetNPCs,
+            KillAuraTargetPlayers = Config.KillAuraTargetPlayers,
+            AntiRagdollEnabled = Config.AntiRagdollEnabled,
+            AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
+            ESPEnabled = Config.ESPEnabled,
+            ESPShowNames = Config.ESPShowNames,
+            ESPShowDistance = Config.ESPShowDistance,
+            ESPShowHealth = Config.ESPShowHealth,
+            ESPMaxDistance = Config.ESPMaxDistance or 500,
+            ESPFillColor = Color3.new(
+                (Config.ESPFillColor and Config.ESPFillColor.R or 255)/255,
+                (Config.ESPFillColor and Config.ESPFillColor.G or 0)/255,
+                (Config.ESPFillColor and Config.ESPFillColor.B or 0)/255
+            ),
+            ESPOutlineColor = Color3.new(
+                (Config.ESPOutlineColor and Config.ESPOutlineColor.R or 255)/255,
+                (Config.ESPOutlineColor and Config.ESPOutlineColor.G or 255)/255,
+                (Config.ESPOutlineColor and Config.ESPOutlineColor.B or 0)/255
+            ),
+            StunGrabImmunityEnabled = Config.StunGrabImmunityEnabled,
+            -- Stats
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
-            SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0}
+            SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0},
+            KillAuraKills = 0
         }
         
         -- ==========================================
@@ -804,7 +882,6 @@ return function(Common)
                                                         task.wait(0.5)
                                                         local acceptedMission = LocalPlayer:FindFirstChild("currentmission")
                                                         if acceptedMission and acceptedMission.Value ~= nil and acceptedMission.Value ~= "" then
-                                                            -- Re-check the giver's mission color after acceptance
                                                             local currentColor = nil
                                                             if giver:FindFirstChild("Head") 
                                                                 and giver.Head:FindFirstChild("givemission")
@@ -812,7 +889,6 @@ return function(Common)
                                                                 currentColor = giver.Head.givemission.color.Image
                                                             end
                                                             
-                                                            -- If mission color is NOT green, cancel it
                                                             if currentColor and currentColor ~= green then
                                                                 ui.Fluent:Notify({
                                                                     Title = "[!] Mission Protection",
@@ -820,7 +896,6 @@ return function(Common)
                                                                     Duration = 3
                                                                 })
                                                                 
-                                                                -- Send !cancel to chat
                                                                 pcall(function()
                                                                     local TextChatService = game:GetService("TextChatService")
                                                                     if TextChatService then
@@ -834,7 +909,6 @@ return function(Common)
                                                                     end
                                                                 end)
                                                                 
-                                                                -- Fallback: try workspace.VC remote
                                                                 pcall(function()
                                                                     local vc = workspace:FindFirstChild("VC")
                                                                     if vc then
@@ -845,11 +919,11 @@ return function(Common)
                                                                     end
                                                                 end)
                                                                 
-                                                                task.wait(1) -- Wait for cancel to process
+                                                                task.wait(1)
                                                             end
                                                         end
                                                         
-                                                        task.wait(1) -- Wait for mission to register on server
+                                                        task.wait(1)
                                                     end
                                                 end
                                                 break
@@ -1407,7 +1481,6 @@ return function(Common)
             Content = "Enable/disable individual skill keys below."
         })
         
-        -- Helper function to create skill toggle
         local function createSkillToggle(keyName, upperKey)
             local toggleName = "AutoSkill" .. upperKey .. "Toggle"
             Tabs.Skills:AddToggle(toggleName, {
@@ -1421,7 +1494,6 @@ return function(Common)
             end)
         end
         
-        -- Create toggles for all keys
         createSkillToggle("r", "R")
         createSkillToggle("t", "T")
         createSkillToggle("y", "Y")
@@ -1468,7 +1540,6 @@ return function(Common)
             end
         })
         
-        -- Generic skill spammer function
         local function createSkillSpammer(keyName, upperKey)
             task.spawn(function()
                 while true do
@@ -1478,16 +1549,9 @@ return function(Common)
                             local combat = char:FindFirstChild("combat")
                             
                             if combat then
-                                -- Press key
                                 combat.update:FireServer("key", keyName)
-                                
-                                -- Wait for configured spam speed
                                 task.wait(FarmState.AutoSkillSpamSpeed or 0.2)
-                                
-                                -- Release key
                                 combat.update:FireServer("key", keyName .. "end")
-                                
-                                -- Update stats
                                 FarmState.SkillStats[keyName] = (FarmState.SkillStats[keyName] or 0) + 1
                             end
                         end)
@@ -1497,7 +1561,6 @@ return function(Common)
             end)
         end
         
-        -- Create spammer for each key
         createSkillSpammer("r", "R")
         createSkillSpammer("t", "T")
         createSkillSpammer("y", "Y")
@@ -1510,7 +1573,6 @@ return function(Common)
         createSkillSpammer("q", "Q")
         createSkillSpammer("e", "E")
         
-        -- Skill Status Display
         local SkillStatusDisplay = Tabs.Skills:AddParagraph({
             Title = "Skill Spammer Status",
             Content = "Initializing..."
@@ -1607,6 +1669,604 @@ return function(Common)
         end)
         
         -- ==========================================
+        -- EXPERIMENTAL FEATURES (NEW!)
+        -- ==========================================
+        Tabs.Experimental:AddParagraph({
+            Title = "[X] EXPERIMENTAL FEATURES",
+            Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!"
+        })
+        
+        -- KILL AURA SECTION
+        Tabs.Experimental:AddSection("KillAura (Rapid M1)")
+        
+        Tabs.Experimental:AddToggle("KillAuraToggle", {
+            Title = "Enable KillAura",
+            Description = "Automatically attack nearby enemies with rapid M1",
+            Default = Config.KillAuraEnabled
+        }):OnChanged(function(v)
+            FarmState.KillAuraEnabled = v
+            Config.KillAuraEnabled = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddSlider("KillAuraRangeSlider", {
+            Title = "KillAura Range (studs)",
+            Description = "Maximum distance to target enemies",
+            Default = Config.KillAuraRange,
+            Min = 5, Max = 50, Rounding = 0,
+            Callback = function(v)
+                FarmState.KillAuraRange = v
+                Config.KillAuraRange = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Experimental:AddSlider("KillAuraSpeedSlider", {
+            Title = "KillAura Speed (seconds)",
+            Description = "Time between M1 attacks. Lower = faster but more detectable.",
+            Default = Config.KillAuraSpeed,
+            Min = 0.02, Max = 0.5, Rounding = 2,
+            Callback = function(v)
+                FarmState.KillAuraSpeed = v
+                Config.KillAuraSpeed = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Experimental:AddToggle("KillAuraNPCToggle", {
+            Title = "Target NPCs",
+            Description = "Attack mission NPCs and enemies",
+            Default = Config.KillAuraTargetNPCs
+        }):OnChanged(function(v)
+            FarmState.KillAuraTargetNPCs = v
+            Config.KillAuraTargetNPCs = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddToggle("KillAuraPlayerToggle", {
+            Title = "Target Players",
+            Description = "Attack other players (PVP mode)",
+            Default = Config.KillAuraTargetPlayers
+        }):OnChanged(function(v)
+            FarmState.KillAuraTargetPlayers = v
+            Config.KillAuraTargetPlayers = v
+            ConfigManager.Save(Config)
+        end)
+        
+        -- KILL AURA LOGIC
+        task.spawn(function()
+            while true do
+                if FarmState.KillAuraEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        
+                        if root and hum and hum.Health > 0 then
+                            local targets = {}
+                            
+                            -- Find NPC targets
+                            if FarmState.KillAuraTargetNPCs then
+                                local npcs = workspace:FindFirstChild("npc")
+                                if npcs then
+                                    for _, npc in pairs(npcs:GetChildren()) do
+                                        if npc:IsA("Model") and npc:FindFirstChild("HumanoidRootPart") 
+                                            and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                                            local dist = (root.Position - npc.HumanoidRootPart.Position).Magnitude
+                                            if dist <= FarmState.KillAuraRange then
+                                                table.insert(targets, {model = npc, root = npc.HumanoidRootPart, dist = dist})
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            -- Find Player targets
+                            if FarmState.KillAuraTargetPlayers then
+                                for _, player in pairs(Players:GetPlayers()) do
+                                    if player ~= LocalPlayer and player.Character then
+                                        local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                        local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
+                                        if playerRoot and playerHum and playerHum.Health > 0 then
+                                            local dist = (root.Position - playerRoot.Position).Magnitude
+                                            if dist <= FarmState.KillAuraRange then
+                                                table.insert(targets, {model = player.Character, root = playerRoot, dist = dist})
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            -- Sort by distance and attack closest
+                            if #targets > 0 then
+                                table.sort(targets, function(a, b) return a.dist < b.dist end)
+                                local closest = targets[1]
+                                killAuraM1(closest.root)
+                                FarmState.KillAuraKills = FarmState.KillAuraKills + 1
+                            end
+                        end
+                    end)
+                end
+                task.wait(FarmState.KillAuraSpeed or 0.08)
+            end
+        end)
+        
+        -- ANTI RAGDOLL SECTION
+        Tabs.Experimental:AddSection("Anti Ragdoll")
+        
+        Tabs.Experimental:AddToggle("AntiRagdollToggle", {
+            Title = "Enable Anti Ragdoll",
+            Description = "Prevents character from going into ragdoll state",
+            Default = Config.AntiRagdollEnabled
+        }):OnChanged(function(v)
+            FarmState.AntiRagdollEnabled = v
+            Config.AntiRagdollEnabled = v
+            ConfigManager.Save(Config)
+        end)
+        
+        -- ANTI RAGDOLL LOGIC
+        task.spawn(function()
+            while true do
+                if FarmState.AntiRagdollEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        
+                        if hum then
+                            -- Check if in ragdoll state and force recovery
+                            local state = hum:GetState()
+                            if state == Enum.HumanoidStateType.Physics 
+                                or state == Enum.HumanoidStateType.Ragdoll
+                                or state == Enum.HumanoidStateType.FallingDown then
+                                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                                task.wait(0.1)
+                                hum:ChangeState(Enum.HumanoidStateType.Running)
+                            end
+                            
+                            -- Also check for ragdoll attribute
+                            local ragdoll = char:GetAttribute("Ragdoll")
+                            if ragdoll and ragdoll ~= 0 then
+                                char:SetAttribute("Ragdoll", 0)
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.1)
+            end
+        end)
+        
+        -- ANTI KNOCKBACK SECTION
+        Tabs.Experimental:AddSection("Anti Knockback")
+        
+        Tabs.Experimental:AddToggle("AntiKnockbackToggle", {
+            Title = "Enable Anti Knockback",
+            Description = "Prevents character from being pushed/knocked back",
+            Default = Config.AntiKnockbackEnabled
+        }):OnChanged(function(v)
+            FarmState.AntiKnockbackEnabled = v
+            Config.AntiKnockbackEnabled = v
+            ConfigManager.Save(Config)
+        end)
+        
+        -- ANTI KNOCKBACK LOGIC
+        task.spawn(function()
+            while true do
+                if FarmState.AntiKnockbackEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        
+                        if root and hum and hum.Health > 0 then
+                            -- Remove BodyVelocity instances (knockback forces)
+                            for _, v in pairs(char:GetDescendants()) do
+                                if v:IsA("BodyVelocity") and v.Name ~= "AntiKB" then
+                                    pcall(function() v:Destroy() end)
+                                elseif v:IsA("BodyForce") then
+                                    pcall(function() v:Destroy() end)
+                                elseif v:IsA("BodyThrust") then
+                                    pcall(function() v:Destroy() end)
+                                end
+                            end
+                            
+                            -- Reset velocity if too high (being knocked)
+                            local vel = root.AssemblyLinearVelocity
+                            if vel.Magnitude > 100 then
+                                root.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.05)
+            end
+        end)
+        
+        -- ESP SECTION
+        Tabs.Experimental:AddSection("ESP (Extra Sensory Perception)")
+        
+        Tabs.Experimental:AddToggle("ESPToggle", {
+            Title = "Enable ESP",
+            Description = "See all players through walls with highlights",
+            Default = Config.ESPEnabled
+        }):OnChanged(function(v)
+            FarmState.ESPEnabled = v
+            Config.ESPEnabled = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddToggle("ESPNamesToggle", {
+            Title = "Show Names",
+            Description = "Display player names above their heads",
+            Default = Config.ESPShowNames
+        }):OnChanged(function(v)
+            FarmState.ESPShowNames = v
+            Config.ESPShowNames = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddToggle("ESPDistanceToggle", {
+            Title = "Show Distance",
+            Description = "Display distance to each player",
+            Default = Config.ESPShowDistance
+        }):OnChanged(function(v)
+            FarmState.ESPShowDistance = v
+            Config.ESPShowDistance = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddToggle("ESPHealthToggle", {
+            Title = "Show Health",
+            Description = "Display player health values",
+            Default = Config.ESPShowHealth
+        }):OnChanged(function(v)
+            FarmState.ESPShowHealth = v
+            Config.ESPShowHealth = v
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddSlider("ESPRangeSlider", {
+            Title = "ESP Max Distance (studs)",
+            Description = "Only show players within this range",
+            Default = Config.ESPMaxDistance,
+            Min = 50, Max = 2000, Rounding = 0,
+            Callback = function(v)
+                FarmState.ESPMaxDistance = v
+                Config.ESPMaxDistance = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.Experimental:AddColorpicker("ESPFillColorPicker", {
+            Title = "ESP Fill Color",
+            Default = FarmState.ESPFillColor
+        }):OnChanged(function(color)
+            FarmState.ESPFillColor = color
+            Config.ESPFillColor = {
+                R = math.floor(color.R * 255),
+                G = math.floor(color.G * 255),
+                B = math.floor(color.B * 255)
+            }
+            ConfigManager.Save(Config)
+        end)
+        
+        Tabs.Experimental:AddColorpicker("ESPOutlineColorPicker", {
+            Title = "ESP Outline Color",
+            Default = FarmState.ESPOutlineColor
+        }):OnChanged(function(color)
+            FarmState.ESPOutlineColor = color
+            Config.ESPOutlineColor = {
+                R = math.floor(color.R * 255),
+                G = math.floor(color.G * 255),
+                B = math.floor(color.B * 255)
+            }
+            ConfigManager.Save(Config)
+        end)
+        
+        -- ESP Storage
+        local ESPHighlights = {}
+        local ESPBillboards = {}
+        
+        -- ESP Creation Function
+        local function createESPForPlayer(player)
+            if player == LocalPlayer then return end
+            if not player.Character then return end
+            
+            -- Clean up existing
+            if ESPHighlights[player] then
+                pcall(function() ESPHighlights[player]:Destroy() end)
+                ESPHighlights[player] = nil
+            end
+            if ESPBillboards[player] then
+                pcall(function() ESPBillboards[player]:Destroy() end)
+                ESPBillboards[player] = nil
+            end
+            
+            -- Create Highlight
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "GlockESP"
+            highlight.FillColor = FarmState.ESPFillColor
+            highlight.FillTransparency = 0.7
+            highlight.OutlineColor = FarmState.ESPOutlineColor
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Adornee = player.Character
+            highlight.Parent = player.Character
+            
+            -- Create Billboard
+            local getUI = gethui or function() return game:GetService("CoreGui") end
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "GlockESP_Billboard"
+            billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+            billboard.Size = UDim2.new(0, 200, 0, 80)
+            billboard.StudsOffset = Vector3.new(0, 3, 0)
+            billboard.AlwaysOnTop = true
+            billboard.LightInfluence = 0
+            billboard.ResetOnSpawn = false
+            
+            pcall(function() billboard.Parent = getUI() end)
+            if not billboard.Parent then
+                billboard.Parent = LocalPlayer:WaitForChild("PlayerGui")
+            end
+            
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Name = "NameLabel"
+            nameLabel.Size = UDim2.new(1, 0, 0, 20)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = player.DisplayName or player.Name
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextSize = 14
+            nameLabel.TextStrokeTransparency = 0
+            nameLabel.Parent = billboard
+            
+            local distLabel = Instance.new("TextLabel")
+            distLabel.Name = "DistLabel"
+            distLabel.Size = UDim2.new(1, 0, 0, 16)
+            distLabel.Position = UDim2.new(0, 0, 0, 20)
+            distLabel.BackgroundTransparency = 1
+            distLabel.Text = "0m"
+            distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            distLabel.Font = Enum.Font.Gotham
+            distLabel.TextSize = 12
+            distLabel.TextStrokeTransparency = 0
+            distLabel.Parent = billboard
+            
+            local healthLabel = Instance.new("TextLabel")
+            healthLabel.Name = "HealthLabel"
+            healthLabel.Size = UDim2.new(1, 0, 0, 16)
+            healthLabel.Position = UDim2.new(0, 0, 0, 36)
+            healthLabel.BackgroundTransparency = 1
+            healthLabel.Text = "100 HP"
+            healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            healthLabel.Font = Enum.Font.Gotham
+            healthLabel.TextSize = 12
+            healthLabel.TextStrokeTransparency = 0
+            healthLabel.Parent = billboard
+            
+            ESPHighlights[player] = highlight
+            ESPBillboards[player] = billboard
+            
+            highlight.Enabled = FarmState.ESPEnabled
+            billboard.Enabled = FarmState.ESPEnabled
+            nameLabel.Visible = FarmState.ESPShowNames
+            distLabel.Visible = FarmState.ESPShowDistance
+            healthLabel.Visible = FarmState.ESPShowHealth
+        end
+        
+        local function removeESPForPlayer(player)
+            if ESPHighlights[player] then
+                pcall(function() ESPHighlights[player]:Destroy() end)
+                ESPHighlights[player] = nil
+            end
+            if ESPBillboards[player] then
+                pcall(function() ESPBillboards[player]:Destroy() end)
+                ESPBillboards[player] = nil
+            end
+        end
+        
+        -- ESP Update Loop
+        task.spawn(function()
+            while true do
+                if FarmState.ESPEnabled then
+                    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    for player, highlight in pairs(ESPHighlights) do
+                        if not player or not player.Parent then
+                            removeESPForPlayer(player)
+                        else
+                            local char = player.Character
+                            local root = char and char:FindFirstChild("HumanoidRootPart")
+                            local hum = char and char:FindFirstChildOfClass("Humanoid")
+                            local billboard = ESPBillboards[player]
+                            
+                            if char and root and hum then
+                                local distance = myRoot and (myRoot.Position - root.Position).Magnitude or 0
+                                
+                                highlight.Enabled = distance <= FarmState.ESPMaxDistance
+                                if billboard then
+                                    billboard.Enabled = distance <= FarmState.ESPMaxDistance
+                                    
+                                    local nameLabel = billboard:FindFirstChild("NameLabel")
+                                    local distLabel = billboard:FindFirstChild("DistLabel")
+                                    local healthLabel = billboard:FindFirstChild("HealthLabel")
+                                    
+                                    if nameLabel then
+                                        nameLabel.Visible = FarmState.ESPShowNames
+                                        nameLabel.Text = player.DisplayName or player.Name
+                                    end
+                                    if distLabel then
+                                        distLabel.Visible = FarmState.ESPShowDistance
+                                        distLabel.Text = string.format("[%.0fm]", distance)
+                                    end
+                                    if healthLabel then
+                                        healthLabel.Visible = FarmState.ESPShowHealth
+                                        healthLabel.Text = string.format("%.0f/%.0f HP", hum.Health, hum.MaxHealth)
+                                        
+                                        local healthPercent = hum.Health / hum.MaxHealth
+                                        if healthPercent > 0.5 then
+                                            healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                                        elseif healthPercent > 0.25 then
+                                            healthLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+                                        else
+                                            healthLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+                                        end
+                                    end
+                                end
+                                
+                                highlight.FillColor = FarmState.ESPFillColor
+                                highlight.OutlineColor = FarmState.ESPOutlineColor
+                            else
+                                highlight.Enabled = false
+                                if billboard then billboard.Enabled = false end
+                            end
+                        end
+                    end
+                else
+                    for player, highlight in pairs(ESPHighlights) do
+                        highlight.Enabled = false
+                        local billboard = ESPBillboards[player]
+                        if billboard then billboard.Enabled = false end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+        
+        -- ESP Player Events
+        Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function()
+                task.wait(0.5)
+                if FarmState.ESPEnabled then
+                    createESPForPlayer(player)
+                end
+            end)
+            if player.Character and FarmState.ESPEnabled then
+                createESPForPlayer(player)
+            end
+        end)
+        
+        Players.PlayerRemoving:Connect(function(player)
+            removeESPForPlayer(player)
+        end)
+        
+        -- Initialize ESP for existing players
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character and FarmState.ESPEnabled then
+                createESPForPlayer(player)
+            end
+        end
+        
+        -- STUN/GRAB IMMUNITY SECTION
+        Tabs.Experimental:AddSection("Stun/Grab Immunity")
+        
+        Tabs.Experimental:AddToggle("StunGrabImmunityToggle", {
+            Title = "Enable Stun/Grab Immunity",
+            Description = "Prevents being stunned, grabbed, or held by enemies",
+            Default = Config.StunGrabImmunityEnabled
+        }):OnChanged(function(v)
+            FarmState.StunGrabImmunityEnabled = v
+            Config.StunGrabImmunityEnabled = v
+            ConfigManager.Save(Config)
+        end)
+        
+        -- STUN/GRAB IMMUNITY LOGIC
+        task.spawn(function()
+            while true do
+                if FarmState.StunGrabImmunityEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        
+                        if char and hum and root and hum.Health > 0 then
+                            -- Remove stun/grab related objects
+                            local stunObjects = {"Stun", "Grab", "Grabbed", "Hold", "Carry", "Knockback", "Ragdoll"}
+                            for _, objName in ipairs(stunObjects) do
+                                local obj = char:FindFirstChild(objName)
+                                if obj then
+                                    pcall(function() obj:Destroy() end)
+                                end
+                            end
+                            
+                            -- Clear stun/grab attributes
+                            local stunAttrs = {"Stunned", "Grabbed", "Held", "Ragdoll", "Knockback"}
+                            for _, attrName in ipairs(stunAttrs) do
+                                local val = char:GetAttribute(attrName)
+                                if val and val ~= 0 and val ~= false then
+                                    char:SetAttribute(attrName, 0)
+                                end
+                            end
+                            
+                            -- Force recovery from bad states
+                            local state = hum:GetState()
+                            if state == Enum.HumanoidStateType.Physics 
+                                or state == Enum.HumanoidStateType.Ragdoll
+                                or state == Enum.HumanoidStateType.FallingDown
+                                or state == Enum.HumanoidStateType.PlatformStanding then
+                                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                                task.wait(0.05)
+                                hum:ChangeState(Enum.HumanoidStateType.Running)
+                            end
+                            
+                            -- Reset AutoRotate if disabled
+                            if not hum.AutoRotate then
+                                hum.AutoRotate = true
+                            end
+                            
+                            -- Remove Weld constraints that might be grabbing us
+                            for _, v in pairs(char:GetDescendants()) do
+                                if v:IsA("Weld") or v:IsA("WeldConstraint") then
+                                    local p0, p1 = v.Part0, v.Part1
+                                    if p0 and p1 then
+                                        local p0Char = p0:FindFirstAncestorOfClass("Model")
+                                        local p1Char = p1:FindFirstAncestorOfClass("Model")
+                                        if p0Char ~= char and p1Char ~= char then
+                                            pcall(function() v:Destroy() end)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.05)
+            end
+        end)
+        
+        -- EXPERIMENTAL STATUS DISPLAY
+        local ExperimentalStatusDisplay = Tabs.Experimental:AddParagraph({
+            Title = "Experimental Features Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local activeFeatures = {}
+                if FarmState.KillAuraEnabled then table.insert(activeFeatures, "KillAura") end
+                if FarmState.AntiRagdollEnabled then table.insert(activeFeatures, "AntiRagdoll") end
+                if FarmState.AntiKnockbackEnabled then table.insert(activeFeatures, "AntiKnockback") end
+                if FarmState.ESPEnabled then table.insert(activeFeatures, "ESP") end
+                if FarmState.StunGrabImmunityEnabled then table.insert(activeFeatures, "StunImmunity") end
+                
+                local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
+                
+                ExperimentalStatusDisplay.Content = string.format(
+                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    #activeFeatures,
+                    activeText,
+                    FarmState.KillAuraRange,
+                    FarmState.KillAuraSpeed,
+                    FarmState.KillAuraKills,
+                    FarmState.KillAuraTargetNPCs and "YES" or "NO",
+                    FarmState.KillAuraTargetPlayers and "YES" or "NO",
+                    FarmState.ESPMaxDistance,
+                    (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
+                )
+                task.wait(0.5)
+            end
+        end)
+        
+        -- ==========================================
         -- UTILITIES
         -- ==========================================
         Tabs.Utilities:AddParagraph({
@@ -1682,12 +2342,21 @@ return function(Common)
                 end
             end
             currentTargetNPC = nil
+            
+            -- Reapply ESP to self on respawn
+            if FarmState.ESPEnabled then
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        createESPForPlayer(player)
+                    end
+                end
+            end
         end)
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing + Auto Skill + Mission Protection)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Experimental Features)",
             Duration = 5
         })
     end
