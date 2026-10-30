@@ -1440,8 +1440,7 @@ task.spawn(function()
                 if antiFallActive then
                     currentBossIndex = currentBossIndex + 1
                     task.wait(2)
-                    continue
-                end
+                continue end
                 
                 -- Wait for mission to fully complete
                 FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
