@@ -1,10 +1,9 @@
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
+-- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection: Auto-cancel non-green missions
--- // Experimental: KillAura (ULTRA FAST FORCE KILL), AntiRagdoll, AntiKnockback, ESP, StunImmunity
--- // AutoFarm Boss: Cycle-based boss mission farming with NPC teleport
+-- // Mission Protection + KillAura (ULTRA FAST) + AutoFarm Boss
+-- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
 return function(Common)
@@ -50,21 +49,20 @@ return function(Common)
             GodModeEnabled = false,
             FakeHealthValue = 999999,
             -- Auto Skill Spammer Config
-            AutoSkillREnabled = false,
-            AutoSkillTEnabled = false,
-            AutoSkillYEnabled = false,
-            AutoSkillFEnabled = false,
-            AutoSkillGEnabled = false,
-            AutoSkillHEnabled = false,
-            AutoSkillVEnabled = false,
-            AutoSkillBEnabled = false,
-            AutoSkillNEnabled = false,
-            AutoSkillQEnabled = false,
-            AutoSkillEEnabled = false,
-            AutoSkillSpamSpeed = 0.2,
+            AutoSkillREnabled = false, AutoSkillTEnabled = false,
+            AutoSkillYEnabled = false, AutoSkillFEnabled = false,
+            AutoSkillGEnabled = false, AutoSkillHEnabled = false,
+            AutoSkillVEnabled = false, AutoSkillBEnabled = false,
+            AutoSkillNEnabled = false, AutoSkillQEnabled = false,
+            AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
+            -- AutoFarm Boss Config
+            AutoFarmBossEnabled = false,
+            AutoFarmBossSelected = {},
+            AutoFarmBossSpeed = 800,
+            AutoFarmBossTimeout = 15,
             -- Experimental Config
             KillAuraEnabled = false,
-            KillAuraRange = 50,
+            KillAuraRange = 500,
             KillAuraSpeed = 0.01,
             KillAuraTargetNPCs = true,
             KillAuraTargetPlayers = true,
@@ -78,12 +76,7 @@ return function(Common)
             ESPMaxDistance = 500,
             ESPFillColor = {R = 255, G = 0, B = 0},
             ESPOutlineColor = {R = 255, G = 255, B = 0},
-            StunGrabImmunityEnabled = false,
-            -- AutoFarm Boss Config
-            AutoFarmBossEnabled = false,
-            AutoFarmBossSelected = {},
-            AutoFarmBossTimeout = 15,
-            AutoFarmBossSpeed = 500
+            StunGrabImmunityEnabled = false
         }
     end
     
@@ -114,42 +107,27 @@ return function(Common)
     -- Shared state: current target for continuous facing
     local currentTargetNPC = nil
     
-    -- M1 Attack Helper - FIXED: looks UP at target from below
+    -- M1 Attack Helper
     local lastM1Time = 0
     local function attackM1(targetHRP)
         local char = LocalPlayer.Character
         if not char then return false end
-        
         local root = char:FindFirstChild("HumanoidRootPart")
         local combat = char:FindFirstChild("combat")
         if not root or not combat then return false end
-        
-        -- Check cooldown
         local now = tick()
-        if now - lastM1Time < (Config.AutoFarmM1Cooldown or 0.3) then
-            return false
-        end
-        
-        -- Face target - LOOK UP from below (no Y-axis zeroing)
+        if now - lastM1Time < (Config.AutoFarmM1Cooldown or 0.3) then return false end
         if targetHRP then
             local targetPos = targetHRP.Position
             root.CFrame = CFrame.lookAt(root.Position, targetPos)
         end
-        
-        -- Fire M1
-        local ok = pcall(function()
-            combat.update:FireServer("mouse1", true)
-        end)
-        
+        local ok = pcall(function() combat.update:FireServer("mouse1", true) end)
         if ok then
             lastM1Time = now
             task.delay(0.05, function()
-                pcall(function()
-                    combat.update:FireServer("mouse1", false)
-                end)
+                pcall(function() combat.update:FireServer("mouse1", false) end)
             end)
         end
-        
         return ok
     end
     
@@ -176,7 +154,6 @@ return function(Common)
         if not statz then return 0 end
         local lvl = statz:FindFirstChild("lvl")
         if not lvl then return 0 end
-        
         if statName == "ninjutsu" then
             local nin = lvl:FindFirstChild("nin")
             return nin and nin.Value or 0
@@ -527,9 +504,17 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
+            -- Boss Farm State
+            AutoFarmBossEnabled = Config.AutoFarmBossEnabled,
+            AutoFarmBossSelected = Config.AutoFarmBossSelected or {},
+            AutoFarmBossSpeed = Config.AutoFarmBossSpeed or 800,
+            AutoFarmBossTimeout = Config.AutoFarmBossTimeout or 15,
+            BossFarmStatus = "Idle",
+            BossFarmCurrent = "",
+            BossFarmCompleted = 0,
             -- Experimental State
             KillAuraEnabled = Config.KillAuraEnabled,
-            KillAuraRange = Config.KillAuraRange or 50,
+            KillAuraRange = Config.KillAuraRange or 500,
             KillAuraSpeed = Config.KillAuraSpeed or 0.01,
             KillAuraTargetNPCs = Config.KillAuraTargetNPCs,
             KillAuraTargetPlayers = Config.KillAuraTargetPlayers,
@@ -552,18 +537,12 @@ return function(Common)
                 (Config.ESPOutlineColor and Config.ESPOutlineColor.B or 0)/255
             ),
             StunGrabImmunityEnabled = Config.StunGrabImmunityEnabled,
-            -- AutoFarm Boss State
-            AutoFarmBossEnabled = Config.AutoFarmBossEnabled,
-            AutoFarmBossSelected = Config.AutoFarmBossSelected or {},
-            AutoFarmBossTimeout = Config.AutoFarmBossTimeout or 15,
-            AutoFarmBossSpeed = Config.AutoFarmBossSpeed or 500,
             -- Stats
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
             SkillStats = {r = 0, t = 0, y = 0, f = 0, g = 0, h = 0, v = 0, b = 0, n = 0, q = 0, e = 0},
-            KillAuraKills = 0,
-            BossFarmCompleted = 0
+            KillAuraKills = 0
         }
         
         -- ==========================================
@@ -574,16 +553,13 @@ return function(Common)
                 currentTargetNPC = nil
                 return
             end
-            
             local char = LocalPlayer.Character
             if not char then return end
             local root = char:FindFirstChild("HumanoidRootPart")
             if not root then return end
-            
             if currentTargetNPC and currentTargetNPC.Parent then
                 local npcRoot = currentTargetNPC:FindFirstChild("HumanoidRootPart")
                 local npcHum = currentTargetNPC:FindFirstChild("Humanoid")
-                
                 if npcRoot and npcHum and npcHum.Health > 0 then
                     local targetPos = npcRoot.Position
                     root.CFrame = CFrame.lookAt(root.Position, targetPos)
@@ -610,17 +586,9 @@ return function(Common)
             Config.GodModeEnabled = v
             ConfigManager.Save(Config)
             if v then
-                ui.Fluent:Notify({
-                    Title = "[G] Godmode Enabled",
-                    Content = "You are now invincible!",
-                    Duration = 3
-                })
+                ui.Fluent:Notify({Title = "[G] Godmode Enabled", Content = "You are now invincible!", Duration = 3})
             else
-                ui.Fluent:Notify({
-                    Title = "[G] Godmode Disabled",
-                    Content = "Normal health restored",
-                    Duration = 3
-                })
+                ui.Fluent:Notify({Title = "[G] Godmode Disabled", Content = "Normal health restored", Duration = 3})
             end
         end)
         
@@ -642,13 +610,10 @@ return function(Common)
                     pcall(function()
                         local char = LocalPlayer.Character
                         local hum = char:FindFirstChildOfClass("Humanoid")
-                        
                         if hum and hum.Health > 0 then
                             hum.Health = hum.MaxHealth
                             local fakehealth = char:FindFirstChild("fakehealth")
-                            if fakehealth then
-                                fakehealth.Value = FarmState.FakeHealthValue
-                            end
+                            if fakehealth then fakehealth.Value = FarmState.FakeHealthValue end
                         end
                     end)
                 end
@@ -656,39 +621,25 @@ return function(Common)
             end
         end)
         
-        local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({
-            Title = "Godmode Status",
-            Content = "Initializing..."
-        })
-        
+        local GodmodeStatusDisplay = Tabs.Godmode:AddParagraph({Title = "Godmode Status", Content = "Initializing..."})
         task.spawn(function()
             while true do
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 local fakehealth = char and char:FindFirstChild("fakehealth")
-                
                 local healthStr = "N/A"
                 local maxHealthStr = "N/A"
                 local fakeHealthStr = "N/A"
-                
                 if hum then
                     healthStr = tostring(math.floor(hum.Health))
                     maxHealthStr = tostring(math.floor(hum.MaxHealth))
                 end
-                
-                if fakehealth then
-                    fakeHealthStr = tostring(fakehealth.Value)
-                end
-                
+                if fakehealth then fakeHealthStr = tostring(fakehealth.Value) end
                 GodmodeStatusDisplay.Content = string.format(
-                    "Status: %s\n\nHealth: %s / %s\nfakehealth Value: %s\nTarget fakehealth: %d\n\nGodmode: %s\n\nNote: Godmode prevents death by keeping\nhealth at max and fakehealth at %d",
+                    "Status: %s\n\nHealth: %s / %s\nfakehealth Value: %s\nTarget fakehealth: %d\n\nGodmode: %s",
                     FarmState.GodModeEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    healthStr,
-                    maxHealthStr,
-                    fakeHealthStr,
-                    FarmState.FakeHealthValue,
-                    FarmState.GodModeEnabled and "ENABLED" or "DISABLED",
-                    FarmState.FakeHealthValue
+                    healthStr, maxHealthStr, fakeHealthStr, FarmState.FakeHealthValue,
+                    FarmState.GodModeEnabled and "ENABLED" or "DISABLED"
                 )
                 task.wait(0.5)
             end
@@ -710,9 +661,7 @@ return function(Common)
             FarmState.AutoFarmEnabled = v
             Config.AutoFarmEnabled = v
             ConfigManager.Save(Config)
-            if not v then
-                currentTargetNPC = nil
-            end
+            if not v then currentTargetNPC = nil end
         end)
         
         Tabs.Main:AddToggle("AutoFarmUseM1Toggle", {
@@ -799,9 +748,7 @@ return function(Common)
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingame")
                                 and LocalPlayer.PlayerGui.Main.ingame:FindFirstChild("MissionStory")
                             
-                            if missionGui and missionGui.Visible then
-                                hasMission = true
-                            end
+                            if missionGui and missionGui.Visible then hasMission = true end
                             
                             if not hasMission then
                                 currentTargetNPC = nil
@@ -813,7 +760,6 @@ return function(Common)
                                         and LocalPlayer.statz.lvl.lvl.Value or 0
                                     
                                     local green = "http://www.roblox.com/asset/?id=5459241648"
-                                    local red = "http://www.roblox.com/asset/?id=5459241799"
                                     
                                     for _, giver in pairs(missionGivers:GetChildren()) do
                                         if giver:FindFirstChild("Head") 
@@ -822,7 +768,6 @@ return function(Common)
                                             
                                             local talk = giver:FindFirstChild("Talk")
                                             local shouldAccept = false
-                                            local missionColor = nil
                                             
                                             if lvl <= 699 then
                                                 if talk and talk:FindFirstChild("typ") 
@@ -831,7 +776,6 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
-                                                    missionColor = green
                                                 end
                                             else
                                                 if talk and talk:FindFirstChild("typ") 
@@ -840,7 +784,6 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
-                                                    missionColor = green
                                                 end
                                             end
                                             
@@ -860,7 +803,7 @@ return function(Common)
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
                                                         
-                                                        -- MISSION PROTECTION: Check if accepted mission is green
+                                                        -- MISSION PROTECTION
                                                         task.wait(0.5)
                                                         local acceptedMission = LocalPlayer:FindFirstChild("currentmission")
                                                         if acceptedMission and acceptedMission.Value ~= nil and acceptedMission.Value ~= "" then
@@ -877,34 +820,26 @@ return function(Common)
                                                                     Content = "Non-green mission detected! Cancelling...",
                                                                     Duration = 3
                                                                 })
-                                                                
                                                                 pcall(function()
                                                                     local TextChatService = game:GetService("TextChatService")
                                                                     if TextChatService then
                                                                         local channel = TextChatService:WaitForChild("TextChannels", 2)
                                                                         if channel then
                                                                             local rbxGeneral = channel:FindFirstChild("RBXGeneral")
-                                                                            if rbxGeneral then
-                                                                                rbxGeneral:SendAsync("!cancel")
-                                                                            end
+                                                                            if rbxGeneral then rbxGeneral:SendAsync("!cancel") end
                                                                         end
                                                                     end
                                                                 end)
-                                                                
                                                                 pcall(function()
                                                                     local vc = workspace:FindFirstChild("VC")
                                                                     if vc then
                                                                         local remote = vc:FindFirstChild("RemoteEvent")
-                                                                        if remote then
-                                                                            remote:FireServer("!cancel")
-                                                                        end
+                                                                        if remote then remote:FireServer("!cancel") end
                                                                     end
                                                                 end)
-                                                                
                                                                 task.wait(1)
                                                             end
                                                         end
-                                                        
                                                         task.wait(1)
                                                     end
                                                 end
@@ -917,7 +852,6 @@ return function(Common)
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local killed = false
-                                    
                                     for _, npc in pairs(npcs:GetChildren()) do
                                         if npc:IsA("Model") 
                                             and npc:FindFirstChild("HumanoidRootPart")
@@ -941,20 +875,13 @@ return function(Common)
                                                 if FarmState.AutoFarmUseM1 then
                                                     local attackCount = 0
                                                     local maxAttacks = 10
-                                                    
                                                     while npc.Humanoid.Health > 0 and attackCount < maxAttacks do
                                                         attackM1(npcRoot)
                                                         attackCount = attackCount + 1
                                                         task.wait(Config.AutoFarmM1Cooldown or 0.3)
-                                                        
-                                                        if not npc.Parent or npc.Humanoid.Health <= 0 then
-                                                            break
-                                                        end
+                                                        if not npc.Parent or npc.Humanoid.Health <= 0 then break end
                                                     end
-                                                    
-                                                    if npc.Humanoid.Health <= 0 then
-                                                        killed = true
-                                                    end
+                                                    if npc.Humanoid.Health <= 0 then killed = true end
                                                 else
                                                     npc.Humanoid.Health = 0
                                                     killed = true
@@ -963,7 +890,6 @@ return function(Common)
                                             break
                                         end
                                     end
-                                    
                                     if not killed then
                                         currentTargetNPC = nil
                                         task.wait(0.5)
@@ -984,32 +910,46 @@ return function(Common)
         -- ==========================================
         Tabs.BossFarm:AddParagraph({
             Title = "[B] AutoFarm Boss System",
-            Content = "Automatically farms boss missions from workspace.bossdropmission.missions.\n\n- Select which bosses to farm (multi-select)\n- Cycles through selected bosses in order\n- Teleports to mission giver and waits up to 15s\n- After accepting, teleports to nearest NPC (~500 studs)\n- Waits for mission completion, then moves to next boss\n- Force-kill nearby NPCs during mission"
+            Content = "Automatically farm boss drop missions.\n\n- Scans workspace.bossdropmission.missions\n- Cycles through selected bosses in order\n- Teleports to missiongiver and accepts quest\n- Waits 15 seconds for quest acceptance\n- Teleports to nearest NPC and waits for completion\n- Moves to next boss after completion\n\nNOTE: Disable regular AutoFarm while using Boss Farm!"
         })
         
-        -- Get available bosses
+        -- Get available bosses from workspace
         local function getAvailableBosses()
             local bosses = {}
-            local bossFolder = workspace:FindFirstChild("bossdropmission")
-            if bossFolder then
-                local missionsFolder = bossFolder:FindFirstChild("missions")
-                if missionsFolder then
-                    for _, bossModel in pairs(missionsFolder:GetChildren()) do
-                        if bossModel:IsA("Model") or bossModel:IsA("Folder") then
-                            table.insert(bosses, bossModel.Name)
+            local missionsFolder = workspace:FindFirstChild("bossdropmission")
+            if missionsFolder then
+                local missionsSubFolder = missionsFolder:FindFirstChild("missions")
+                if missionsSubFolder then
+                    for _, folder in pairs(missionsSubFolder:GetChildren()) do
+                        if folder:IsA("Folder") or folder:IsA("Model") then
+                            table.insert(bosses, folder.Name)
                         end
                     end
-                    table.sort(bosses)
                 end
             end
+            table.sort(bosses)
             return bosses
         end
         
         local availableBosses = getAvailableBosses()
+        if #availableBosses == 0 then
+            availableBosses = {"(No bosses found - check workspace.bossdropmission.missions)"}
+        end
+        
+        -- Validate selected bosses
+        local validBosses = {}
+        for _, v in ipairs(FarmState.AutoFarmBossSelected) do
+            if table.find(availableBosses, v) then
+                table.insert(validBosses, v)
+            end
+        end
+        
+        local defaultBossDict = {}
+        for _, v in ipairs(validBosses) do defaultBossDict[v] = true end
         
         Tabs.BossFarm:AddToggle("AutoFarmBossToggle", {
-            Title = "Enable Boss Farm",
-            Description = "Automatically farm selected boss missions in cycle",
+            Title = "Enable AutoFarm Boss",
+            Description = "Automatically cycle through selected bosses and farm them",
             Default = Config.AutoFarmBossEnabled
         }):OnChanged(function(v)
             FarmState.AutoFarmBossEnabled = v
@@ -1018,48 +958,51 @@ return function(Common)
             if v then
                 ui.Fluent:Notify({
                     Title = "[B] Boss Farm Enabled",
-                    Content = "Cycling through " .. #FarmState.AutoFarmBossSelected .. " boss(es)",
+                    Content = "Starting boss cycle...",
                     Duration = 3
                 })
+            else
+                FarmState.BossFarmStatus = "Idle"
+                FarmState.BossFarmCurrent = ""
             end
         end)
         
-        Tabs.BossFarm:AddDropdown("AutoFarmBossDropdown", {
+        local BossDropdown = Tabs.BossFarm:AddDropdown("BossSelectionDropdown", {
             Title = "Select Bosses to Farm",
-            Description = "Choose which bosses to farm (multi-select, cycled in order)",
+            Description = "Choose which bosses to cycle through (multi-select)",
             Values = availableBosses,
             Multi = true,
-            Default = arrayToDict(Config.AutoFarmBossSelected or {}),
-            Flag = "BossFarmFlag"
-        }):OnChanged(function(Value)
-            local parsed = parseMultiDropdown(Value)
+            Default = defaultBossDict,
+            Flag = "BossSelectionFlag"
+        })
+        
+        BossDropdown:OnChanged(function(Value)
+            local parsed = {}
+            if type(Value) == "table" then
+                for k, v in pairs(Value) do
+                    if type(k) == "string" and v == true then
+                        table.insert(parsed, k)
+                    elseif type(k) == "number" and type(v) == "string" then
+                        table.insert(parsed, v)
+                    end
+                end
+            end
+            table.sort(parsed)
             FarmState.AutoFarmBossSelected = parsed
             Config.AutoFarmBossSelected = parsed
             ConfigManager.Save(Config)
             ui.Fluent:Notify({
-                Title = "[B] Boss Selection Updated",
+                Title = "[B] Boss List Updated",
                 Content = "Selected: " .. (#parsed > 0 and table.concat(parsed, ", ") or "NONE"),
-                Duration = 2
+                Duration = 3
             })
         end)
         
-        Tabs.BossFarm:AddSlider("AutoFarmBossTimeoutSlider", {
-            Title = "Mission Accept Timeout (seconds)",
-            Description = "How long to wait for mission acceptance before skipping",
-            Default = Config.AutoFarmBossTimeout,
-            Min = 5, Max = 30, Rounding = 0,
-            Callback = function(v)
-                FarmState.AutoFarmBossTimeout = v
-                Config.AutoFarmBossTimeout = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
         Tabs.BossFarm:AddSlider("AutoFarmBossSpeedSlider", {
-            Title = "Boss Farm Tween Speed (studs/sec)",
-            Description = "Teleport speed for boss farm",
+            Title = "Boss Tween Speed (studs/sec)",
+            Description = "Speed when traveling to boss missiongiver",
             Default = Config.AutoFarmBossSpeed,
-            Min = 100, Max = 2500, Rounding = 0,
+            Min = 200, Max = 2500, Rounding = 0,
             Callback = function(v)
                 FarmState.AutoFarmBossSpeed = v
                 Config.AutoFarmBossSpeed = v
@@ -1067,10 +1010,36 @@ return function(Common)
             end
         })
         
-        -- Boss Farm Status Display
-        local BossFarmStatusDisplay = Tabs.BossFarm:AddParagraph({
-            Title = "Boss Farm Status",
-            Content = "Initializing..."
+        Tabs.BossFarm:AddSlider("AutoFarmBossTimeoutSlider", {
+            Title = "Quest Accept Timeout (seconds)",
+            Description = "How long to wait for quest acceptance before skipping",
+            Default = Config.AutoFarmBossTimeout,
+            Min = 5, Max = 60, Rounding = 0,
+            Callback = function(v)
+                FarmState.AutoFarmBossTimeout = v
+                Config.AutoFarmBossTimeout = v
+                ConfigManager.Save(Config)
+            end
+        })
+        
+        Tabs.BossFarm:AddButton({
+            Title = "Refresh Boss List",
+            Callback = function()
+                availableBosses = getAvailableBosses()
+                if #availableBosses == 0 then
+                    availableBosses = {"(No bosses found)"}
+                end
+                ui.Fluent:Notify({
+                    Title = "[B] Boss List Refreshed",
+                    Content = "Found " .. #availableBosses .. " boss(es)",
+                    Duration = 3
+                })
+            end
+        })
+        
+        Tabs.BossFarm:AddParagraph({
+            Title = "Boss Farm Cycle Info",
+            Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - If accepted: teleport to nearest NPC (500 stud range)\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
         })
         
         -- Boss Farm Logic
@@ -1079,288 +1048,255 @@ return function(Common)
             
             while true do
                 if FarmState.AutoFarmBossEnabled and LocalPlayer.Character then
+                    local selectedBosses = FarmState.AutoFarmBossSelected
+                    if #selectedBosses == 0 then
+                        FarmState.BossFarmStatus = "No bosses selected"
+                        task.wait(1)
+                        continue
+                    end
+                    
+                    -- Cycle through bosses
+                    if currentBossIndex > #selectedBosses then
+                        currentBossIndex = 1
+                    end
+                    
+                    local bossName = selectedBosses[currentBossIndex]
+                    FarmState.BossFarmCurrent = bossName
+                    FarmState.BossFarmStatus = "Traveling to " .. bossName
+                    
                     pcall(function()
                         local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        local hum = char and char:FindFirstChildOfClass("Humanoid")
                         
-                        if root and hum and hum.Health > 0 then
-                            -- Check if we have bosses selected
-                            if #FarmState.AutoFarmBossSelected == 0 then
-                                BossFarmStatusDisplay.Content = "Status: [X] NO BOSSES SELECTED\n\nSelect at least one boss from the dropdown."
-                                task.wait(1)
-                                return
-                            end
-                            
-                            -- Get current boss
-                            local currentBossName = FarmState.AutoFarmBossSelected[currentBossIndex]
-                            if not currentBossName then
-                                currentBossIndex = 1
-                                currentBossName = FarmState.AutoFarmBossSelected[1]
-                            end
-                            
-                            BossFarmStatusDisplay.Content = string.format(
-                                "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Finding mission giver...",
-                                currentBossName,
-                                currentBossIndex,
-                                #FarmState.AutoFarmBossSelected,
-                                FarmState.BossFarmCompleted
-                            )
-                            
-                            -- Find boss mission folder
-                            local bossFolder = workspace:FindFirstChild("bossdropmission")
-                            if not bossFolder then
-                                BossFarmStatusDisplay.Content = "Status: [X] ERROR\n\nbossdropmission folder not found!"
-                                task.wait(2)
-                                return
-                            end
-                            
-                            local missionsFolder = bossFolder:FindFirstChild("missions")
-                            if not missionsFolder then
-                                BossFarmStatusDisplay.Content = "Status: [X] ERROR\n\nmissions folder not found!"
-                                task.wait(2)
-                                return
-                            end
-                            
-                            local bossModel = missionsFolder:FindFirstChild(currentBossName)
-                            if not bossModel then
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [X] ERROR\n\nBoss '%s' not found in missions folder!\nSkipping to next boss...",
-                                    currentBossName
-                                )
-                                currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
-                                task.wait(2)
-                                return
-                            end
-                            
-                            -- Find mission giver in boss model
-                            local missionGiver = nil
-                            for _, child in pairs(bossModel:GetChildren()) do
-                                if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
-                                    if child:FindFirstChild("Head") and child.Head:FindFirstChild("givemission") then
-                                        missionGiver = child
-                                        break
-                                    end
-                                end
-                            end
-                            
-                            if not missionGiver then
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [X] ERROR\n\nNo mission giver found for '%s'!\nSkipping to next boss...",
-                                    currentBossName
-                                )
-                                currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
-                                task.wait(2)
-                                return
-                            end
-                            
-                            local giverRoot = missionGiver:FindFirstChild("HumanoidRootPart")
-                            if not giverRoot then
-                                currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
-                                task.wait(1)
-                                return
-                            end
-                            
-                            -- Teleport to mission giver
-                            BossFarmStatusDisplay.Content = string.format(
-                                "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Teleporting to mission giver...",
-                                currentBossName,
-                                currentBossIndex,
-                                #FarmState.AutoFarmBossSelected,
-                                FarmState.BossFarmCompleted
-                            )
-                            
-                            local teleportSpeed = FarmState.AutoFarmBossSpeed or 500
-                            toTarget(root.Position, giverRoot.Position, giverRoot.CFrame, teleportSpeed)
+                        if not root or not hum or hum.Health <= 0 then
                             task.wait(1)
-                            
-                            -- Try to accept mission
-                            local clientTalk = missionGiver:FindFirstChild("CLIENTTALK")
-                            if not clientTalk then
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [X] ERROR\n\nCLIENTTALK not found for '%s'!\nSkipping to next boss...",
-                                    currentBossName
-                                )
-                                currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
-                                task.wait(2)
-                                return
-                            end
-                            
-                            BossFarmStatusDisplay.Content = string.format(
-                                "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Attempting to accept mission (timeout: %ds)...",
-                                currentBossName,
-                                currentBossIndex,
-                                #FarmState.AutoFarmBossSelected,
-                                FarmState.BossFarmCompleted,
-                                FarmState.AutoFarmBossTimeout
-                            )
-                            
-                            local missionAccepted = false
-                            local startTime = tick()
-                            
-                            while tick() - startTime < FarmState.AutoFarmBossTimeout do
-                                if not FarmState.AutoFarmBossEnabled then break end
-                                
-                                local dist = (root.Position - giverRoot.Position).Magnitude
-                                if dist < 15 then
-                                    pcall(function()
-                                        clientTalk:FireServer()
-                                        task.wait(0.3)
-                                        clientTalk:FireServer("accept")
-                                    end)
-                                    
-                                    task.wait(0.5)
-                                    
-                                    -- Check if mission accepted
-                                    local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                                    if currentmission and currentmission.Value and currentmission.Value ~= "" then
-                                        missionAccepted = true
-                                        break
-                                    end
+                            return
+                        end
+                        
+                        -- Find boss mission folder
+                        local missionsFolder = workspace:FindFirstChild("bossdropmission")
+                        if not missionsFolder then
+                            FarmState.BossFarmStatus = "bossdropmission folder not found"
+                            task.wait(2)
+                            return
+                        end
+                        
+                        local missionsSubFolder = missionsFolder:FindFirstChild("missions")
+                        if not missionsSubFolder then
+                            FarmState.BossFarmStatus = "missions subfolder not found"
+                            task.wait(2)
+                            return
+                        end
+                        
+                        local bossFolder = missionsSubFolder:FindFirstChild(bossName)
+                        if not bossFolder then
+                            FarmState.BossFarmStatus = "Boss folder not found: " .. bossName
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        -- Find missiongiver model inside boss folder
+                        local missiongiver = bossFolder:FindFirstChild("missiongiver")
+                        if not missiongiver then
+                            -- Try to find any model with HumanoidRootPart
+                            for _, child in pairs(bossFolder:GetChildren()) do
+                                if child:IsA("Model") and child:FindFirstChild("HumanoidRootPart") then
+                                    missiongiver = child
+                                    break
                                 end
+                            end
+                        end
+                        
+                        if not missiongiver then
+                            FarmState.BossFarmStatus = "missiongiver not found in " .. bossName
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        local giverRoot = missiongiver:FindFirstChild("HumanoidRootPart")
+                        if not giverRoot then
+                            FarmState.BossFarmStatus = "HumanoidRootPart not found in missiongiver"
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        -- Teleport to missiongiver
+                        FarmState.BossFarmStatus = "Teleporting to " .. bossName .. " missiongiver"
+                        local targetCFrame = CFrame.new(giverRoot.Position + Vector3.new(0, -5, 0))
+                        
+                        local info = TweenInfo.new(
+                            (giverRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                            Enum.EasingStyle.Linear
+                        )
+                        local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
+                        tween:Play()
+                        tween.Completed:Wait()
+                        
+                        task.wait(1)
+                        
+                        -- Try to accept quest (15 second timeout)
+                        FarmState.BossFarmStatus = "Trying to accept " .. bossName .. " quest..."
+                        local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
+                        local questAccepted = false
+                        local startTime = tick()
+                        
+                        while tick() - startTime < FarmState.AutoFarmBossTimeout do
+                            if not FarmState.AutoFarmBossEnabled then break end
+                            
+                            -- Check if already have mission
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                                questAccepted = true
+                                break
+                            end
+                            
+                            -- Try to accept
+                            if clientTalk then
+                                pcall(function()
+                                    clientTalk:FireServer()
+                                    task.wait(0.3)
+                                    clientTalk:FireServer("accept")
+                                end)
+                            end
+                            
+                            task.wait(1)
+                        end
+                        
+                        if not questAccepted then
+                            -- Check one more time
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                                questAccepted = true
+                            end
+                        end
+                        
+                        if not questAccepted then
+                            FarmState.BossFarmStatus = "Failed to accept " .. bossName .. " quest (timeout)"
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        FarmState.BossFarmStatus = "Quest accepted! Finding nearest NPC..."
+                        task.wait(1)
+                        
+                        -- Find nearest NPC (within 500 stud range)
+                        local npcs = workspace:FindFirstChild("npc")
+                        if not npcs then
+                            FarmState.BossFarmStatus = "npc folder not found"
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        local nearestNPC = nil
+                        local nearestDist = 500 -- Max search distance
+                        
+                        for _, npc in pairs(npcs:GetChildren()) do
+                            if npc:IsA("Model") then
+                                local npcRoot = npc:FindFirstChild("HumanoidRootPart")
+                                local npcHum = npc:FindFirstChild("Humanoid")
                                 
-                                task.wait(0.5)
-                            end
-                            
-                            if not missionAccepted then
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [!] TIMEOUT\n\nFailed to accept mission for '%s' after %ds!\nSkipping to next boss...",
-                                    currentBossName,
-                                    FarmState.AutoFarmBossTimeout
-                                )
-                                currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
-                                task.wait(2)
-                                return
-                            end
-                            
-                            -- Mission accepted! Find nearest NPC
-                            BossFarmStatusDisplay.Content = string.format(
-                                "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Mission accepted! Finding nearest NPC...",
-                                currentBossName,
-                                currentBossIndex,
-                                #FarmState.AutoFarmBossSelected,
-                                FarmState.BossFarmCompleted
-                            )
-                            
-                            local npcs = workspace:FindFirstChild("npc")
-                            if not npcs then
-                                BossFarmStatusDisplay.Content = "Status: [X] ERROR\n\nnpc folder not found!"
-                                task.wait(2)
-                                return
-                            end
-                            
-                            -- Find nearest NPC (within ~500 studs)
-                            local nearestNPC = nil
-                            local nearestDist = math.huge
-                            
-                            for _, npc in pairs(npcs:GetChildren()) do
-                                if npc:IsA("Model") 
-                                    and npc:FindFirstChild("HumanoidRootPart")
-                                    and npc:FindFirstChild("Humanoid")
-                                    and npc.Humanoid.Health > 0
-                                    and npc:FindFirstChild("npctype")
-                                    and string.find(npc.Name, "npc") then
-                                    
-                                    local npcRoot = npc.HumanoidRootPart
+                                if npcRoot and npcHum and npcHum.Health > 0 then
                                     local dist = (root.Position - npcRoot.Position).Magnitude
-                                    
-                                    if dist < nearestDist and dist < 500 then
+                                    if dist < nearestDist then
                                         nearestDist = dist
                                         nearestNPC = npc
                                     end
                                 end
                             end
-                            
-                            if not nearestNPC then
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [X] ERROR\n\nNo NPC found within 500 studs for '%s'!\nWaiting for mission to complete...",
-                                    currentBossName
-                                )
-                            else
-                                -- Teleport to nearest NPC
-                                local npcRoot = nearestNPC.HumanoidRootPart
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Teleporting to nearest NPC (%.0f studs)...",
-                                    currentBossName,
-                                    currentBossIndex,
-                                    #FarmState.AutoFarmBossSelected,
-                                    FarmState.BossFarmCompleted,
-                                    nearestDist
-                                )
-                                
-                                toTarget(root.Position, npcRoot.Position, npcRoot.CFrame, teleportSpeed)
-                                task.wait(1)
-                            end
-                            
-                            -- Wait for mission to complete
-                            BossFarmStatusDisplay.Content = string.format(
-                                "Status: [OK] ACTIVE\n\nCurrent Boss: %s\nBoss Index: %d / %d\nCompleted: %d\n\nPhase: Waiting for mission completion...",
-                                currentBossName,
-                                currentBossIndex,
-                                #FarmState.AutoFarmBossSelected,
-                                FarmState.BossFarmCompleted
+                        end
+                        
+                        if not nearestNPC then
+                            FarmState.BossFarmStatus = "No NPC found within 500 studs"
+                            currentBossIndex = currentBossIndex + 1
+                            task.wait(2)
+                            return
+                        end
+                        
+                        -- Teleport to nearest NPC
+                        FarmState.BossFarmStatus = "Teleporting to nearest NPC (" .. math.floor(nearestDist) .. " studs)"
+                        local npcRoot = nearestNPC:FindFirstChild("HumanoidRootPart")
+                        if npcRoot then
+                            local targetCF = CFrame.new(npcRoot.Position + Vector3.new(0, -8, 0))
+                            local info2 = TweenInfo.new(
+                                (npcRoot.Position - root.Position).Magnitude / FarmState.AutoFarmBossSpeed,
+                                Enum.EasingStyle.Linear
                             )
-                            
-                            local missionComplete = false
-                            local missionStartTime = tick()
-                            local maxMissionTime = 300 -- 5 minutes max
-                            
-                            while tick() - missionStartTime < maxMissionTime do
-                                if not FarmState.AutoFarmBossEnabled then break end
-                                
-                                local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                                if not currentmission or not currentmission.Value or currentmission.Value == "" then
-                                    missionComplete = true
-                                    break
-                                end
-                                
-                                -- Kill nearby NPCs while waiting
-                                if nearestNPC and nearestNPC.Parent then
-                                    local npcRoot = nearestNPC.HumanoidRootPart
-                                    local npcHum = nearestNPC:FindFirstChild("Humanoid")
-                                    
-                                    if npcRoot and npcHum and npcHum.Health > 0 then
-                                        local dist = (root.Position - npcRoot.Position).Magnitude
-                                        if dist < 20 then
-                                            -- Force kill
-                                            pcall(function()
-                                                npcHum.Health = 0
-                                            end)
-                                        end
-                                    end
-                                end
-                                
-                                task.wait(0.5)
+                            local tween2 = TweenService:Create(root, info2, {CFrame = targetCF})
+                            tween2:Play()
+                            tween2.Completed:Wait()
+                        end
+                        
+                        -- Wait for mission to complete
+                        FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
+                        
+                        while FarmState.AutoFarmBossEnabled do
+                            local currentmission = LocalPlayer:FindFirstChild("currentmission")
+                            if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                                -- Mission completed!
+                                break
                             end
                             
-                            if missionComplete then
-                                FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [OK] SUCCESS\n\nBoss '%s' mission completed!\nMoving to next boss...",
-                                    currentBossName
-                                )
-                                ui.Fluent:Notify({
-                                    Title = "[B] Boss Mission Complete",
-                                    Content = currentBossName .. " finished! Total: " .. FarmState.BossFarmCompleted,
-                                    Duration = 3
-                                })
-                            else
-                                BossFarmStatusDisplay.Content = string.format(
-                                    "Status: [!] TIMEOUT\n\nBoss '%s' mission timed out after %ds!\nMoving to next boss...",
-                                    currentBossName,
-                                    maxMissionTime
-                                )
+                            -- Check if character is still alive
+                            local char2 = LocalPlayer.Character
+                            local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
+                            if not hum2 or hum2.Health <= 0 then
+                                break
                             end
                             
-                            -- Move to next boss
-                            currentBossIndex = (currentBossIndex % #FarmState.AutoFarmBossSelected) + 1
+                            task.wait(1)
+                        end
+                        
+                        if FarmState.AutoFarmBossEnabled then
+                            FarmState.BossFarmStatus = bossName .. " mission completed!"
+                            FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
+                            ui.Fluent:Notify({
+                                Title = "[B] Boss Completed",
+                                Content = bossName .. " mission finished!",
+                                Duration = 3
+                            })
                             task.wait(2)
                         end
+                        
+                        currentBossIndex = currentBossIndex + 1
                     end)
                 else
-                    BossFarmStatusDisplay.Content = "Status: [X] INACTIVE\n\nEnable Boss Farm to start."
+                    FarmState.BossFarmStatus = "Disabled"
+                    currentBossIndex = 1
                 end
-                task.wait(1)
+                
+                task.wait(0.5)
+            end
+        end)
+        
+        -- Boss Farm Status Display
+        local BossStatusDisplay = Tabs.BossFarm:AddParagraph({
+            Title = "Boss Farm Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local selectedText = #FarmState.AutoFarmBossSelected > 0 
+                    and table.concat(FarmState.AutoFarmBossSelected, ", ") 
+                    or "None"
+                
+                BossStatusDisplay.Content = string.format(
+                    "Status: %s\n\nCurrent Boss: %s\nMissions Completed: %d\n\nSelected Bosses (%d):\n%s\n\nSettings:\n- Tween Speed: %d studs/s\n- Timeout: %d seconds\n\nNote: Disable regular AutoFarm to avoid conflicts!",
+                    FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+                    FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
+                    FarmState.BossFarmCompleted,
+                    #FarmState.AutoFarmBossSelected,
+                    selectedText,
+                    FarmState.AutoFarmBossSpeed,
+                    FarmState.AutoFarmBossTimeout
+                )
+                task.wait(0.5)
             end
         end)
         
@@ -1403,10 +1339,8 @@ return function(Common)
                                                 Content = "Teleporting to scroll...",
                                                 Duration = 2
                                             })
-                                            
                                             toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                             task.wait(0.1)
-                                            
                                             invoke:FireServer(LocalPlayer)
                                             fireclickdetector(clickDetector)
                                         end
@@ -1428,10 +1362,8 @@ return function(Common)
                                             Content = "Teleporting to scroll...",
                                             Duration = 2
                                         })
-                                        
                                         toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                         task.wait(0.1)
-                                        
                                         invoke:FireServer(LocalPlayer)
                                         fireclickdetector(clickDetector)
                                     end
@@ -1482,7 +1414,6 @@ return function(Common)
                             
                             if root and hum and hum.Health > 0 then
                                 hum:ChangeState(11)
-                                
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local zetsu = warserver:FindFirstChild("zetsu")
@@ -1619,121 +1550,65 @@ return function(Common)
             end
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsNinToggle", {
-            Title = "Auto NIN (Ninjutsu)",
-            Description = "Add points to Ninjutsu stat",
-            Default = Config.AutoStatsNinEnabled
-        }):OnChanged(function(v)
-            FarmState.AutoStatsNinEnabled = v
-            Config.AutoStatsNinEnabled = v
-            ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsNinToggle", {Title = "Auto NIN (Ninjutsu)", Default = Config.AutoStatsNinEnabled}):OnChanged(function(v)
+            FarmState.AutoStatsNinEnabled = v; Config.AutoStatsNinEnabled = v; ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsTaiToggle", {
-            Title = "Auto TAI (Taijutsu)",
-            Description = "Add points to Taijutsu stat",
-            Default = Config.AutoStatsTaiEnabled
-        }):OnChanged(function(v)
-            FarmState.AutoStatsTaiEnabled = v
-            Config.AutoStatsTaiEnabled = v
-            ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsTaiToggle", {Title = "Auto TAI (Taijutsu)", Default = Config.AutoStatsTaiEnabled}):OnChanged(function(v)
+            FarmState.AutoStatsTaiEnabled = v; Config.AutoStatsTaiEnabled = v; ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsChiToggle", {
-            Title = "Auto CHI (Chakra)",
-            Description = "Add points to Chakra stat",
-            Default = Config.AutoStatsChiEnabled
-        }):OnChanged(function(v)
-            FarmState.AutoStatsChiEnabled = v
-            Config.AutoStatsChiEnabled = v
-            ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsChiToggle", {Title = "Auto CHI (Chakra)", Default = Config.AutoStatsChiEnabled}):OnChanged(function(v)
+            FarmState.AutoStatsChiEnabled = v; Config.AutoStatsChiEnabled = v; ConfigManager.Save(Config)
         end)
         
-        Tabs.Stats:AddToggle("AutoStatsHpToggle", {
-            Title = "Auto HP (Health)",
-            Description = "Add points to Health stat",
-            Default = Config.AutoStatsHpEnabled
-        }):OnChanged(function(v)
-            FarmState.AutoStatsHpEnabled = v
-            Config.AutoStatsHpEnabled = v
-            ConfigManager.Save(Config)
+        Tabs.Stats:AddToggle("AutoStatsHpToggle", {Title = "Auto HP (Health)", Default = Config.AutoStatsHpEnabled}):OnChanged(function(v)
+            FarmState.AutoStatsHpEnabled = v; Config.AutoStatsHpEnabled = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Stats:AddSlider("AutoStatsIntervalSlider", {
-            Title = "Check Interval (seconds)",
-            Description = "How often to check for available points",
-            Default = Config.AutoStatsInterval,
+            Title = "Check Interval (seconds)", Default = Config.AutoStatsInterval,
             Min = 1, Max = 10, Rounding = 0,
-            Callback = function(v)
-                Config.AutoStatsInterval = v
-                ConfigManager.Save(Config)
-            end
+            Callback = function(v) Config.AutoStatsInterval = v; ConfigManager.Save(Config) end
         })
         
         Tabs.Stats:AddSlider("AutoStatsMinPointsSlider", {
-            Title = "Minimum Points to Spend",
-            Description = "Only spend points when you have at least this many",
-            Default = Config.AutoStatsMinPoints,
+            Title = "Minimum Points to Spend", Default = Config.AutoStatsMinPoints,
             Min = 1, Max = 50, Rounding = 0,
-            Callback = function(v)
-                Config.AutoStatsMinPoints = v
-                ConfigManager.Save(Config)
-            end
+            Callback = function(v) Config.AutoStatsMinPoints = v; ConfigManager.Save(Config) end
         })
         
-        Tabs.Stats:AddButton({Title = "Add All Available Points to NIN", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Points to NIN", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("ninjutsu", points)
-                if ok then
-                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to NIN", Duration = 3})
-                else
-                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
-                end
+                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to NIN" or "Failed", Duration = 3})
             else
-                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
+                ui.Fluent:Notify({Title = "[!]", Content = "No points", Duration = 2})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Available Points to TAI", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Points to TAI", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("taijutsu", points)
-                if ok then
-                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to TAI", Duration = 3})
-                else
-                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
-                end
-            else
-                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
+                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to TAI" or "Failed", Duration = 3})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Available Points to CHI", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Points to CHI", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("chakra", points)
-                if ok then
-                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to CHI", Duration = 3})
-                else
-                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
-                end
-            else
-                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
+                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to CHI" or "Failed", Duration = 3})
             end
         end})
         
-        Tabs.Stats:AddButton({Title = "Add All Available Points to HP", Callback = function()
+        Tabs.Stats:AddButton({Title = "Add All Points to HP", Callback = function()
             local points = getStatPoints()
             if points > 0 then
                 local ok = addStat("health", points)
-                if ok then
-                    ui.Fluent:Notify({Title = "[OK] Stats", Content = "Added " .. points .. " points to HP", Duration = 3})
-                else
-                    ui.Fluent:Notify({Title = "[X] Error", Content = "Failed to add points", Duration = 3})
-                end
-            else
-                ui.Fluent:Notify({Title = "[!] Info", Content = "No points available", Duration = 2})
+                ui.Fluent:Notify({Title = ok and "[OK]" or "[X]", Content = ok and "Added " .. points .. " to HP" or "Failed", Duration = 3})
             end
         end})
         
@@ -1742,26 +1617,15 @@ return function(Common)
                 if FarmState.AutoStatsEnabled then
                     pcall(function()
                         local points = getStatPoints()
-                        
                         if points >= (Config.AutoStatsMinPoints or 5) then
                             local statsToDistribute = {}
-                            
-                            if FarmState.AutoStatsNinEnabled then
-                                table.insert(statsToDistribute, "ninjutsu")
-                            end
-                            if FarmState.AutoStatsTaiEnabled then
-                                table.insert(statsToDistribute, "taijutsu")
-                            end
-                            if FarmState.AutoStatsChiEnabled then
-                                table.insert(statsToDistribute, "chakra")
-                            end
-                            if FarmState.AutoStatsHpEnabled then
-                                table.insert(statsToDistribute, "health")
-                            end
+                            if FarmState.AutoStatsNinEnabled then table.insert(statsToDistribute, "ninjutsu") end
+                            if FarmState.AutoStatsTaiEnabled then table.insert(statsToDistribute, "taijutsu") end
+                            if FarmState.AutoStatsChiEnabled then table.insert(statsToDistribute, "chakra") end
+                            if FarmState.AutoStatsHpEnabled then table.insert(statsToDistribute, "health") end
                             
                             if #statsToDistribute > 0 then
                                 local pointsPerStat = math.floor(points / #statsToDistribute)
-                                
                                 for _, statName in ipairs(statsToDistribute) do
                                     if pointsPerStat > 0 then
                                         local ok = addStat(statName, pointsPerStat)
@@ -1771,13 +1635,11 @@ return function(Common)
                                         task.wait(0.2)
                                     end
                                 end
-                                
                                 local remaining = points - (pointsPerStat * #statsToDistribute)
                                 if remaining > 0 and #statsToDistribute > 0 then
                                     addStat(statsToDistribute[1], remaining)
                                     FarmState.StatsAdded[statsToDistribute[1]] = (FarmState.StatsAdded[statsToDistribute[1]] or 0) + remaining
                                 end
-                                
                                 ui.Fluent:Notify({
                                     Title = "[S] Stats Distributed",
                                     Content = "Spent " .. points .. " points across " .. #statsToDistribute .. " stats",
@@ -1791,11 +1653,7 @@ return function(Common)
             end
         end)
         
-        local StatsStatusDisplay = Tabs.Stats:AddParagraph({
-            Title = "Stats Status",
-            Content = "Initializing..."
-        })
-        
+        local StatsStatusDisplay = Tabs.Stats:AddParagraph({Title = "Stats Status", Content = "Initializing..."})
         task.spawn(function()
             while true do
                 local points = getStatPoints()
@@ -1805,19 +1663,17 @@ return function(Common)
                 local hpLvl = getStatLevel("health")
                 
                 StatsStatusDisplay.Content = string.format(
-                    "Status: %s\n\nAvailable Points: %d\nMin to Spend: %d\nCheck Interval: %ds\n\nCurrent Levels:\n- NIN: %d (+%d added)\n- TAI: %d (+%d added)\n- CHI: %d (+%d added)\n- HP: %d (+%d added)\n\nEnabled Stats:\n- NIN: %s\n- TAI: %s\n- CHI: %s\n- HP: %s",
-                    FarmState.AutoStatsEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    points,
-                    Config.AutoStatsMinPoints,
-                    Config.AutoStatsInterval,
+                    "Status: %s\n\nAvailable Points: %d\nMin to Spend: %d\nCheck Interval: %ds\n\nCurrent Levels:\n- NIN: %d (+%d)\n- TAI: %d (+%d)\n- CHI: %d (+%d)\n- HP: %d (+%d)\n\nEnabled: NIN:%s TAI:%s CHI:%s HP:%s",
+                    FarmState.AutoStatsEnabled and "[OK]" or "[X]",
+                    points, Config.AutoStatsMinPoints, Config.AutoStatsInterval,
                     ninLvl, FarmState.StatsAdded.ninjutsu or 0,
                     taiLvl, FarmState.StatsAdded.taijutsu or 0,
                     chiLvl, FarmState.StatsAdded.chakra or 0,
                     hpLvl, FarmState.StatsAdded.health or 0,
-                    FarmState.AutoStatsNinEnabled and "[OK]" or "[X]",
-                    FarmState.AutoStatsTaiEnabled and "[OK]" or "[X]",
-                    FarmState.AutoStatsChiEnabled and "[OK]" or "[X]",
-                    FarmState.AutoStatsHpEnabled and "[OK]" or "[X]"
+                    FarmState.AutoStatsNinEnabled and "Y" or "N",
+                    FarmState.AutoStatsTaiEnabled and "Y" or "N",
+                    FarmState.AutoStatsChiEnabled and "Y" or "N",
+                    FarmState.AutoStatsHpEnabled and "Y" or "N"
                 )
                 task.wait(1)
             end
@@ -1828,31 +1684,19 @@ return function(Common)
         -- ==========================================
         Tabs.Skills:AddParagraph({
             Title = "[K] Auto Skill Spammer",
-            Content = "Automatically spam skill keys (R,T,Y,F,G,H,V,B,N,Q,E).\n\n- Each key can be enabled/disabled independently\n- Adjustable spam speed (cooldown between presses)\n- Fires 'key' then 'keyend' to simulate hold+release\n- Useful for spamming jutsu/moves repeatedly\n- Works with AutoFarm for maximum DPS"
+            Content = "Automatically spam skill keys (R,T,Y,F,G,H,V,B,N,Q,E).\n\n- Each key can be enabled/disabled independently\n- Adjustable spam speed (cooldown between presses)\n- Fires 'key' then 'keyend' to simulate hold+release\n- Useful for spamming jutsu/moves repeatedly"
         })
         
         Tabs.Skills:AddSlider("AutoSkillSpamSpeedSlider", {
-            Title = "Spam Speed (seconds)",
-            Description = "Time between each key press. Lower = faster spam but more detectable.",
-            Default = Config.AutoSkillSpamSpeed,
+            Title = "Spam Speed (seconds)", Default = Config.AutoSkillSpamSpeed,
             Min = 0.05, Max = 2.0, Rounding = 2,
-            Callback = function(v)
-                FarmState.AutoSkillSpamSpeed = v
-                Config.AutoSkillSpamSpeed = v
-                ConfigManager.Save(Config)
-            end
-        })
-        
-        Tabs.Skills:AddParagraph({
-            Title = "Skill Toggles",
-            Content = "Enable/disable individual skill keys below."
+            Callback = function(v) FarmState.AutoSkillSpamSpeed = v; Config.AutoSkillSpamSpeed = v; ConfigManager.Save(Config) end
         })
         
         local function createSkillToggle(keyName, upperKey)
             local toggleName = "AutoSkill" .. upperKey .. "Toggle"
             Tabs.Skills:AddToggle(toggleName, {
                 Title = "Spam " .. upperKey .. " Key",
-                Description = "Automatically press and release " .. upperKey .. " key",
                 Default = Config[toggleName:gsub("Toggle", "Enabled")]
             }):OnChanged(function(v)
                 FarmState[toggleName:gsub("Toggle", "Enabled")] = v
@@ -1861,51 +1705,30 @@ return function(Common)
             end)
         end
         
-        createSkillToggle("r", "R")
-        createSkillToggle("t", "T")
-        createSkillToggle("y", "Y")
-        createSkillToggle("f", "F")
-        createSkillToggle("g", "G")
-        createSkillToggle("h", "H")
-        createSkillToggle("v", "V")
-        createSkillToggle("b", "B")
-        createSkillToggle("n", "N")
-        createSkillToggle("q", "Q")
-        createSkillToggle("e", "E")
+        createSkillToggle("r", "R"); createSkillToggle("t", "T"); createSkillToggle("y", "Y")
+        createSkillToggle("f", "F"); createSkillToggle("g", "G"); createSkillToggle("h", "H")
+        createSkillToggle("v", "V"); createSkillToggle("b", "B"); createSkillToggle("n", "N")
+        createSkillToggle("q", "Q"); createSkillToggle("e", "E")
         
-        Tabs.Skills:AddButton({
-            Title = "Enable All Skills",
-            Callback = function()
-                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
-                for _, key in ipairs(keys) do
-                    FarmState["AutoSkill" .. key .. "Enabled"] = true
-                    Config["AutoSkill" .. key .. "Enabled"] = true
-                end
-                ConfigManager.Save(Config)
-                ui.Fluent:Notify({
-                    Title = "[K] All Skills Enabled",
-                    Content = "All skill spam toggles activated",
-                    Duration = 2
-                })
+        Tabs.Skills:AddButton({Title = "Enable All Skills", Callback = function()
+            local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+            for _, key in ipairs(keys) do
+                FarmState["AutoSkill" .. key .. "Enabled"] = true
+                Config["AutoSkill" .. key .. "Enabled"] = true
             end
-        })
+            ConfigManager.Save(Config)
+            ui.Fluent:Notify({Title = "[K] All Skills Enabled", Content = "All activated", Duration = 2})
+        end})
         
-        Tabs.Skills:AddButton({
-            Title = "Disable All Skills",
-            Callback = function()
-                local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
-                for _, key in ipairs(keys) do
-                    FarmState["AutoSkill" .. key .. "Enabled"] = false
-                    Config["AutoSkill" .. key .. "Enabled"] = false
-                end
-                ConfigManager.Save(Config)
-                ui.Fluent:Notify({
-                    Title = "[K] All Skills Disabled",
-                    Content = "All skill spam toggles deactivated",
-                    Duration = 2
-                })
+        Tabs.Skills:AddButton({Title = "Disable All Skills", Callback = function()
+            local keys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
+            for _, key in ipairs(keys) do
+                FarmState["AutoSkill" .. key .. "Enabled"] = false
+                Config["AutoSkill" .. key .. "Enabled"] = false
             end
-        })
+            ConfigManager.Save(Config)
+            ui.Fluent:Notify({Title = "[K] All Skills Disabled", Content = "All deactivated", Duration = 2})
+        end})
         
         local function createSkillSpammer(keyName, upperKey)
             task.spawn(function()
@@ -1914,7 +1737,6 @@ return function(Common)
                         pcall(function()
                             local char = LocalPlayer.Character
                             local combat = char:FindFirstChild("combat")
-                            
                             if combat then
                                 combat.update:FireServer("key", keyName)
                                 task.wait(FarmState.AutoSkillSpamSpeed or 0.2)
@@ -1928,43 +1750,27 @@ return function(Common)
             end)
         end
         
-        createSkillSpammer("r", "R")
-        createSkillSpammer("t", "T")
-        createSkillSpammer("y", "Y")
-        createSkillSpammer("f", "F")
-        createSkillSpammer("g", "G")
-        createSkillSpammer("h", "H")
-        createSkillSpammer("v", "V")
-        createSkillSpammer("b", "B")
-        createSkillSpammer("n", "N")
-        createSkillSpammer("q", "Q")
-        createSkillSpammer("e", "E")
+        createSkillSpammer("r", "R"); createSkillSpammer("t", "T"); createSkillSpammer("y", "Y")
+        createSkillSpammer("f", "F"); createSkillSpammer("g", "G"); createSkillSpammer("h", "H")
+        createSkillSpammer("v", "V"); createSkillSpammer("b", "B"); createSkillSpammer("n", "N")
+        createSkillSpammer("q", "Q"); createSkillSpammer("e", "E")
         
-        local SkillStatusDisplay = Tabs.Skills:AddParagraph({
-            Title = "Skill Spammer Status",
-            Content = "Initializing..."
-        })
-        
+        local SkillStatusDisplay = Tabs.Skills:AddParagraph({Title = "Skill Spammer Status", Content = "Initializing..."})
         task.spawn(function()
             while true do
                 local activeSkills = {}
                 local keys = {"r", "t", "y", "f", "g", "h", "v", "b", "n", "q", "e"}
                 local upperKeys = {"R", "T", "Y", "F", "G", "H", "V", "B", "N", "Q", "E"}
-                
                 for i, key in ipairs(keys) do
                     if FarmState["AutoSkill" .. upperKeys[i] .. "Enabled"] then
                         table.insert(activeSkills, upperKeys[i] .. ":" .. (FarmState.SkillStats[key] or 0))
                     end
                 end
-                
                 local activeText = #activeSkills > 0 and table.concat(activeSkills, ", ") or "None"
-                
                 SkillStatusDisplay.Content = string.format(
-                    "Status: %s\n\nSpam Speed: %.2fs\nActive Skills: %d / 11\n\nActive Keys:\n%s\n\nNote: Each key fires 'key' then 'keyend'\nto simulate a full press+release cycle.",
-                    #activeSkills > 0 and "[OK] ACTIVE" or "[X] INACTIVE",
-                    FarmState.AutoSkillSpamSpeed,
-                    #activeSkills,
-                    activeText
+                    "Status: %s\n\nSpam Speed: %.2fs\nActive: %d / 11\n\n%s",
+                    #activeSkills > 0 and "[OK]" or "[X]",
+                    FarmState.AutoSkillSpamSpeed, #activeSkills, activeText
                 )
                 task.wait(1)
             end
@@ -1979,24 +1785,15 @@ return function(Common)
         })
         
         Tabs.Chakra:AddToggle("AutoChakraToggle", {
-            Title = "Enable Auto Chakra",
-            Default = Config.AutoChakraEnabled
+            Title = "Enable Auto Chakra", Default = Config.AutoChakraEnabled
         }):OnChanged(function(v)
-            FarmState.AutoChakraEnabled = v
-            Config.AutoChakraEnabled = v
-            ConfigManager.Save(Config)
+            FarmState.AutoChakraEnabled = v; Config.AutoChakraEnabled = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Chakra:AddSlider("ChakraThresholdSlider", {
-            Title = "Charge Threshold",
-            Description = "Start charging when chakra drops below this value",
-            Default = Config.AutoChakraThreshold,
+            Title = "Charge Threshold", Default = Config.AutoChakraThreshold,
             Min = 30000, Max = 250000, Rounding = 0,
-            Callback = function(v)
-                FarmState.ChakraThreshold = v
-                Config.AutoChakraThreshold = v
-                ConfigManager.Save(Config)
-            end
+            Callback = function(v) FarmState.ChakraThreshold = v; Config.AutoChakraThreshold = v; ConfigManager.Save(Config) end
         })
         
         task.spawn(function()
@@ -2005,7 +1802,6 @@ return function(Common)
                     pcall(function()
                         local char = LocalPlayer.Character
                         local hum = char:FindFirstChildOfClass("Humanoid")
-                        
                         if hum and hum.Health > 0 then
                             local chakraGui = LocalPlayer.PlayerGui:FindFirstChild("Main") 
                                 and LocalPlayer.PlayerGui.Main:FindFirstChild("ingamearena")
@@ -2015,7 +1811,6 @@ return function(Common)
                             if chakraGui and chakraGui.Text then
                                 local chakraText = chakraGui.Text
                                 local chakraValue = tonumber(string.match(chakraText, "CHA: (%d+)"))
-                                
                                 if chakraValue then
                                     if chakraValue < FarmState.ChakraThreshold then
                                         char.combat.update:FireServer("key", "c")
@@ -2024,10 +1819,7 @@ return function(Common)
                                     end
                                 end
                             end
-                            
-                            if hum.WalkSpeed == 0 then
-                                hum.WalkSpeed = 50
-                            end
+                            if hum.WalkSpeed == 0 then hum.WalkSpeed = 50 end
                         end
                     end)
                 end
@@ -2036,19 +1828,19 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES (NEW!)
+        -- EXPERIMENTAL FEATURES
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
             Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!"
         })
         
-        -- KILL AURA SECTION - ULTRA FAST FORCE KILL MODE
+        -- KILL AURA SECTION - ULTRA FAST FORCE KILL
         Tabs.Experimental:AddSection("KillAura (ULTRA FAST FORCE KILL)")
         
         Tabs.Experimental:AddToggle("KillAuraToggle", {
             Title = "Enable KillAura",
-            Description = "ULTRA FAST: Instantly sets Health=0 on ALL nearby Humanoids (0.01s interval)",
+            Description = "ULTRA FAST: Instantly sets Health=0 on ALL nearby Humanoids",
             Default = Config.KillAuraEnabled
         }):OnChanged(function(v)
             FarmState.KillAuraEnabled = v
@@ -2065,9 +1857,9 @@ return function(Common)
         
         Tabs.Experimental:AddSlider("KillAuraRangeSlider", {
             Title = "KillAura Range (studs)",
-            Description = "Maximum distance to target enemies",
+            Description = "Maximum distance to target enemies (default: 500)",
             Default = Config.KillAuraRange,
-            Min = 10, Max = 200, Rounding = 0,
+            Min = 50, Max = 1000, Rounding = 0,
             Callback = function(v)
                 FarmState.KillAuraRange = v
                 Config.KillAuraRange = v
@@ -2077,7 +1869,7 @@ return function(Common)
         
         Tabs.Experimental:AddSlider("KillAuraSpeedSlider", {
             Title = "KillAura Speed (seconds)",
-            Description = "Time between kill attempts. Lower = more aggressive (min: 0.01s)",
+            Description = "Time between kill cycles. Lower = more aggressive (min: 0.01s)",
             Default = Config.KillAuraSpeed,
             Min = 0.01, Max = 0.5, Rounding = 2,
             Callback = function(v)
@@ -2088,8 +1880,8 @@ return function(Common)
         })
         
         Tabs.Experimental:AddToggle("KillAuraNPCToggle", {
-            Title = "Target NPCs",
-            Description = "Kill all NPCs in range (mission NPCs, enemies, bosses)",
+            Title = "Target ALL NPCs",
+            Description = "Kill all NPCs in range (missions, bosses, training)",
             Default = Config.KillAuraTargetNPCs
         }):OnChanged(function(v)
             FarmState.KillAuraTargetNPCs = v
@@ -2098,8 +1890,8 @@ return function(Common)
         end)
         
         Tabs.Experimental:AddToggle("KillAuraPlayerToggle", {
-            Title = "Target Players",
-            Description = "Kill other players in range (PVP mode)",
+            Title = "Target Players (PVP)",
+            Description = "Kill other players in range",
             Default = Config.KillAuraTargetPlayers
         }):OnChanged(function(v)
             FarmState.KillAuraTargetPlayers = v
@@ -2108,7 +1900,7 @@ return function(Common)
         end)
         
         Tabs.Experimental:AddToggle("KillAuraForceKillToggle", {
-            Title = "Force Kill Mode",
+            Title = "Force Kill Mode (REQUIRED)",
             Description = "Directly set Health=0 (bypasses combat system)",
             Default = Config.KillAuraForceKill
         }):OnChanged(function(v)
@@ -2116,6 +1908,11 @@ return function(Common)
             Config.KillAuraForceKill = v
             ConfigManager.Save(Config)
         end)
+        
+        Tabs.Experimental:AddParagraph({
+            Title = "KillAura Info",
+            Content = "ULTRA FAST MODE:\n- Scans ALL Humanoids in workspace (not just npc folder)\n- 0.01 second cycle (100 kills/sec potential)\n- 500 stud default range\n- Force kill sets Health=0 directly\n- No M1 attacks, no cooldowns\n\nWARNING: Very detectable! Use only in private servers!"
+        })
         
         -- KILL AURA LOGIC - ULTRA FAST AGGRESSIVE FORCE KILL
         task.spawn(function()
@@ -2129,15 +1926,15 @@ return function(Common)
                         if root and hum and hum.Health > 0 then
                             local killCount = 0
                             
-                            -- KILL ALL NPCs IN RANGE - SCAN ENTIRE WORKSPACE
+                            -- SCAN ALL HUMANOIDs IN WORKSPACE (not just npc folder)
                             if FarmState.KillAuraTargetNPCs then
                                 -- Scan workspace.npc folder
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     for _, npc in pairs(npcs:GetChildren()) do
                                         if npc:IsA("Model") then
+                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
                                             local npcHum = npc:FindFirstChildOfClass("Humanoid")
-                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Torso")
                                             
                                             if npcRoot and npcHum and npcHum.Health > 0 then
                                                 local dist = (root.Position - npcRoot.Position).Magnitude
@@ -2153,17 +1950,42 @@ return function(Common)
                                     end
                                 end
                                 
-                                -- Also scan workspace directly for any Humanoid (bosses, etc)
-                                for _, obj in pairs(workspace:GetDescendants()) do
-                                    if obj:IsA("Humanoid") and obj.Health > 0 then
-                                        local model = obj.Parent
-                                        if model and model:IsA("Model") and model ~= char then
-                                            local modelRoot = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
-                                            if modelRoot then
-                                                local dist = (root.Position - modelRoot.Position).Magnitude
+                                -- Also scan workspace.bossdropmission for bosses
+                                local bossFolder = workspace:FindFirstChild("bossdropmission")
+                                if bossFolder then
+                                    for _, descendant in pairs(bossFolder:GetDescendants()) do
+                                        if descendant:IsA("Humanoid") and descendant.Health > 0 then
+                                            local model = descendant.Parent
+                                            if model and model:IsA("Model") then
+                                                local modelRoot = model:FindFirstChild("HumanoidRootPart")
+                                                if modelRoot then
+                                                    local dist = (root.Position - modelRoot.Position).Magnitude
+                                                    if dist <= FarmState.KillAuraRange then
+                                                        if FarmState.KillAuraForceKill then
+                                                            descendant.Health = 0
+                                                            killCount = killCount + 1
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                                
+                                -- Scan workspace for any stray Humanoids
+                                for _, obj in pairs(workspace:GetChildren()) do
+                                    if obj:IsA("Model") and obj ~= char then
+                                        local objRoot = obj:FindFirstChild("HumanoidRootPart")
+                                        local objHum = obj:FindFirstChildOfClass("Humanoid")
+                                        
+                                        if objRoot and objHum and objHum.Health > 0 then
+                                            -- Skip players if not targeting them
+                                            local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
+                                            if not isPlayer then
+                                                local dist = (root.Position - objRoot.Position).Magnitude
                                                 if dist <= FarmState.KillAuraRange then
                                                     if FarmState.KillAuraForceKill then
-                                                        obj.Health = 0
+                                                        objHum.Health = 0
                                                         killCount = killCount + 1
                                                     end
                                                 end
@@ -2198,7 +2020,7 @@ return function(Common)
                         end
                     end)
                 end
-                task.wait(FarmState.KillAuraSpeed or 0.01) -- ULTRA FAST: 0.01s default
+                task.wait(FarmState.KillAuraSpeed or 0.01)
             end
         end)
         
@@ -2215,14 +2037,12 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- ANTI RAGDOLL LOGIC
         task.spawn(function()
             while true do
                 if FarmState.AntiRagdollEnabled and LocalPlayer.Character then
                     pcall(function()
                         local char = LocalPlayer.Character
                         local hum = char:FindFirstChildOfClass("Humanoid")
-                        
                         if hum then
                             local state = hum:GetState()
                             if state == Enum.HumanoidStateType.Physics 
@@ -2232,7 +2052,6 @@ return function(Common)
                                 task.wait(0.1)
                                 hum:ChangeState(Enum.HumanoidStateType.Running)
                             end
-                            
                             local ragdoll = char:GetAttribute("Ragdoll")
                             if ragdoll and ragdoll ~= 0 then
                                 char:SetAttribute("Ragdoll", 0)
@@ -2257,7 +2076,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- ANTI KNOCKBACK LOGIC
         task.spawn(function()
             while true do
                 if FarmState.AntiKnockbackEnabled and LocalPlayer.Character then
@@ -2292,80 +2110,48 @@ return function(Common)
         Tabs.Experimental:AddSection("ESP (Extra Sensory Perception)")
         
         Tabs.Experimental:AddToggle("ESPToggle", {
-            Title = "Enable ESP",
-            Description = "See all players through walls with highlights",
-            Default = Config.ESPEnabled
+            Title = "Enable ESP", Default = Config.ESPEnabled
         }):OnChanged(function(v)
-            FarmState.ESPEnabled = v
-            Config.ESPEnabled = v
-            ConfigManager.Save(Config)
+            FarmState.ESPEnabled = v; Config.ESPEnabled = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Experimental:AddToggle("ESPNamesToggle", {
-            Title = "Show Names",
-            Description = "Display player names above their heads",
-            Default = Config.ESPShowNames
+            Title = "Show Names", Default = Config.ESPShowNames
         }):OnChanged(function(v)
-            FarmState.ESPShowNames = v
-            Config.ESPShowNames = v
-            ConfigManager.Save(Config)
+            FarmState.ESPShowNames = v; Config.ESPShowNames = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Experimental:AddToggle("ESPDistanceToggle", {
-            Title = "Show Distance",
-            Description = "Display distance to each player",
-            Default = Config.ESPShowDistance
+            Title = "Show Distance", Default = Config.ESPShowDistance
         }):OnChanged(function(v)
-            FarmState.ESPShowDistance = v
-            Config.ESPShowDistance = v
-            ConfigManager.Save(Config)
+            FarmState.ESPShowDistance = v; Config.ESPShowDistance = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Experimental:AddToggle("ESPHealthToggle", {
-            Title = "Show Health",
-            Description = "Display player health values",
-            Default = Config.ESPShowHealth
+            Title = "Show Health", Default = Config.ESPShowHealth
         }):OnChanged(function(v)
-            FarmState.ESPShowHealth = v
-            Config.ESPShowHealth = v
-            ConfigManager.Save(Config)
+            FarmState.ESPShowHealth = v; Config.ESPShowHealth = v; ConfigManager.Save(Config)
         end)
         
         Tabs.Experimental:AddSlider("ESPRangeSlider", {
-            Title = "ESP Max Distance (studs)",
-            Description = "Only show players within this range",
-            Default = Config.ESPMaxDistance,
+            Title = "ESP Max Distance (studs)", Default = Config.ESPMaxDistance,
             Min = 50, Max = 2000, Rounding = 0,
-            Callback = function(v)
-                FarmState.ESPMaxDistance = v
-                Config.ESPMaxDistance = v
-                ConfigManager.Save(Config)
-            end
+            Callback = function(v) FarmState.ESPMaxDistance = v; Config.ESPMaxDistance = v; ConfigManager.Save(Config) end
         })
         
         Tabs.Experimental:AddColorpicker("ESPFillColorPicker", {
-            Title = "ESP Fill Color",
-            Default = FarmState.ESPFillColor
+            Title = "ESP Fill Color", Default = FarmState.ESPFillColor
         }):OnChanged(function(color)
             FarmState.ESPFillColor = color
-            Config.ESPFillColor = {
-                R = math.floor(color.R * 255),
-                G = math.floor(color.G * 255),
-                B = math.floor(color.B * 255)
-            }
+            Config.ESPFillColor = {R = math.floor(color.R * 255), G = math.floor(color.G * 255), B = math.floor(color.B * 255)}
             ConfigManager.Save(Config)
         end)
         
         Tabs.Experimental:AddColorpicker("ESPOutlineColorPicker", {
-            Title = "ESP Outline Color",
-            Default = FarmState.ESPOutlineColor
+            Title = "ESP Outline Color", Default = FarmState.ESPOutlineColor
         }):OnChanged(function(color)
             FarmState.ESPOutlineColor = color
-            Config.ESPOutlineColor = {
-                R = math.floor(color.R * 255),
-                G = math.floor(color.G * 255),
-                B = math.floor(color.B * 255)
-            }
+            Config.ESPOutlineColor = {R = math.floor(color.R * 255), G = math.floor(color.G * 255), B = math.floor(color.B * 255)}
             ConfigManager.Save(Config)
         end)
         
@@ -2373,7 +2159,6 @@ return function(Common)
         local ESPHighlights = {}
         local ESPBillboards = {}
         
-        -- ESP Creation Function
         local function createESPForPlayer(player)
             if player == LocalPlayer then return end
             if not player.Character then return end
@@ -2468,7 +2253,6 @@ return function(Common)
             end
         end
         
-        -- ESP Update Loop
         task.spawn(function()
             while true do
                 if FarmState.ESPEnabled then
@@ -2536,28 +2320,18 @@ return function(Common)
             end
         end)
         
-        -- ESP Player Events
         Players.PlayerAdded:Connect(function(player)
             player.CharacterAdded:Connect(function()
                 task.wait(0.5)
-                if FarmState.ESPEnabled then
-                    createESPForPlayer(player)
-                end
+                if FarmState.ESPEnabled then createESPForPlayer(player) end
             end)
-            if player.Character and FarmState.ESPEnabled then
-                createESPForPlayer(player)
-            end
+            if player.Character and FarmState.ESPEnabled then createESPForPlayer(player) end
         end)
         
-        Players.PlayerRemoving:Connect(function(player)
-            removeESPForPlayer(player)
-        end)
+        Players.PlayerRemoving:Connect(function(player) removeESPForPlayer(player) end)
         
-        -- Initialize ESP for existing players
         for _, player in pairs(Players:GetPlayers()) do
-            if player.Character and FarmState.ESPEnabled then
-                createESPForPlayer(player)
-            end
+            if player.Character and FarmState.ESPEnabled then createESPForPlayer(player) end
         end
         
         -- STUN/GRAB IMMUNITY SECTION
@@ -2573,7 +2347,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- STUN/GRAB IMMUNITY LOGIC
         task.spawn(function()
             while true do
                 if FarmState.StunGrabImmunityEnabled and LocalPlayer.Character then
@@ -2586,9 +2359,7 @@ return function(Common)
                             local stunObjects = {"Stun", "Grab", "Grabbed", "Hold", "Carry", "Knockback", "Ragdoll"}
                             for _, objName in ipairs(stunObjects) do
                                 local obj = char:FindFirstChild(objName)
-                                if obj then
-                                    pcall(function() obj:Destroy() end)
-                                end
+                                if obj then pcall(function() obj:Destroy() end) end
                             end
                             
                             local stunAttrs = {"Stunned", "Grabbed", "Held", "Ragdoll", "Knockback"}
@@ -2609,9 +2380,7 @@ return function(Common)
                                 hum:ChangeState(Enum.HumanoidStateType.Running)
                             end
                             
-                            if not hum.AutoRotate then
-                                hum.AutoRotate = true
-                            end
+                            if not hum.AutoRotate then hum.AutoRotate = true end
                             
                             for _, v in pairs(char:GetDescendants()) do
                                 if v:IsA("Weld") or v:IsA("WeldConstraint") then
@@ -2650,12 +2419,9 @@ return function(Common)
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs (ULTRA FAST)\n- Kills: %d\n- Force Kill: %s\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
-                    #activeFeatures,
-                    activeText,
-                    FarmState.KillAuraRange,
-                    FarmState.KillAuraSpeed,
-                    FarmState.KillAuraKills,
+                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Force Kill: %s\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    #activeFeatures, activeText,
+                    FarmState.KillAuraRange, FarmState.KillAuraSpeed, FarmState.KillAuraKills,
                     FarmState.KillAuraForceKill and "YES" or "NO",
                     FarmState.KillAuraTargetNPCs and "YES" or "NO",
                     FarmState.KillAuraTargetPlayers and "YES" or "NO",
@@ -2736,9 +2502,7 @@ return function(Common)
                 if FarmState.GodModeEnabled then
                     char.Humanoid.Health = char.Humanoid.MaxHealth
                     local fakehealth = char:FindFirstChild("fakehealth")
-                    if fakehealth then
-                        fakehealth.Value = FarmState.FakeHealthValue
-                    end
+                    if fakehealth then fakehealth.Value = FarmState.FakeHealthValue end
                 end
             end
             currentTargetNPC = nil
@@ -2755,7 +2519,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + ULTRA FAST KillAura + Boss Farm)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Ultra KillAura + Boss Farm)",
             Duration = 5
         })
     end
