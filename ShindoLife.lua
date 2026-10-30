@@ -1,9 +1,9 @@
--- // ==========================================
--- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
--- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
--- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection: Auto-cancel non-green missions
--- // ==========================================
+--  ==========================================
+--  GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
+--  AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
+--  Continuous Facing + Underground Attack + Auto Skill Spammer
+--  Mission Protection: Auto-cancel non-green missions
+--  ==========================================
 
 return function(Common)
     local Fluent = Common.Fluent
