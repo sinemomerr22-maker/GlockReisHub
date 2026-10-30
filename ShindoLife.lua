@@ -921,19 +921,19 @@ return function(Common)
             end
         end)
         
-        -- ==========================================
--- AUTOFARM BOSS (FIXED - NPC SEARCH + RETRY)
+-- ==========================================
+-- AUTOFARM BOSS (FIXED - ALTERNATIVE QUEST DETECTION)
 -- ==========================================
 Tabs.BossFarm:AddParagraph({
-    Title = "[B] AutoFarm Boss System (FIXED)",
+    Title = "[B] AutoFarm Boss System (FIXED v2)",
     Content = "Automatically farm boss drop missions.\n\n" ..
         "- Scans workspace.bossdropmission.missions\n" ..
         "- Cycles through selected bosses in order\n" ..
         "- Teleports to missiongiver and accepts quest\n" ..
-        "- 🆕 FIXED: Waits for NPCs to spawn (up to 10s)\n" ..
-        "- 🆕 FIXED: Retries NPC search if not found\n" ..
-        "- 🆕 FIXED: Kills ALL NPCs with 'npc' in name\n" ..
-        "- 🆕 FIXED: Waits 3s after mission complete\n" ..
+        "- 🆕 FIXED: Multiple quest acceptance methods\n" ..
+        "- 🆕 FIXED: Proceeds if NPCs spawn (even without currentmission)\n" ..
+        "- 🆕 FIXED: Better debugging and status messages\n" ..
+        "- Kills NPCs one by one until mission completes\n" ..
         "- Moves to next boss after completion\n\n" ..
         "NOTE: Disable regular AutoFarm while using Boss Farm!"
 })
@@ -1064,10 +1064,10 @@ Tabs.BossFarm:AddButton({
 
 Tabs.BossFarm:AddParagraph({
     Title = "Boss Farm Cycle Info",
-    Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try to accept quest (15s timeout)\n   - 🆕 Wait up to 10s for NPCs to spawn\n   - Find ALL NPCs with 'npc' in name\n   - Teleport to each NPC and kill them one by one\n   - 🆕 Wait 3s after mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
+    Content = "1. Select bosses from dropdown above\n2. Enable AutoFarm Boss toggle\n3. Script will cycle: Boss1 -> Boss2 -> Boss3 -> Boss1...\n4. For each boss:\n   - Teleport to missiongiver\n   - Try multiple quest acceptance methods\n   - 🆕 Check if NPCs spawned (real success indicator)\n   - Kill NPCs one by one\n   - Wait for mission completion\n   - Move to next boss\n5. Disable regular AutoFarm to avoid conflicts"
 })
 
--- 🆕 FIXED: Comprehensive NPC search with retry
+-- 🆕 Helper: Find all alive NPCs with "npc" in name
 local function findAllAliveNPCs()
     local npcList = {}
     local npcsFolder = workspace:FindFirstChild("npc")
@@ -1076,14 +1076,13 @@ local function findAllAliveNPCs()
         return npcList
     end
     
-    -- Search direct children first (most common)
+    -- Search direct children first
     for _, npc in pairs(npcsFolder:GetChildren()) do
         if npc:IsA("Model") then
             local npcRoot = npc:FindFirstChild("HumanoidRootPart")
             local npcHum = npc:FindFirstChildOfClass("Humanoid")
             
             if npcRoot and npcHum and npcHum.Health > 0 then
-                -- Check if name contains "npc" (case insensitive)
                 local nameLower = npc.Name:lower()
                 if string.find(nameLower, "npc") then
                     table.insert(npcList, {
@@ -1097,10 +1096,9 @@ local function findAllAliveNPCs()
         end
     end
     
-    -- ALSO search descendants (NPCs in subfolders)
+    -- Also search descendants
     for _, descendant in pairs(npcsFolder:GetDescendants()) do
         if descendant:IsA("Model") and descendant.Parent ~= npcsFolder then
-            -- Skip if already added (was a direct child)
             local alreadyAdded = false
             for _, existing in ipairs(npcList) do
                 if existing.model == descendant then
@@ -1131,7 +1129,7 @@ local function findAllAliveNPCs()
     return npcList
 end
 
--- Boss Farm Logic - FIXED WITH RETRY
+-- Boss Farm Logic - FIXED WITH ALTERNATIVE DETECTION
 task.spawn(function()
     local currentBossIndex = 1
     
@@ -1227,23 +1225,45 @@ task.spawn(function()
                 
                 task.wait(1)
                 
-                -- Try to accept quest (15 second timeout)
+                -- 🆕 FIXED: Try multiple quest acceptance methods
                 FarmState.BossFarmStatus = "Trying to accept " .. bossName .. " quest..."
-                local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
                 local questAccepted = false
                 local startTime = tick()
+                
+                -- Count NPCs before attempting quest
+                local npcsBefore = #findAllAliveNPCs()
+                ui.Fluent:Notify({
+                    Title = "[B] Debug Info",
+                    Content = "NPCs before quest: " .. npcsBefore,
+                    Duration = 2
+                })
                 
                 while tick() - startTime < FarmState.AutoFarmBossTimeout do
                     if not FarmState.AutoFarmBossEnabled then break end
                     
-                    -- Check if already have mission
+                    -- Method 1: Check currentmission (traditional)
                     local currentmission = LocalPlayer:FindFirstChild("currentmission")
                     if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
                         questAccepted = true
+                        FarmState.BossFarmStatus = "Quest accepted via currentmission!"
                         break
                     end
                     
-                    -- Try to accept
+                    -- Method 2: Check if NPCs spawned (boss missions often don't use currentmission)
+                    local npcsNow = #findAllAliveNPCs()
+                    if npcsNow > npcsBefore then
+                        questAccepted = true
+                        FarmState.BossFarmStatus = "Quest accepted - NPCs spawned! (" .. npcsNow .. " > " .. npcsBefore .. ")"
+                        ui.Fluent:Notify({
+                            Title = "[B] Quest Accepted",
+                            Content = "Detected " .. (npcsNow - npcsBefore) .. " new NPC(s)",
+                            Duration = 3
+                        })
+                        break
+                    end
+                    
+                    -- Try to accept using CLIENTTALK
+                    local clientTalk = missiongiver:FindFirstChild("CLIENTTALK")
                     if clientTalk then
                         pcall(function()
                             clientTalk:FireServer()
@@ -1252,50 +1272,61 @@ task.spawn(function()
                         end)
                     end
                     
+                    -- Try alternative: startevent
+                    pcall(function()
+                        LocalPlayer.startevent:FireServer("bossquest", bossName)
+                    end)
+                    
                     task.wait(1)
                 end
                 
+                -- Final check after timeout
                 if not questAccepted then
-                    -- Check one more time
                     local currentmission = LocalPlayer:FindFirstChild("currentmission")
                     if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
                         questAccepted = true
+                    else
+                        -- Check if NPCs spawned anyway
+                        local npcsFinal = #findAllAliveNPCs()
+                        if npcsFinal > npcsBefore then
+                            questAccepted = true
+                            FarmState.BossFarmStatus = "Quest accepted after timeout - NPCs present!"
+                        end
                     end
                 end
                 
                 if not questAccepted then
                     FarmState.BossFarmStatus = "Failed to accept " .. bossName .. " quest (timeout)"
+                    ui.Fluent:Notify({
+                        Title = "[!] Boss Farm",
+                        Content = "Quest acceptance failed for " .. bossName,
+                        Duration = 3
+                    })
                     currentBossIndex = currentBossIndex + 1
                     task.wait(2)
                     return
                 end
                 
-                FarmState.BossFarmStatus = "Quest accepted! Waiting for NPCs to spawn..."
-                task.wait(2) -- Initial wait for NPCs to spawn
+                FarmState.BossFarmStatus = "Quest accepted! Finding NPCs..."
+                task.wait(2) -- Wait for NPCs to fully spawn
                 
-                -- 🆕 FIXED: Wait for NPCs with retry (up to 10 seconds)
-                local npcList = {}
-                local npcSearchStartTime = tick()
-                local maxNP CWaitTime = 10
+                -- Find ALL NPCs with "npc" in name
+                local npcList = findAllAliveNPCs()
                 
-                while tick() - npcSearchStartTime < maxNPCWaitTime do
-                    if not FarmState.AutoFarmBossEnabled then break end
-                    
+                -- 🆕 FIXED: Retry NPC search if none found initially
+                local retryCount = 0
+                while #npcList == 0 and retryCount < 5 do
+                    retryCount = retryCount + 1
+                    FarmState.BossFarmStatus = "Waiting for NPCs... (" .. retryCount .. "/5)"
+                    task.wait(2)
                     npcList = findAllAliveNPCs()
-                    
-                    if #npcList > 0 then
-                        break -- Found NPCs!
-                    end
-                    
-                    FarmState.BossFarmStatus = "Waiting for NPCs... (" .. math.floor(tick() - npcSearchStartTime) .. "s/" .. maxNPCWaitTime .. "s)"
-                    task.wait(1)
                 end
                 
                 if #npcList == 0 then
-                    FarmState.BossFarmStatus = "No NPCs found after " .. maxNPCWaitTime .. "s - skipping boss"
+                    FarmState.BossFarmStatus = "No NPCs found after retries"
                     ui.Fluent:Notify({
                         Title = "[!] Boss Farm",
-                        Content = "No NPCs found for " .. bossName .. " - moving to next boss",
+                        Content = "No NPCs found for " .. bossName .. " - skipping",
                         Duration = 3
                     })
                     currentBossIndex = currentBossIndex + 1
@@ -1304,16 +1335,24 @@ task.spawn(function()
                 end
                 
                 FarmState.BossFarmStatus = "Found " .. #npcList .. " NPC(s). Starting kill cycle..."
+                ui.Fluent:Notify({
+                    Title = "[B] NPCs Found",
+                    Content = "Killing " .. #npcList .. " NPC(s) for " .. bossName,
+                    Duration = 3
+                })
                 
                 -- Kill each NPC in order
                 for i, npcData in ipairs(npcList) do
                     -- Check if boss farm is still enabled
                     if not FarmState.AutoFarmBossEnabled then break end
                     
-                    -- Check if mission is still active
+                    -- Check if mission is still active (for traditional missions)
                     local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                    if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                    if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                        -- Mission still active, continue
+                    elseif currentmission and (currentmission.Value == nil or currentmission.Value == "") then
                         -- Mission completed!
+                        FarmState.BossFarmStatus = "Mission completed!"
                         break
                     end
                     
@@ -1351,7 +1390,9 @@ task.spawn(function()
                     while npcData.hum.Health > 0 and FarmState.AutoFarmBossEnabled do
                         -- Check if mission is still active
                         local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                        if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
+                        if currentmission and currentmission.Value ~= nil and currentmission.Value ~= "" then
+                            -- Mission still active
+                        elseif currentmission and (currentmission.Value == nil or currentmission.Value == "") then
                             break -- Mission completed
                         end
                         
@@ -1377,6 +1418,7 @@ task.spawn(function()
                         
                         -- Timeout after 30 seconds per NPC
                         if tick() - killStartTime > 30 then
+                            FarmState.BossFarmStatus = "NPC kill timeout, moving to next..."
                             break
                         end
                     end
@@ -1384,12 +1426,10 @@ task.spawn(function()
                     task.wait(1) -- Wait before moving to next NPC
                 end
                 
-                -- 🆕 FIXED: Wait for mission to fully complete (3 seconds)
+                -- Wait for mission to fully complete
                 FarmState.BossFarmStatus = "Waiting for " .. bossName .. " mission completion..."
                 local completionWait = 0
-                local maxCompletionWait = 15
-                
-                while FarmState.AutoFarmBossEnabled and completionWait < maxCompletionWait do
+                while FarmState.AutoFarmBossEnabled and completionWait < 15 do
                     local currentmission = LocalPlayer:FindFirstChild("currentmission")
                     if not currentmission or currentmission.Value == nil or currentmission.Value == "" then
                         -- Mission completed!
@@ -1399,11 +1439,8 @@ task.spawn(function()
                     completionWait = completionWait + 1
                 end
                 
-                -- 🆕 FIXED: Extra wait after mission complete to ensure cleanup
                 if FarmState.AutoFarmBossEnabled then
-                    FarmState.BossFarmStatus = bossName .. " mission completed! Waiting 3s..."
-                    task.wait(3) -- Extra buffer time
-                    
+                    FarmState.BossFarmStatus = bossName .. " mission completed!"
                     FarmState.BossFarmCompleted = FarmState.BossFarmCompleted + 1
                     ui.Fluent:Notify({
                         Title = "[B] Boss Completed",
@@ -1451,9 +1488,9 @@ task.spawn(function()
             "Settings:\n" ..
             "- Tween Speed: %d studs/s\n" ..
             "- Timeout: %d seconds\n\n" ..
-            "🆕 NPC Wait Time: 10s\n" ..
-            "🆕 Post-Complete Wait: 3s\n" ..
-            "🆕 Retry Search: Enabled\n\n" ..
+            "🆕 Multiple quest acceptance methods\n" ..
+            "🆕 NPC spawn detection\n" ..
+            "🆕 Retry logic for NPC search\n\n" ..
             "Note: Disable regular AutoFarm!",
             FarmState.AutoFarmBossEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
             FarmState.BossFarmCurrent ~= "" and FarmState.BossFarmCurrent or "None",
