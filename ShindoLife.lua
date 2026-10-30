@@ -3,7 +3,7 @@
 -- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection: Auto-cancel non-green missions
--- // Experimental: KillAura, AntiRagdoll, AntiKnockback, ESP, StunImmunity
+-- // Experimental: KillAura (FORCE KILL), AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
 return function(Common)
@@ -63,10 +63,11 @@ return function(Common)
             AutoSkillSpamSpeed = 0.2,
             -- Experimental Config
             KillAuraEnabled = false,
-            KillAuraRange = 25,
-            KillAuraSpeed = 0.08,
+            KillAuraRange = 30,
+            KillAuraSpeed = 0.05,
             KillAuraTargetNPCs = true,
-            KillAuraTargetPlayers = false,
+            KillAuraTargetPlayers = true,
+            KillAuraForceKill = true,
             AntiRagdollEnabled = false,
             AntiKnockbackEnabled = false,
             ESPEnabled = false,
@@ -137,39 +138,6 @@ return function(Common)
         if ok then
             lastM1Time = now
             task.delay(0.05, function()
-                pcall(function()
-                    combat.update:FireServer("mouse1", false)
-                end)
-            end)
-        end
-        
-        return ok
-    end
-    
-    -- Fast M1 for KillAura (bypasses normal cooldown)
-    local function killAuraM1(targetHRP)
-        local char = LocalPlayer.Character
-        if not char then return false end
-        
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local combat = char:FindFirstChild("combat")
-        if not root or not combat then return false end
-        
-        -- Face target
-        if targetHRP then
-            local dir = (targetHRP.Position - root.Position) * Vector3.new(1, 0, 1)
-            if dir.Magnitude > 0.1 then
-                root.CFrame = CFrame.lookAt(root.Position, root.Position + dir.Unit)
-            end
-        end
-        
-        -- Fire M1
-        local ok = pcall(function()
-            combat.update:FireServer("mouse1", true)
-        end)
-        
-        if ok then
-            task.delay(0.03, function()
                 pcall(function()
                     combat.update:FireServer("mouse1", false)
                 end)
@@ -554,10 +522,11 @@ return function(Common)
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
             -- Experimental State
             KillAuraEnabled = Config.KillAuraEnabled,
-            KillAuraRange = Config.KillAuraRange or 25,
-            KillAuraSpeed = Config.KillAuraSpeed or 0.08,
+            KillAuraRange = Config.KillAuraRange or 30,
+            KillAuraSpeed = Config.KillAuraSpeed or 0.05,
             KillAuraTargetNPCs = Config.KillAuraTargetNPCs,
             KillAuraTargetPlayers = Config.KillAuraTargetPlayers,
+            KillAuraForceKill = Config.KillAuraForceKill,
             AntiRagdollEnabled = Config.AntiRagdollEnabled,
             AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
             ESPEnabled = Config.ESPEnabled,
@@ -1676,24 +1645,31 @@ return function(Common)
             Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!"
         })
         
-        -- KILL AURA SECTION
-        Tabs.Experimental:AddSection("KillAura (Rapid M1)")
+        -- KILL AURA SECTION - FORCE KILL MODE
+        Tabs.Experimental:AddSection("KillAura (FORCE KILL)")
         
         Tabs.Experimental:AddToggle("KillAuraToggle", {
             Title = "Enable KillAura",
-            Description = "Automatically attack nearby enemies with rapid M1",
+            Description = "FORCE KILL: Instantly sets Health=0 on all nearby enemies",
             Default = Config.KillAuraEnabled
         }):OnChanged(function(v)
             FarmState.KillAuraEnabled = v
             Config.KillAuraEnabled = v
             ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({
+                    Title = "[X] KillAura ACTIVATED",
+                    Content = "Force-kill mode enabled!",
+                    Duration = 3
+                })
+            end
         end)
         
         Tabs.Experimental:AddSlider("KillAuraRangeSlider", {
             Title = "KillAura Range (studs)",
             Description = "Maximum distance to target enemies",
             Default = Config.KillAuraRange,
-            Min = 5, Max = 50, Rounding = 0,
+            Min = 10, Max = 100, Rounding = 0,
             Callback = function(v)
                 FarmState.KillAuraRange = v
                 Config.KillAuraRange = v
@@ -1703,9 +1679,9 @@ return function(Common)
         
         Tabs.Experimental:AddSlider("KillAuraSpeedSlider", {
             Title = "KillAura Speed (seconds)",
-            Description = "Time between M1 attacks. Lower = faster but more detectable.",
+            Description = "Time between kill attempts. Lower = more aggressive.",
             Default = Config.KillAuraSpeed,
-            Min = 0.02, Max = 0.5, Rounding = 2,
+            Min = 0.01, Max = 0.5, Rounding = 2,
             Callback = function(v)
                 FarmState.KillAuraSpeed = v
                 Config.KillAuraSpeed = v
@@ -1715,7 +1691,7 @@ return function(Common)
         
         Tabs.Experimental:AddToggle("KillAuraNPCToggle", {
             Title = "Target NPCs",
-            Description = "Attack mission NPCs and enemies",
+            Description = "Kill all NPCs in range (mission NPCs, enemies, bosses)",
             Default = Config.KillAuraTargetNPCs
         }):OnChanged(function(v)
             FarmState.KillAuraTargetNPCs = v
@@ -1725,7 +1701,7 @@ return function(Common)
         
         Tabs.Experimental:AddToggle("KillAuraPlayerToggle", {
             Title = "Target Players",
-            Description = "Attack other players (PVP mode)",
+            Description = "Kill other players in range (PVP mode)",
             Default = Config.KillAuraTargetPlayers
         }):OnChanged(function(v)
             FarmState.KillAuraTargetPlayers = v
@@ -1733,7 +1709,17 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- KILL AURA LOGIC
+        Tabs.Experimental:AddToggle("KillAuraForceKillToggle", {
+            Title = "Force Kill Mode",
+            Description = "Directly set Health=0 (bypasses combat system)",
+            Default = Config.KillAuraForceKill
+        }):OnChanged(function(v)
+            FarmState.KillAuraForceKill = v
+            Config.KillAuraForceKill = v
+            ConfigManager.Save(Config)
+        end)
+        
+        -- KILL AURA LOGIC - AGGRESSIVE FORCE KILL
         task.spawn(function()
             while true do
                 if FarmState.KillAuraEnabled and LocalPlayer.Character then
@@ -1741,53 +1727,85 @@ return function(Common)
                         local char = LocalPlayer.Character
                         local root = char:FindFirstChild("HumanoidRootPart")
                         local hum = char:FindFirstChildOfClass("Humanoid")
+                        local combat = char:FindFirstChild("combat")
                         
                         if root and hum and hum.Health > 0 then
-                            local targets = {}
+                            local killCount = 0
                             
-                            -- Find NPC targets
+                            -- KILL ALL NPCs IN RANGE
                             if FarmState.KillAuraTargetNPCs then
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     for _, npc in pairs(npcs:GetChildren()) do
-                                        if npc:IsA("Model") and npc:FindFirstChild("HumanoidRootPart") 
-                                            and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
-                                            local dist = (root.Position - npc.HumanoidRootPart.Position).Magnitude
-                                            if dist <= FarmState.KillAuraRange then
-                                                table.insert(targets, {model = npc, root = npc.HumanoidRootPart, dist = dist})
+                                        if npc:IsA("Model") then
+                                            local npcRoot = npc:FindFirstChild("HumanoidRootPart")
+                                            local npcHum = npc:FindFirstChildOfClass("Humanoid")
+                                            
+                                            if npcRoot and npcHum and npcHum.Health > 0 then
+                                                local dist = (root.Position - npcRoot.Position).Magnitude
+                                                
+                                                if dist <= FarmState.KillAuraRange then
+                                                    -- FORCE KILL: Set Health to 0
+                                                    if FarmState.KillAuraForceKill then
+                                                        npcHum.Health = 0
+                                                        killCount = killCount + 1
+                                                    else
+                                                        -- Fallback: Use combat system
+                                                        if combat then
+                                                            -- Face target
+                                                            root.CFrame = CFrame.lookAt(root.Position, npcRoot.Position)
+                                                            -- Fire M1
+                                                            pcall(function()
+                                                                combat.update:FireServer("mouse1", true)
+                                                                task.wait(0.05)
+                                                                combat.update:FireServer("mouse1", false)
+                                                            end)
+                                                        end
+                                                    end
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
                             
-                            -- Find Player targets
+                            -- KILL ALL PLAYERS IN RANGE
                             if FarmState.KillAuraTargetPlayers then
                                 for _, player in pairs(Players:GetPlayers()) do
                                     if player ~= LocalPlayer and player.Character then
                                         local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
                                         local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
+                                        
                                         if playerRoot and playerHum and playerHum.Health > 0 then
                                             local dist = (root.Position - playerRoot.Position).Magnitude
+                                            
                                             if dist <= FarmState.KillAuraRange then
-                                                table.insert(targets, {model = player.Character, root = playerRoot, dist = dist})
+                                                -- FORCE KILL: Set Health to 0
+                                                if FarmState.KillAuraForceKill then
+                                                    playerHum.Health = 0
+                                                    killCount = killCount + 1
+                                                else
+                                                    -- Fallback: Use combat system
+                                                    if combat then
+                                                        root.CFrame = CFrame.lookAt(root.Position, playerRoot.Position)
+                                                        pcall(function()
+                                                            combat.update:FireServer("mouse1", true)
+                                                            task.wait(0.05)
+                                                            combat.update:FireServer("mouse1", false)
+                                                        end)
+                                                    end
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
                             
-                            -- Sort by distance and attack closest
-                            if #targets > 0 then
-                                table.sort(targets, function(a, b) return a.dist < b.dist end)
-                                local closest = targets[1]
-                                killAuraM1(closest.root)
-                                FarmState.KillAuraKills = FarmState.KillAuraKills + 1
-                            end
+                            FarmState.KillAuraKills = FarmState.KillAuraKills + killCount
                         end
                     end)
                 end
-                task.wait(FarmState.KillAuraSpeed or 0.08)
+                task.wait(FarmState.KillAuraSpeed or 0.05)
             end
         end)
         
@@ -1813,7 +1831,6 @@ return function(Common)
                         local hum = char:FindFirstChildOfClass("Humanoid")
                         
                         if hum then
-                            -- Check if in ragdoll state and force recovery
                             local state = hum:GetState()
                             if state == Enum.HumanoidStateType.Physics 
                                 or state == Enum.HumanoidStateType.Ragdoll
@@ -1823,7 +1840,6 @@ return function(Common)
                                 hum:ChangeState(Enum.HumanoidStateType.Running)
                             end
                             
-                            -- Also check for ragdoll attribute
                             local ragdoll = char:GetAttribute("Ragdoll")
                             if ragdoll and ragdoll ~= 0 then
                                 char:SetAttribute("Ragdoll", 0)
@@ -1858,7 +1874,6 @@ return function(Common)
                         local hum = char:FindFirstChildOfClass("Humanoid")
                         
                         if root and hum and hum.Health > 0 then
-                            -- Remove BodyVelocity instances (knockback forces)
                             for _, v in pairs(char:GetDescendants()) do
                                 if v:IsA("BodyVelocity") and v.Name ~= "AntiKB" then
                                     pcall(function() v:Destroy() end)
@@ -1869,7 +1884,6 @@ return function(Common)
                                 end
                             end
                             
-                            -- Reset velocity if too high (being knocked)
                             local vel = root.AssemblyLinearVelocity
                             if vel.Magnitude > 100 then
                                 root.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
@@ -1971,7 +1985,6 @@ return function(Common)
             if player == LocalPlayer then return end
             if not player.Character then return end
             
-            -- Clean up existing
             if ESPHighlights[player] then
                 pcall(function() ESPHighlights[player]:Destroy() end)
                 ESPHighlights[player] = nil
@@ -1981,7 +1994,6 @@ return function(Common)
                 ESPBillboards[player] = nil
             end
             
-            -- Create Highlight
             local highlight = Instance.new("Highlight")
             highlight.Name = "GlockESP"
             highlight.FillColor = FarmState.ESPFillColor
@@ -1992,7 +2004,6 @@ return function(Common)
             highlight.Adornee = player.Character
             highlight.Parent = player.Character
             
-            -- Create Billboard
             local getUI = gethui or function() return game:GetService("CoreGui") end
             local billboard = Instance.new("BillboardGui")
             billboard.Name = "GlockESP_Billboard"
@@ -2179,7 +2190,6 @@ return function(Common)
                         local root = char:FindFirstChild("HumanoidRootPart")
                         
                         if char and hum and root and hum.Health > 0 then
-                            -- Remove stun/grab related objects
                             local stunObjects = {"Stun", "Grab", "Grabbed", "Hold", "Carry", "Knockback", "Ragdoll"}
                             for _, objName in ipairs(stunObjects) do
                                 local obj = char:FindFirstChild(objName)
@@ -2188,7 +2198,6 @@ return function(Common)
                                 end
                             end
                             
-                            -- Clear stun/grab attributes
                             local stunAttrs = {"Stunned", "Grabbed", "Held", "Ragdoll", "Knockback"}
                             for _, attrName in ipairs(stunAttrs) do
                                 local val = char:GetAttribute(attrName)
@@ -2197,7 +2206,6 @@ return function(Common)
                                 end
                             end
                             
-                            -- Force recovery from bad states
                             local state = hum:GetState()
                             if state == Enum.HumanoidStateType.Physics 
                                 or state == Enum.HumanoidStateType.Ragdoll
@@ -2208,12 +2216,10 @@ return function(Common)
                                 hum:ChangeState(Enum.HumanoidStateType.Running)
                             end
                             
-                            -- Reset AutoRotate if disabled
                             if not hum.AutoRotate then
                                 hum.AutoRotate = true
                             end
                             
-                            -- Remove Weld constraints that might be grabbing us
                             for _, v in pairs(char:GetDescendants()) do
                                 if v:IsA("Weld") or v:IsA("WeldConstraint") then
                                     local p0, p1 = v.Part0, v.Part1
@@ -2251,12 +2257,13 @@ return function(Common)
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
+                    "Active Features: %d / 5\n\n%s\n\nKillAura Stats:\n- Range: %d studs\n- Speed: %.2fs\n- Kills: %d\n- Force Kill: %s\n- Target NPCs: %s\n- Target Players: %s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d",
                     #activeFeatures,
                     activeText,
                     FarmState.KillAuraRange,
                     FarmState.KillAuraSpeed,
                     FarmState.KillAuraKills,
+                    FarmState.KillAuraForceKill and "YES" or "NO",
                     FarmState.KillAuraTargetNPCs and "YES" or "NO",
                     FarmState.KillAuraTargetPlayers and "YES" or "NO",
                     FarmState.ESPMaxDistance,
@@ -2343,7 +2350,6 @@ return function(Common)
             end
             currentTargetNPC = nil
             
-            -- Reapply ESP to self on respawn
             if FarmState.ESPEnabled then
                 for _, player in pairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
@@ -2356,7 +2362,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Experimental Features)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + FORCE KILL Aura)",
             Duration = 5
         })
     end
