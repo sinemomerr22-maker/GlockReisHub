@@ -2,6 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 Attack + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
+// Mission Protection: Auto-cancel non-green missions
 -- // ==========================================
 
 return function(Common)
@@ -634,11 +635,11 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTOFARM (MISSION-BASED)
+        -- AUTOFARM (MISSION-BASED) WITH MISSION PROTECTION
         -- ==========================================
         Tabs.Main:AddParagraph({
-            Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND + PROTECTION)",
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- NEW: MISSION PROTECTION - Auto-cancels non-green missions\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -714,7 +715,12 @@ return function(Common)
             Content = "Player positions UNDER the NPC (Y offset) and looks UP at them.\nM1 attacks are fired while facing upward.\nRenderStepped loop keeps player facing target at all times.\n\nRecommended: Y=-8, Z=0 for most NPCs"
         })
         
-        -- AutoFarm logic
+        Tabs.Main:AddParagraph({
+            Title = "Mission Protection",
+            Content = "If a non-green mission is accidentally accepted,\nthe script will automatically send '!cancel'\nto the chat to abort the mission.\n\nThis prevents getting stuck on red/other color missions."
+        })
+        
+        -- AutoFarm logic with mission protection
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -756,6 +762,7 @@ return function(Common)
                                             
                                             local talk = giver:FindFirstChild("Talk")
                                             local shouldAccept = false
+                                            local missionColor = nil
                                             
                                             if lvl <= 699 then
                                                 if talk and talk:FindFirstChild("typ") 
@@ -764,6 +771,7 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
+                                                    missionColor = green
                                                 end
                                             else
                                                 if talk and talk:FindFirstChild("typ") 
@@ -772,6 +780,7 @@ return function(Common)
                                                     and giver.Head.givemission.color.Visible
                                                     and giver.Head.givemission.color.Image == green then
                                                     shouldAccept = true
+                                                    missionColor = green
                                                 end
                                             end
                                             
@@ -790,7 +799,57 @@ return function(Common)
                                                         clientTalk:FireServer()
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
-                                                        task.wait(1)
+                                                        
+                                                        -- MISSION PROTECTION: Check if accepted mission is green
+                                                        task.wait(0.5)
+                                                        local acceptedMission = LocalPlayer:FindFirstChild("currentmission")
+                                                        if acceptedMission and acceptedMission.Value ~= nil and acceptedMission.Value ~= "" then
+                                                            -- Re-check the giver's mission color after acceptance
+                                                            local currentColor = nil
+                                                            if giver:FindFirstChild("Head") 
+                                                                and giver.Head:FindFirstChild("givemission")
+                                                                and giver.Head.givemission:FindFirstChild("color") then
+                                                                currentColor = giver.Head.givemission.color.Image
+                                                            end
+                                                            
+                                                            -- If mission color is NOT green, cancel it
+                                                            if currentColor and currentColor ~= green then
+                                                                ui.Fluent:Notify({
+                                                                    Title = "[!] Mission Protection",
+                                                                    Content = "Non-green mission detected! Cancelling...",
+                                                                    Duration = 3
+                                                                })
+                                                                
+                                                                -- Send !cancel to chat
+                                                                pcall(function()
+                                                                    local TextChatService = game:GetService("TextChatService")
+                                                                    if TextChatService then
+                                                                        local channel = TextChatService:WaitForChild("TextChannels", 2)
+                                                                        if channel then
+                                                                            local rbxGeneral = channel:FindFirstChild("RBXGeneral")
+                                                                            if rbxGeneral then
+                                                                                rbxGeneral:SendAsync("!cancel")
+                                                                            end
+                                                                        end
+                                                                    end
+                                                                end)
+                                                                
+                                                                -- Fallback: try workspace.VC remote
+                                                                pcall(function()
+                                                                    local vc = workspace:FindFirstChild("VC")
+                                                                    if vc then
+                                                                        local remote = vc:FindFirstChild("RemoteEvent")
+                                                                        if remote then
+                                                                            remote:FireServer("!cancel")
+                                                                        end
+                                                                    end
+                                                                end)
+                                                                
+                                                                task.wait(1) -- Wait for cancel to process
+                                                            end
+                                                        end
+                                                        
+                                                        task.wait(1) -- Wait for mission to register on server
                                                     end
                                                 end
                                                 break
@@ -1324,7 +1383,7 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- AUTO SKILL SPAMMER (NEW!)
+        -- AUTO SKILL SPAMMER
         -- ==========================================
         Tabs.Skills:AddParagraph({
             Title = "[K] Auto Skill Spammer",
@@ -1628,7 +1687,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing + Auto Skill)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Underground Attack + Continuous Facing + Auto Skill + Mission Protection)",
             Duration = 5
         })
     end
