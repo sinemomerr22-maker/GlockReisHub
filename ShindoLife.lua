@@ -7,6 +7,7 @@
 -- // Scroll Sniper (Auto Server Hop + Time-Based) + Scroll Get (Manual)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
+-- // 🔧 FIXED: Flexible time parsing for getCurrentGameTime()
 -- // ==========================================
 
 return function(Common)
@@ -142,6 +143,36 @@ return function(Common)
             end
         end)
         
+        -- 🔧 FIXED: Parse time with multiple format attempts
+        local function parseTimeString(timeStr)
+            if not timeStr or timeStr == "" then return nil, nil, nil end
+            
+            -- Try pattern 1: "HH:MM AM/PM" (with space)
+            local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s+(%a+)")
+            
+            -- Try pattern 2: "HH:MMAM/PM" (no space)
+            if not hour then
+                hour, minute, period = string.match(timeStr, "(%d+):(%d+)(%a+)")
+            end
+            
+            -- Try pattern 3: "HH:MM" (24-hour, no period)
+            if not hour then
+                hour, minute = string.match(timeStr, "(%d+):(%d+)")
+                period = nil
+            end
+            
+            -- Try pattern 4: Just numbers
+            if not hour then
+                hour = string.match(timeStr, "(%d+)")
+                if hour then
+                    minute = 0
+                    period = nil
+                end
+            end
+            
+            return hour, minute, period
+        end
+        
         local function updateTime()
             pcall(function()
                 local globalTime = workspace:FindFirstChild("GLOBALTIME")
@@ -152,7 +183,20 @@ return function(Common)
                         if timeValue and timeValue ~= "" then
                             timeLabel.Text = "EST: " .. timeValue
                             
-                            local hour = tonumber(string.match(timeValue, "(%d+)"))
+                            local hour, minute, period = parseTimeString(timeValue)
+                            hour = tonumber(hour)
+                            minute = tonumber(minute)
+                            
+                            -- Convert to 24-hour format
+                            if period and hour then
+                                period = period:upper()
+                                if period == "PM" and hour ~= 12 then
+                                    hour = hour + 12
+                                elseif period == "AM" and hour == 12 then
+                                    hour = 0
+                                end
+                            end
+                            
                             if hour then
                                 if hour >= 6 and hour < 12 then
                                     timeLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
@@ -1656,7 +1700,7 @@ return function(Common)
                 "🆕 20-minute window (time to time+20min)\n" ..
                 "🆕 30s wait per server, then hops\n" ..
                 "🆕 Auto-claims scroll when found\n" ..
-                "🔧 FIXED: Location matching with plain text search\n\n" ..
+                "🔧 FIXED: Flexible time parsing + plain text location\n\n" ..
                 "NOTE: Fill Private Server IDs table below!"
         })
         
@@ -2010,7 +2054,6 @@ return function(Common)
             ScrollWidgets = {}
             ScrollData = {}
             
-            -- 🔍 DEBUG: Starting refresh
             ui.Fluent:Notify({
                 Title = "[DEBUG] Refresh Start",
                 Content = "Looking for GLOBALTIME...",
@@ -2051,19 +2094,9 @@ return function(Common)
             
             local excludedCount = 0
             local includedCount = 0
-            local debugFirstScroll = nil
             
             for _, scroll in pairs(clientTell:GetChildren()) do
                 if scroll:IsA("StringValue") then
-                    -- Capture first scroll for debug
-                    if not debugFirstScroll then
-                        debugFirstScroll = {
-                            name = scroll.Name,
-                            location = getScrollLocation(scroll),
-                            hour = parseScrollTime(scroll)
-                        }
-                    end
-                    
                     if not shouldExcludeScroll(scroll) then
                         local hour, minute = parseScrollTime(scroll)
                         local location = getScrollLocation(scroll)
@@ -2116,20 +2149,6 @@ return function(Common)
                         excludedCount = excludedCount + 1
                     end
                 end
-            end
-            
-            -- 🔍 DEBUG: Show first scroll details
-            if debugFirstScroll then
-                ui.Fluent:Notify({
-                    Title = "[DEBUG] First Scroll",
-                    Content = string.format(
-                        "Name: %s\nLocation: %s\nTime: %s",
-                        debugFirstScroll.name,
-                        debugFirstScroll.location,
-                        debugFirstScroll.hour and formatTime(debugFirstScroll.hour, select(2, parseScrollTime(debugFirstScroll.instance))) or "N/A"
-                    ),
-                    Duration = 4
-                })
             end
             
             ui.Fluent:Notify({
@@ -2227,21 +2246,64 @@ return function(Common)
             end
         end)
         
+        -- 🔧 FIXED: Flexible time parsing with multiple format attempts
         local function getCurrentGameTime()
             local globalTime = workspace:FindFirstChild("GLOBALTIME")
-            if not globalTime then return nil, nil end
+            if not globalTime then 
+                print("[DEBUG getCurrentGameTime] GLOBALTIME not found")
+                return nil, nil 
+            end
             
             local estTime = globalTime:FindFirstChild("globalesttime")
-            if not estTime or not estTime.Value then return nil, nil end
+            if not estTime then 
+                print("[DEBUG getCurrentGameTime] globalesttime not found")
+                return nil, nil 
+            end
+            
+            if not estTime.Value or estTime.Value == "" then 
+                print("[DEBUG getCurrentGameTime] globalesttime.Value is empty")
+                return nil, nil 
+            end
             
             local timeStr = estTime.Value
-            local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s*(%a+)")
+            print("[DEBUG getCurrentGameTime] Raw time string: '" .. timeStr .. "'")
             
-            if not hour or not minute then return nil, nil end
+            -- Try pattern 1: "HH:MM AM/PM" (with space)
+            local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s+(%a+)")
+            print("[DEBUG getCurrentGameTime] Pattern 1 (HH:MM AM/PM):", hour, minute, period)
+            
+            -- Try pattern 2: "HH:MMAM/PM" (no space)
+            if not hour then
+                hour, minute, period = string.match(timeStr, "(%d+):(%d+)(%a+)")
+                print("[DEBUG getCurrentGameTime] Pattern 2 (HH:MMAM/PM):", hour, minute, period)
+            end
+            
+            -- Try pattern 3: "HH:MM" (24-hour, no period)
+            if not hour then
+                hour, minute = string.match(timeStr, "(%d+):(%d+)")
+                period = nil
+                print("[DEBUG getCurrentGameTime] Pattern 3 (HH:MM 24h):", hour, minute)
+            end
+            
+            -- Try pattern 4: Just first number
+            if not hour then
+                hour = string.match(timeStr, "(%d+)")
+                if hour then
+                    minute = 0
+                    period = nil
+                    print("[DEBUG getCurrentGameTime] Pattern 4 (first number):", hour, minute)
+                end
+            end
+            
+            if not hour or not minute then 
+                print("[DEBUG getCurrentGameTime] ❌ FAILED to parse time from: '" .. timeStr .. "'")
+                return nil, nil 
+            end
             
             hour = tonumber(hour)
             minute = tonumber(minute)
             
+            -- Convert to 24-hour format if period exists
             if period then
                 period = period:upper()
                 if period == "PM" and hour ~= 12 then
@@ -2251,6 +2313,7 @@ return function(Common)
                 end
             end
             
+            print("[DEBUG getCurrentGameTime] ✓ Parsed time: " .. hour .. ":" .. minute)
             return hour, minute
         end
         
@@ -2353,7 +2416,7 @@ return function(Common)
                             if not currentHour then
                                 ui.Fluent:Notify({
                                     Title = "[DEBUG] ❌ Time Failed",
-                                    Content = "getCurrentGameTime() returned nil!\n\nCheck GLOBALTIME.globalesttime",
+                                    Content = "getCurrentGameTime() returned nil!\n\nCheck console (F9) for details",
                                     Duration = 4
                                 })
                             else
@@ -2593,8 +2656,8 @@ return function(Common)
                     "- 00:00 / 01:00 time scrolls\n" ..
                     "- Location with 'drop' or 'boss'\n" ..
                     "- Name with 'bossdrop'\n\n" ..
-                    "🔧 FIXED: Plain text location matching\n" ..
-                    "(handles [RPG], brackets, special chars)\n\n" ..
+                    "🔧 FIXED: Flexible time parsing\n" ..
+                    "(handles AM/PM, 24h, with/without space)\n\n" ..
                     "Window: Time to Time+20min\n" ..
                     "Wait: 30s per server\n\n" ..
                     "Available keywords: " .. table.concat(
@@ -3648,7 +3711,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper DEBUG + Travel System + InstaKill + LIVE TIME)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper FIXED + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
