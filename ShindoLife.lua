@@ -1,4 +1,3 @@
-```lua
 -- // ==========================================
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
@@ -3309,4 +3308,3 @@ return function(Common)
         })
     end
 end
-```
