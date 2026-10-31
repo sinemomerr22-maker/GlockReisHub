@@ -4,10 +4,10 @@
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill)
 -- // Travel System (All Maps + Private/Friend Teleport)
--- // Scroll Sniper (PUBLIC SERVER HOP + Time-Based + AUTO REFRESH)
+-- // Scroll Sniper (PUBLIC SERVER HOP + Time-Based + AUTO REFRESH + HOP DELAY)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
--- // 🔧 UPDATED: Scroll Sniper now uses Public Server Hop via Maps PlaceIds
+-- // 🔧 UPDATED: Public Server Hop + Configurable Hop Delay (25s default)
 -- // ==========================================
 
 return function(Common)
@@ -273,6 +273,8 @@ return function(Common)
             ScrollSniperEnabled = false,
             ScrollSniperSelected = {},
             ScrollSniperAutoRefreshInterval = 60,
+            ScrollSniperHopDelay = 25,
+            ScrollSniperMaxHops = 5,
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
             AutoRankEnabled = false,
@@ -762,11 +764,14 @@ return function(Common)
             ScrollSniperEnabled = Config.ScrollSniperEnabled,
             ScrollSniperSelected = Config.ScrollSniperSelected or {},
             ScrollSniperAutoRefreshInterval = Config.ScrollSniperAutoRefreshInterval or 60,
+            ScrollSniperHopDelay = Config.ScrollSniperHopDelay or 25,
+            ScrollSniperMaxHops = Config.ScrollSniperMaxHops or 5,
             ScrollSniperStatus = "Idle",
             ScrollSniperCurrent = "",
             ScrollSniperServersHopped = 0,
             ScrollSniperScrollsClaimed = 0,
             ScrollSniperRefreshCount = 0,
+            ScrollSniperCurrentHopCountdown = 0,
             WarFarmEnabled = Config.WarFarmEnabled,
             AutoChakraEnabled = Config.AutoChakraEnabled,
             AutoRankEnabled = Config.AutoRankEnabled,
@@ -1678,7 +1683,7 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- SCROLL SNIPER (PUBLIC SERVER HOP + TIME-BASED + AUTO REFRESH)
+        -- SCROLL SNIPER (PUBLIC SERVER HOP + TIME-BASED + AUTO REFRESH + HOP DELAY)
         -- ==========================================
         Tabs.ScrollSniper:AddParagraph({
             Title = "[S] Scroll Sniper (Public Server Hop)",
@@ -1691,17 +1696,17 @@ return function(Common)
                 "🆕 Select scrolls to hunt\n" ..
                 "🆕 Hops to PUBLIC servers via PlaceId\n" ..
                 "🆕 20-minute window (time to time+20min)\n" ..
-                "🆕 30s wait per server, then hops\n" ..
+                "🆕 🕐 HOP DELAY: Waits X seconds BEFORE teleport\n" ..
+                "🆕 15s wait per server, then hops\n" ..
                 "🆕 Auto-claims scroll when found\n" ..
                 "🆕 AUTO-REFRESH: Updates scroll list periodically\n" ..
                 "🔧 FIXED: Flexible time parsing + plain text location\n\n" ..
                 "NOTE: Uses Maps table PlaceIds for teleportation"
         })
         
-        -- 🔧 NEW: Helper function to get PlaceId from Scroll Location string
+        -- 🔧 Helper function to get PlaceId from Scroll Location string
         local function getPlaceIdForLocation(locStr)
             local loc = string.lower(locStr or "")
-            -- Specific checks first to avoid ambiguity
             if string.find(loc, "new ember") or string.find(loc, "blaze") then return 6986372023 end
             if string.find(loc, "forest") then return 5447073001 end
             if string.find(loc, "shindai") or string.find(loc, "valley") then return 5451401540 end
@@ -1719,7 +1724,6 @@ return function(Common)
             if string.find(loc, "cloud") or string.find(loc, "nimbus") then return 4601350656 end
             if string.find(loc, "sand") or string.find(loc, "dunes") then return 4601350394 end
             if string.find(loc, "mist") or string.find(loc, "haze") then return 4601350760 end
-            -- Fallback for "Ember" (Leaf)
             if string.find(loc, "ember") or string.find(loc, "leaf") then return 4601350214 end
             return nil
         end
@@ -1908,6 +1912,42 @@ return function(Common)
             end
         })
         
+        -- 🆕 HOP DELAY SLIDER (NEW!)
+        Tabs.ScrollSniper:AddSlider("ScrollSniperHopDelaySlider", {
+            Title = "Hop Delay (seconds)",
+            Description = "Wait time BEFORE teleporting to new server. Prevents detection.",
+            Default = Config.ScrollSniperHopDelay,
+            Min = 5, Max = 120, Rounding = 0,
+            Callback = function(v)
+                FarmState.ScrollSniperHopDelay = v
+                Config.ScrollSniperHopDelay = v
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[S] Hop Delay Updated",
+                    Content = "Will wait " .. v .. " seconds before each hop",
+                    Duration = 3
+                })
+            end
+        })
+        
+        -- 🆕 MAX HOPS SLIDER
+        Tabs.ScrollSniper:AddSlider("ScrollSniperMaxHopsSlider", {
+            Title = "Max Hops per Scroll",
+            Description = "Maximum number of server hops to try for each scroll",
+            Default = Config.ScrollSniperMaxHops,
+            Min = 1, Max = 20, Rounding = 0,
+            Callback = function(v)
+                FarmState.ScrollSniperMaxHops = v
+                Config.ScrollSniperMaxHops = v
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[S] Max Hops Updated",
+                    Content = "Will try up to " .. v .. " hops per scroll",
+                    Duration = 3
+                })
+            end
+        })
+        
         Tabs.ScrollSniper:AddButton({
             Title = "✅ Select All Scrolls",
             Description = "Select all available scrolls for hunting",
@@ -2092,6 +2132,7 @@ return function(Common)
             return false
         end
         
+        -- 🔧 MAIN LOOP with HOP DELAY
         task.spawn(function()
             while true do
                 if FarmState.ScrollSniperEnabled then
@@ -2135,9 +2176,9 @@ return function(Common)
                                 continue
                             end
                             
-                            -- Public Server Hop Loop
+                            -- Public Server Hop Loop with DELAY
                             local hopCount = 0
-                            local maxHops = 5
+                            local maxHops = FarmState.ScrollSniperMaxHops or 5
                             local claimed = false
                             
                             while FarmState.ScrollSniperEnabled and hopCount < maxHops and not claimed do
@@ -2147,6 +2188,47 @@ return function(Common)
                                     break -- Time window passed
                                 end
                                 
+                                -- 🆕 HOP DELAY COUNTDOWN (BEFORE teleport)
+                                local hopDelay = FarmState.ScrollSniperHopDelay or 25
+                                FarmState.ScrollSniperStatus = string.format("Waiting %ds before hop %d/%d", 
+                                    hopDelay, hopCount + 1, maxHops)
+                                
+                                ui.Fluent:Notify({
+                                    Title = "[S] Hop Delay",
+                                    Content = string.format("Waiting %d seconds before hopping to %s...", 
+                                        hopDelay, scrollInfo.location),
+                                    Duration = math.min(hopDelay, 5)
+                                })
+                                
+                                -- Countdown with time window re-checks
+                                local countdownStart = tick()
+                                while tick() - countdownStart < hopDelay do
+                                    if not FarmState.ScrollSniperEnabled then break end
+                                    
+                                    -- Re-check time window during countdown
+                                    local checkH, checkM = getCurrentGameTime()
+                                    if not (checkH and isTimeInWindow(scrollInfo.hour, scrollInfo.minute, checkH, checkM)) then
+                                        -- Time window passed during delay, abort
+                                        FarmState.ScrollSniperStatus = "Time window expired during delay"
+                                        break
+                                    end
+                                    
+                                    local remaining = math.ceil(hopDelay - (tick() - countdownStart))
+                                    FarmState.ScrollSniperCurrentHopCountdown = remaining
+                                    FarmState.ScrollSniperStatus = string.format("Hop in %ds (%d/%d): %s", 
+                                        remaining, hopCount + 1, maxHops, scrollInfo.location)
+                                    
+                                    task.wait(1)
+                                end
+                                
+                                -- If aborted or time expired, break out
+                                if not FarmState.ScrollSniperEnabled then break end
+                                local finalH, finalM = getCurrentGameTime()
+                                if not (finalH and isTimeInWindow(scrollInfo.hour, scrollInfo.minute, finalH, finalM)) then
+                                    break
+                                end
+                                
+                                FarmState.ScrollSniperCurrentHopCountdown = 0
                                 FarmState.ScrollSniperStatus = string.format("Hop %d/%d: %s", hopCount + 1, maxHops, scrollInfo.location)
                                 
                                 ui.Fluent:Notify({
@@ -2188,6 +2270,7 @@ return function(Common)
                     end)
                 else
                     FarmState.ScrollSniperStatus = "Disabled"
+                    FarmState.ScrollSniperCurrentHopCountdown = 0
                 end
                 
                 task.wait(2)
@@ -2241,6 +2324,10 @@ return function(Common)
                     and string.format("Every %ds", FarmState.ScrollSniperAutoRefreshInterval)
                     or "Disabled"
                 
+                local countdownInfo = (FarmState.ScrollSniperCurrentHopCountdown or 0) > 0
+                    and string.format("\n⏱️ Hop in: %ds", FarmState.ScrollSniperCurrentHopCountdown)
+                    or ""
+                
                 ScrollSniperStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
                     "🕐 Game Time: %s EST\n" ..
@@ -2250,7 +2337,9 @@ return function(Common)
                     "🔄 Servers Hopped: %d\n" ..
                     "✅ Scrolls Claimed: %d\n" ..
                     "🔃 Refresh Count: %d\n" ..
-                    "⏱️ Auto-Refresh: %s\n\n" ..
+                    "⏱️ Auto-Refresh: %s\n" ..
+                    "🕐 Hop Delay: %ds\n" ..
+                    "🔁 Max Hops: %d%s\n\n" ..
                     "🚫 Auto-Excluded:\n" ..
                     "- 00:00 / 01:00 time scrolls\n" ..
                     "- Location with 'drop' or 'boss'\n" ..
@@ -2259,7 +2348,7 @@ return function(Common)
                     "(handles AM/PM, 24h, with/without space)\n\n" ..
                     "Mode: PUBLIC SERVER HOP\n" ..
                     "Window: Time to Time+20min\n" ..
-                    "Wait: 15s load + 20s search",
+                    "Wait: Hop delay + 15s load + 20s search",
                     FarmState.ScrollSniperEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
                     gameTimeStr,
                     selectedCount,
@@ -2269,7 +2358,10 @@ return function(Common)
                     FarmState.ScrollSniperServersHopped,
                     FarmState.ScrollSniperScrollsClaimed,
                     FarmState.ScrollSniperRefreshCount,
-                    refreshStatus
+                    refreshStatus,
+                    FarmState.ScrollSniperHopDelay,
+                    FarmState.ScrollSniperMaxHops,
+                    countdownInfo
                 )
                 task.wait(1)
             end
@@ -3303,7 +3395,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper PUBLIC HOP + Travel System + InstaKill + LIVE TIME)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper HOP DELAY + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
