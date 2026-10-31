@@ -3,7 +3,7 @@
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
--- // Travel System (All Maps) + Experimental (Anti-Void, No Fall Damage)
+-- // Travel (All Maps) + Experimental Features
 -- // ==========================================
 
 return function(Common)
@@ -73,8 +73,12 @@ return function(Common)
             ESPFillColor = {R = 255, G = 0, B = 0},
             ESPOutlineColor = {R = 255, G = 255, B = 0},
             StunGrabImmunityEnabled = false,
-            AntiVoidEnabled = false,
-            NoFallDamageEnabled = false
+            NoClipEnabled = false,
+            AutoElementSpinEnabled = false,
+            AutoBreathingSpinEnabled = false,
+            AutoCodesEnabled = false,
+            CustomWalkSpeed = 16,
+            CustomJumpPower = 50
         }
     end
     
@@ -530,8 +534,12 @@ return function(Common)
                 (Config.ESPOutlineColor and Config.ESPOutlineColor.B or 0)/255
             ),
             StunGrabImmunityEnabled = Config.StunGrabImmunityEnabled,
-            AntiVoidEnabled = Config.AntiVoidEnabled,
-            NoFallDamageEnabled = Config.NoFallDamageEnabled,
+            NoClipEnabled = Config.NoClipEnabled,
+            AutoElementSpinEnabled = Config.AutoElementSpinEnabled,
+            AutoBreathingSpinEnabled = Config.AutoBreathingSpinEnabled,
+            AutoCodesEnabled = Config.AutoCodesEnabled,
+            CustomWalkSpeed = Config.CustomWalkSpeed or 16,
+            CustomJumpPower = Config.CustomJumpPower or 50,
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
@@ -1003,6 +1011,21 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
+        Tabs.InstaKill:AddParagraph({
+            Title = "InstaKill Mechanics",
+            Content = "How it works:\n\n" ..
+                "1. Scans all Humanoids in workspace\n" ..
+                "2. Filters by range and target type (NPC/Player)\n" ..
+                "3. Teleports behind target (if enabled)\n" ..
+                "4. Faces target using CFrame.lookAt\n" ..
+                "5. 🆕 FORCE LOCAL KILL: Sets Health=0, MaxHealth=0, State=Dead, BreakJoints\n" ..
+                "6. Fires combat.update:FireServer('mouse1', true)\n" ..
+                "7. Waits minimal delay (0.001-0.1s)\n" ..
+                "8. Fires combat.update:FireServer('mouse1', false)\n" ..
+                "9. Repeats at extreme speed\n\n" ..
+                "This overwhelms the server with M1 requests AND locally destroys the target's humanoid."
+        })
+        
         -- INSTAKILL LOGIC - M1 SPAM ENGINE + LOCAL FORCE KILL
         task.spawn(function()
             while true do
@@ -1017,32 +1040,51 @@ return function(Common)
                             local killCount = 0
                             local targets = {}
                             
+                            -- Collect all valid targets
                             if FarmState.InstaKillTargetNPCs then
+                                -- Scan workspace.npc folder
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     for _, npc in pairs(npcs:GetChildren()) do
                                         if npc:IsA("Model") then
                                             local npcRoot = npc:FindFirstChild("HumanoidRootPart")
                                             local npcHum = npc:FindFirstChildOfClass("Humanoid")
+                                            
                                             if npcRoot and npcHum and npcHum.Health > 0 then
                                                 local dist = (root.Position - npcRoot.Position).Magnitude
+                                                
                                                 if dist <= FarmState.InstaKillRange then
-                                                    table.insert(targets, {model = npc, root = npcRoot, hum = npcHum, distance = dist})
+                                                    table.insert(targets, {
+                                                        model = npc,
+                                                        root = npcRoot,
+                                                        hum = npcHum,
+                                                        name = npc.Name,
+                                                        distance = dist
+                                                    })
                                                 end
                                             end
                                         end
                                     end
                                 end
+                                
+                                -- Scan workspace for any other NPCs
                                 for _, obj in pairs(workspace:GetChildren()) do
                                     if obj:IsA("Model") and obj ~= char then
                                         local objRoot = obj:FindFirstChild("HumanoidRootPart")
                                         local objHum = obj:FindFirstChildOfClass("Humanoid")
+                                        
                                         if objRoot and objHum and objHum.Health > 0 then
                                             local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
                                             if not isPlayer then
                                                 local dist = (root.Position - objRoot.Position).Magnitude
                                                 if dist <= FarmState.InstaKillRange then
-                                                    table.insert(targets, {model = obj, root = objRoot, hum = objHum, distance = dist})
+                                                    table.insert(targets, {
+                                                        model = obj,
+                                                        root = objRoot,
+                                                        hum = objHum,
+                                                        name = obj.Name,
+                                                        distance = dist
+                                                    })
                                                 end
                                             end
                                         end
@@ -1050,43 +1092,79 @@ return function(Common)
                                 end
                             end
                             
+                            -- Add players if targeting enabled
                             if FarmState.InstaKillTargetPlayers then
                                 for _, player in pairs(Players:GetPlayers()) do
                                     if player ~= LocalPlayer and player.Character then
                                         local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
                                         local playerHum = player.Character:FindFirstChildOfClass("Humanoid")
+                                        
                                         if playerRoot and playerHum and playerHum.Health > 0 then
                                             local dist = (root.Position - playerRoot.Position).Magnitude
+                                            
                                             if dist <= FarmState.InstaKillRange then
-                                                table.insert(targets, {model = player.Character, root = playerRoot, hum = playerHum, distance = dist})
+                                                table.insert(targets, {
+                                                    model = player.Character,
+                                                    root = playerRoot,
+                                                    hum = playerHum,
+                                                    name = player.Name,
+                                                    distance = dist
+                                                })
                                             end
                                         end
                                     end
                                 end
                             end
                             
+                            -- Sort by distance (closest first)
                             table.sort(targets, function(a, b) return a.distance < b.distance end)
                             
+                            -- Attack all targets with M1 spam + Local Force Kill
                             for _, target in ipairs(targets) do
-                                if not target.hum or not target.root.Parent then continue end
+                                if not target.hum or not target.root.Parent then
+                                    continue
+                                end
+                                
+                                -- Teleport to target if enabled
                                 if FarmState.InstaKillTeleportToTarget then
                                     local behindOffset = -target.root.CFrame.LookVector * 3
-                                    root.CFrame = CFrame.new(target.root.Position + behindOffset)
+                                    local targetCFrame = CFrame.new(target.root.Position + behindOffset)
+                                    root.CFrame = targetCFrame
                                 end
+                                
+                                -- Face the target
                                 if FarmState.InstaKillFaceTarget then
                                     root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
                                 end
+                                
+                                -- 🆕 FORCE LOCAL KILL (Stubborn Health & Humanoid Reset)
                                 pcall(function()
                                     target.hum.Health = 0
                                     target.hum.MaxHealth = 0
                                     target.hum:ChangeState(Enum.HumanoidStateType.Dead)
                                     target.model:BreakJoints()
                                 end)
-                                pcall(function() combat.update:FireServer("mouse1", true) end)
+                                
+                                -- SPAM M1 ATTACK
+                                -- Fire mouse1 true (start attack)
+                                pcall(function()
+                                    combat.update:FireServer("mouse1", true)
+                                end)
+                                
+                                -- Minimal delay
                                 task.wait(FarmState.InstaKillSpeed)
-                                pcall(function() combat.update:FireServer("mouse1", false) end)
-                                if target.hum.Health <= 0 or not target.model.Parent then killCount = killCount + 1 end
+                                
+                                -- Fire mouse1 false (end attack)
+                                pcall(function()
+                                    combat.update:FireServer("mouse1", false)
+                                end)
+                                
+                                -- Check if target died
+                                if target.hum.Health <= 0 or not target.model.Parent then
+                                    killCount = killCount + 1
+                                end
                             end
+                            
                             FarmState.InstaKillKills = FarmState.InstaKillKills + killCount
                         end
                     end)
@@ -1095,104 +1173,357 @@ return function(Common)
             end
         end)
         
-        local InstaKillStatusDisplay = Tabs.InstaKill:AddParagraph({Title = "InstaKill Status", Content = "Initializing..."})
+        -- InstaKill Status Display
+        local InstaKillStatusDisplay = Tabs.InstaKill:AddParagraph({
+            Title = "InstaKill Status",
+            Content = "Initializing..."
+        })
+        
         task.spawn(function()
             while true do
                 local attacksPerSec = math.floor(1 / (FarmState.InstaKillSpeed or 0.003))
+                
                 InstaKillStatusDisplay.Content = string.format(
-                    "Status: %s\n\nAttack Speed: %d attacks/sec\nRange: %d studs\nTotal Kills: %d\n\nActive: %s",
+                    "Status: %s\n\n" ..
+                    "Attack Speed: %d attacks/sec\n" ..
+                    "Range: %d studs\n" ..
+                    "Total Kills: %d\n\n" ..
+                    "Settings:\n" ..
+                    "- Target NPCs: %s\n" ..
+                    "- Target Players: %s\n" ..
+                    "- Auto-Face: %s\n" ..
+                    "- Teleport: %s\n\n" ..
+                    "Active: %s",
                     FarmState.InstaKillEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
-                    attacksPerSec, FarmState.InstaKillRange, FarmState.InstaKillKills,
+                    attacksPerSec,
+                    FarmState.InstaKillRange,
+                    FarmState.InstaKillKills,
+                    FarmState.InstaKillTargetNPCs and "YES" or "NO",
+                    FarmState.InstaKillTargetPlayers and "YES" or "NO",
+                    FarmState.InstaKillFaceTarget and "YES" or "NO",
+                    FarmState.InstaKillTeleportToTarget and "YES" or "NO",
                     FarmState.InstaKillEnabled and "M1 SPAM + LOCAL FORCE KILL RUNNING" or "DISABLED"
                 )
                 task.wait(0.5)
             end
         end)
-
+        
         -- ==========================================
         -- TRAVEL SYSTEM (ALL MAPS)
         -- ==========================================
         Tabs.Travel:AddParagraph({
-            Title = "[T] World Traveler",
-            Content = "Teleport to any village, arena, or special location in Shindo Life.\n\n- Uses rpgteleport for separate places\n- Uses workspace search for Open World villages\n- Instant CFrame teleport\n- Includes all major maps and hidden areas"
+            Title = "[T] Travel System - All Maps",
+            Content = "Teleport to any location in Shindo Life.\n\n" ..
+                "🗺️ VILLAGES (Main Map CFrame):\n" ..
+                "- Ember (Konohagakure)\n" ..
+                "- Dunes (Sunagakure)\n" ..
+                "- Nimbus (Kumogakure)\n" ..
+                "- Obelisk (Iwagakure)\n" ..
+                "- Haze (Kirigakure)\n" ..
+                "- Blaze (New Ember)\n\n" ..
+                "🏞️ SPECIAL LOCATIONS (Main Map CFrame):\n" ..
+                "- Shikai Forest, Mount Maki, Ryuji Cave\n" ..
+                "- Jejunes, Vinland, Narumaki Bridge\n" ..
+                "- Espada\n\n" ..
+                "🌍 SEPARATE PLACES (Remote Teleport):\n" ..
+                "- Training Field (Lv.100+)\n" ..
+                "- Tempest Village (Lv.300+)\n" ..
+                "- Forest of Embers (Lv.300+)\n" ..
+                "- Shindai Valley (Lv.800+)\n" ..
+                "- Dawn Hideout / Akatsuki (Lv.1000+)\n" ..
+                "- Open World / Shinobi (Lv.300+)\n" ..
+                "- Conquest (Lv.500+)\n" ..
+                "- Dungeon (Lv.300+)"
         })
-
-        local TravelLocations = {
-            {name = "Training Field", placeId = 5431071837},
-            {name = "Storm Village (Blaze)", placeId = 5084678830},
-            {name = "Tempest Village", placeId = 6901575446},
-            {name = "Forest of Embers", placeId = 5447073001},
-            {name = "Dawn Hideout (Espada)", placeId = 5431069982},
-            {name = "Shinobi World", placeId = 5943872934},
-            {name = "Conquest Arena", placeId = 6341670805},
-            {name = "Shindai Valley", placeId = 5451401540},
-            {name = "Ember (Leaf)", search = {"Ember", "Konohagakure", "Leaf"}},
-            {name = "Obelisk (Stone)", search = {"Obelisk", "Iwagakure", "Stone"}},
-            {name = "Nimbus (Cloud)", search = {"Nimbus", "Kumogakure", "Cloud"}},
-            {name = "Haze (Mist)", search = {"Haze", "Kirigakure", "Mist"}},
-            {name = "Dunes (Sand)", search = {"Dunes", "Sunagakure", "Sand"}},
-            {name = "Vinland", search = {"Vinland"}},
-            {name = "Great Narumaki Bridge", search = {"Narumaki"}},
-            {name = "Jejunes", search = {"Jejunes"}},
-            {name = "Shikai Forest", search = {"ShikaiForest", "Shikai"}},
-            {name = "Mount Maki", search = {"MountMaki", "Maki"}},
-            {name = "Ryuji Cave", search = {"RyujiCave", "Ryuji"}},
-            {name = "Open World Spawn", search = {"spawn", "Spawn"}},
-        }
-
-        for _, loc in ipairs(TravelLocations) do
-            Tabs.Travel:AddButton({Title = "Teleport to " .. loc.name, Callback = function()
-                task.spawn(function()
-                    local char = LocalPlayer.Character
-                    if not char or not char:FindFirstChild("HumanoidRootPart") then
-                        ui.Fluent:Notify({Title = "[X] Error", Content = "Character not found", Duration = 2})
-                        return
-                    end
-                    
-                    if loc.placeId then
-                        if loc.placeId == game.PlaceId then
-                            ui.Fluent:Notify({Title = "[!] Info", Content = "Already in " .. loc.name, Duration = 2})
-                            return
-                        end
-                        ui.Fluent:Notify({Title = "[T] Traveling", Content = "Teleporting to " .. loc.name .. "...", Duration = 2})
-                        pcall(function()
-                            LocalPlayer.startevent:FireServer("rpgteleport", loc.placeId)
-                        end)
-                        task.wait(1.5)
-                        if game.PlaceId ~= loc.placeId then
-                            pcall(function() TeleportService:Teleport(loc.placeId, LocalPlayer) end)
-                        end
-                    elseif loc.search then
-                        local found = false
-                        for _, searchName in ipairs(loc.search) do
-                            local target = workspace:FindFirstChild(searchName, true)
-                            if target then
-                                local cf = nil
-                                if target:FindFirstChild("HumanoidRootPart") then
-                                    cf = target.HumanoidRootPart.CFrame
-                                elseif target:FindFirstChild("Spawn") then
-                                    cf = target.Spawn.CFrame
-                                elseif target:IsA("BasePart") then
-                                    cf = target.CFrame
-                                elseif target:IsA("Model") and target.PrimaryPart then
-                                    cf = target.PrimaryPart.CFrame
-                                end
-                                
-                                if cf then
-                                    char.HumanoidRootPart.CFrame = cf + Vector3.new(0, 5, 0)
-                                    ui.Fluent:Notify({Title = "[OK] Teleport", Content = "Arrived at " .. loc.name, Duration = 2})
-                                    found = true
-                                    break
-                                end
-                            end
-                        end
-                        if not found then
-                            ui.Fluent:Notify({Title = "[X] Error", Content = "Could not find " .. loc.name .. " in workspace", Duration = 3})
-                        end
-                    end
-                end)
-            end})
+        
+        -- Teleport Helper Functions
+        local function getPlayerLevel()
+            local lvl = LocalPlayer:FindFirstChild("statz") 
+                and LocalPlayer.statz:FindFirstChild("lvl")
+                and LocalPlayer.statz.lvl:FindFirstChild("lvl")
+            return lvl and lvl.Value or 0
         end
+        
+        local function teleportToCFrame(cf, locationName)
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = cf
+                ui.Fluent:Notify({
+                    Title = "[OK] Teleport", 
+                    Content = "Teleported to " .. locationName, 
+                    Duration = 2
+                })
+            else
+                ui.Fluent:Notify({
+                    Title = "[X] Error", 
+                    Content = "Character not found", 
+                    Duration = 2
+                })
+            end
+        end
+        
+        local function teleportToPlace(placeId, remoteName, minLevel, locationName)
+            local currentLevel = getPlayerLevel()
+            if minLevel and currentLevel < minLevel then
+                ui.Fluent:Notify({
+                    Title = "[!] Level Required", 
+                    Content = "Need Level " .. minLevel .. "+ (Current: " .. currentLevel .. ")", 
+                    Duration = 3
+                })
+                return
+            end
+            
+            local remote = remoteName or "rpgteleport"
+            pcall(function()
+                LocalPlayer.startevent:FireServer(remote, placeId)
+            end)
+            ui.Fluent:Notify({
+                Title = "[OK] Teleport", 
+                Content = "Teleporting to " .. locationName .. "...", 
+                Duration = 2
+            })
+        end
+        
+        -- ==========================================
+        -- VILLAGES (Main Map CFrame Teleports)
+        -- ==========================================
+        Tabs.Travel:AddSection("🏘️ Villages (Main Map)")
+        
+        Tabs.Travel:AddButton({Title = "🔥 Ember (Konohagakure)", Callback = function()
+            teleportToCFrame(CFrame.new(-10293, 335, -4534), "Ember Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🏜️ Dunes (Sunagakure)", Callback = function()
+            teleportToCFrame(CFrame.new(8823, 138, 4416), "Dunes Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "☁️ Nimbus (Kumogakure)", Callback = function()
+            teleportToCFrame(CFrame.new(-1768, 198, 9093), "Nimbus Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🗿 Obelisk (Iwagakure)", Callback = function()
+            teleportToCFrame(CFrame.new(10052, 255, -8112), "Obelisk Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌫️ Haze (Kirigakure)", Callback = function()
+            teleportToCFrame(CFrame.new(12576, 50, -5635), "Haze Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🔥 Blaze (New Ember)", Callback = function()
+            teleportToCFrame(CFrame.new(-9850, 360, -4120), "Blaze Area")
+        end})
+        
+        -- ==========================================
+        -- SPECIAL LOCATIONS (Main Map CFrame Teleports)
+        -- ==========================================
+        Tabs.Travel:AddSection("🏞️ Special Locations (Main Map)")
+        
+        Tabs.Travel:AddButton({Title = "🌲 Shikai Forest", Callback = function()
+            teleportToCFrame(CFrame.new(-4586, 144, 3537), "Shikai Forest")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⛰️ Mount Maki", Callback = function()
+            teleportToCFrame(CFrame.new(-398, 301, 5250), "Mount Maki")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🕳️ Ryuji Cave", Callback = function()
+            teleportToCFrame(CFrame.new(-5350, 118, -1720), "Ryuji Cave")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🏝️ Jejunes", Callback = function()
+            teleportToCFrame(CFrame.new(4200, 150, -2300), "Jejunes Island")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⚔️ Vinland", Callback = function()
+            teleportToCFrame(CFrame.new(-12450, 100, 8450), "Vinland")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌉 Great Narumaki Bridge", Callback = function()
+            teleportToCFrame(CFrame.new(2450, 120, 1250), "Narumaki Bridge")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⚡ Espada", Callback = function()
+            teleportToCFrame(CFrame.new(-7850, 200, 6250), "Espada")
+        end})
+        
+        -- ==========================================
+        -- SEPARATE PLACES (Remote Teleports)
+        -- ==========================================
+        Tabs.Travel:AddSection("🌍 Separate Places (Remote Teleport)")
+        
+        Tabs.Travel:AddButton({Title = "🎯 Training Field (Lv.100+)", Callback = function()
+            teleportToPlace(5431071837, "rpgteleport", 100, "Training Field")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌪️ Tempest Village (Lv.300+)", Callback = function()
+            teleportToPlace(6901575446, "rpgteleport", 300, "Tempest Village")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🔥 Forest of Embers (Lv.300+)", Callback = function()
+            teleportToPlace(5447073001, "rpgteleport", 300, "Forest of Embers")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🏔️ Shindai Valley (Lv.800+)", Callback = function()
+            teleportToPlace(5451401540, "rpgteleport", 800, "Shindai Valley")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌑 Dawn Hideout / Akatsuki (Lv.1000+)", Callback = function()
+            teleportToPlace(5431069982, "rpgteleport", 1000, "Dawn Hideout")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌐 Open World / Shinobi (Lv.300+)", Callback = function()
+            teleportToPlace(5943872934, "shindoworld", 300, "Open World")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⚔️ Conquest (Lv.500+)", Callback = function()
+            teleportToPlace(6341670805, "conquestteleport", 500, "Conquest")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🏰 Dungeon (Lv.300+)", Callback = function()
+            teleportToPlace(7524809704, "rpgteleport", 300, "Dungeon")
+        end})
+        
+        -- ==========================================
+        -- ARENAS & MODES
+        -- ==========================================
+        Tabs.Travel:AddSection("🎮 Arenas & Game Modes")
+        
+        Tabs.Travel:AddButton({Title = "🏟️ Arena", Callback = function()
+            teleportToPlace(5307141034, "arenateleport", nil, "Arena")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⚔️ Arena X (Lv.600+)", Callback = function()
+            teleportToPlace(5743370338, "arenateleport", 600, "Arena X")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🏆 SS Comp (Lv.600+)", Callback = function()
+            teleportToPlace(6593187011, "arenateleport", 600, "SS Comp")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🥇 Pro Comp (S+ Rank)", Callback = function()
+            teleportToPlace(5664803952, "arenateleport", nil, "Pro Comp")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🎁 Rewards", Callback = function()
+            teleportToPlace(5451410109, "arenateleport", nil, "Rewards")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "⚔️ War Mode (Lv.400+)", Callback = function()
+            teleportToPlace(5824792748, "warmodeteleport", 400, "War Mode")
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🌍 World X (Hardcore)", Callback = function()
+            teleportToPlace(5943874201, "worldx", nil, "World X")
+        end})
+        
+        -- ==========================================
+        -- QUICK TELEPORTS
+        -- ==========================================
+        Tabs.Travel:AddSection("⚡ Quick Teleports")
+        
+        Tabs.Travel:AddButton({Title = "🏠 Teleport to Spawn", Callback = function()
+            pcall(function()
+                local spawn = workspace:FindFirstChild("spawn") or workspace:FindFirstChild("Spawn")
+                if spawn and spawn:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.HumanoidRootPart.CFrame
+                    ui.Fluent:Notify({Title = "[OK] Teleport", Content = "Teleported to Spawn", Duration = 2})
+                end
+            end)
+        end})
+        
+        Tabs.Travel:AddButton({Title = "📜 Teleport to Training Log", Callback = function()
+            pcall(function()
+                local npc = workspace:FindFirstChild("npc")
+                if npc then
+                    local log = npc:FindFirstChild("logtraining")
+                    if log and log:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = log.HumanoidRootPart.CFrame
+                        ui.Fluent:Notify({Title = "[OK] Teleport", Content = "Teleported to Training Log", Duration = 2})
+                    end
+                end
+            end)
+        end})
+        
+        Tabs.Travel:AddButton({Title = "🔄 Rejoin Same Server", Callback = function()
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end)
+        end})
+        
+        -- Private Server Code Input
+        Tabs.Travel:AddInput("PrivateServerCodeInput", {
+            Title = "Private Server Code",
+            Placeholder = "Enter PS code...",
+            Finished = true,
+            Callback = function(code)
+                if code and code ~= "" then
+                    pcall(function()
+                        LocalPlayer.startevent:FireServer("teleporttoprivate", code, nil)
+                        ui.Fluent:Notify({
+                            Title = "[OK] Private Server", 
+                            Content = "Joining PS: " .. code, 
+                            Duration = 3
+                        })
+                    end)
+                end
+            end
+        })
+        
+        Tabs.Travel:AddButton({Title = "🔑 Join Private Server", Callback = function()
+            local code = Fluent.Options.PrivateServerCodeInput and Fluent.Options.PrivateServerCodeInput.Value
+            if code and code ~= "" then
+                pcall(function()
+                    LocalPlayer.startevent:FireServer("teleporttoprivate", code, nil)
+                    ui.Fluent:Notify({
+                        Title = "[OK] Private Server", 
+                        Content = "Joining PS: " .. code, 
+                        Duration = 3
+                    })
+                end)
+            else
+                ui.Fluent:Notify({
+                    Title = "[!] Error", 
+                    Content = "Enter a private server code first", 
+                    Duration = 2
+                })
+            end
+        end})
+        
+        -- Travel Status Display
+        local TravelStatusDisplay = Tabs.Travel:AddParagraph({
+            Title = "Travel Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local currentLevel = getPlayerLevel()
+                local char = LocalPlayer.Character
+                local pos = "N/A"
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local p = char.HumanoidRootPart.Position
+                    pos = string.format("X:%.0f Y:%.0f Z:%.0f", p.X, p.Y, p.Z)
+                end
+                
+                TravelStatusDisplay.Content = string.format(
+                    "📍 Current Position:\n%s\n\n" ..
+                    "📊 Player Info:\n" ..
+                    "- Level: %d\n" ..
+                    "- Place ID: %d\n" ..
+                    "- Job ID: %s\n\n" ..
+                    "🗺️ Available Maps: 26\n" ..
+                    "- Villages: 6\n" ..
+                    "- Special: 7\n" ..
+                    "- Places: 8\n" ..
+                    "- Arenas: 7",
+                    pos,
+                    currentLevel,
+                    game.PlaceId,
+                    string.sub(game.JobId or "Unknown", 1, 8) .. "..."
+                )
+                task.wait(1)
+            end
+        end)
         
         -- ==========================================
         -- SCROLL SNIPER
@@ -1226,8 +1557,13 @@ return function(Common)
                                     if sh.Position.Y > -1000 and sh.Position.Y < 2000 then
                                         local invoke = sh:FindFirstChild("invoke")
                                         local clickDetector = sh:FindFirstChild("ClickDetector")
+                                        
                                         if invoke and clickDetector then
-                                            ui.Fluent:Notify({Title = "[S] Scroll Detected!", Content = "Teleporting...", Duration = 2})
+                                            ui.Fluent:Notify({
+                                                Title = "[S] Scroll Detected!",
+                                                Content = "Teleporting to scroll...",
+                                                Duration = 2
+                                            })
                                             toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                             task.wait(0.1)
                                             invoke:FireServer(LocalPlayer)
@@ -1237,14 +1573,20 @@ return function(Common)
                                 end
                             end
                         end
+                        
                         for _, obj in pairs(workspace:GetChildren()) do
                             if obj:IsA("Model") and obj:FindFirstChild("sh") then
                                 local sh = obj.sh
                                 if sh.Position.Y > -1000 and sh.Position.Y < 2000 then
                                     local invoke = sh:FindFirstChild("invoke")
                                     local clickDetector = sh:FindFirstChild("ClickDetector")
+                                    
                                     if invoke and clickDetector then
-                                        ui.Fluent:Notify({Title = "[S] Scroll Detected!", Content = "Teleporting...", Duration = 2})
+                                        ui.Fluent:Notify({
+                                            Title = "[S] Scroll Detected!",
+                                            Content = "Teleporting to scroll...",
+                                            Duration = 2
+                                        })
                                         toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
                                         task.wait(0.1)
                                         invoke:FireServer(LocalPlayer)
@@ -1290,33 +1632,44 @@ return function(Common)
                     pcall(function()
                         local warmode = workspace:FindFirstChild("warmode")
                         local warserver = workspace:FindFirstChild("warserver")
+                        
                         if warmode and warserver then
                             local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            
                             if root and hum and hum.Health > 0 then
                                 hum:ChangeState(11)
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     local zetsu = warserver:FindFirstChild("zetsu")
                                     local round = warserver:FindFirstChild("round")
+                                    
                                     for _, npc in pairs(npcs:GetChildren()) do
-                                        if npc:IsA("Model") and npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                                        if npc:IsA("Model") 
+                                            and npc:FindFirstChild("HumanoidRootPart")
+                                            and npc:FindFirstChild("Humanoid")
+                                            and npc.Humanoid.Health > 0 then
+                                            
                                             local isMegaBoss = npc:FindFirstChild("megaboss") ~= nil
+                                            
                                             if isMegaBoss then
-                                                toTarget(root.Position, npc.HumanoidRootPart.Position, CFrame.new(npc.HumanoidRootPart.Position))
+                                                toTarget(root.Position, npc.HumanoidRootPart.Position,
+                                                    CFrame.new(npc.HumanoidRootPart.Position))
                                                 task.wait(0.5)
                                                 npc.Humanoid.Health = 0
                                             else
                                                 if zetsu and zetsu.Value > 0 then
                                                     npc.Humanoid.Health = 0
                                                 else
-                                                    toTarget(root.Position, npc.HumanoidRootPart.Position, CFrame.new(npc.HumanoidRootPart.Position + Vector3.new(0, -12, 0)))
+                                                    toTarget(root.Position, npc.HumanoidRootPart.Position,
+                                                        CFrame.new(npc.HumanoidRootPart.Position + Vector3.new(0, -12, 0)))
                                                     task.wait(0.3)
                                                     npc.Humanoid.Health = 0
                                                 end
                                             end
                                         end
                                     end
+                                    
                                     if Config.WarAutoReset and round and round.Value > 20 then
                                         task.wait(5)
                                         LocalPlayer.Character:BreakJoints()
@@ -1700,12 +2053,217 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES
+        -- EXPERIMENTAL FEATURES (ENHANCED)
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
             Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam + Local Force Kill) has been moved to its own dedicated tab."
         })
+        
+        -- NOCLIP SECTION (NEW)
+        Tabs.Experimental:AddSection("👻 NoClip (Walk Through Walls)")
+        
+        Tabs.Experimental:AddToggle("NoClipToggle", {
+            Title = "Enable NoClip",
+            Description = "Walk through walls, floors, and objects",
+            Default = Config.NoClipEnabled
+        }):OnChanged(function(v)
+            FarmState.NoClipEnabled = v
+            Config.NoClipEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({Title = "[X] NoClip Enabled", Content = "You can now walk through walls!", Duration = 3})
+            end
+        end)
+        
+        task.spawn(function()
+            while true do
+                if FarmState.NoClipEnabled and LocalPlayer.Character then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        for _, part in pairs(char:GetDescendants()) do
+                            if part:IsA("BasePart") and part.CanCollide then
+                                part.CanCollide = false
+                            end
+                        end
+                    end)
+                end
+                task.wait(0.1)
+            end
+        end)
+        
+        -- AUTO ELEMENT SPIN (NEW)
+        Tabs.Experimental:AddSection("🌀 Auto Element Spin")
+        
+        Tabs.Experimental:AddToggle("AutoElementSpinToggle", {
+            Title = "Enable Auto Element Spin",
+            Description = "Automatically spin element1-4 when spins available",
+            Default = Config.AutoElementSpinEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoElementSpinEnabled = v
+            Config.AutoElementSpinEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({Title = "[X] Element Spin Enabled", Content = "Auto-spinning elements...", Duration = 3})
+            end
+        end)
+        
+        task.spawn(function()
+            while true do
+                if FarmState.AutoElementSpinEnabled then
+                    pcall(function()
+                        local startevent = LocalPlayer:FindFirstChild("startevent")
+                        local spins = LocalPlayer:FindFirstChild("statz") and LocalPlayer.statz:FindFirstChild("spins")
+                        if startevent and spins and spins.Value > 0 then
+                            for i = 1, 4 do
+                                local slot = "element" .. i
+                                pcall(function()
+                                    startevent:FireServer("spin", slot)
+                                end)
+                                task.wait(0.5)
+                            end
+                        end
+                    end)
+                end
+                task.wait(5)
+            end
+        end)
+        
+        -- AUTO BREATHING SPIN (NEW)
+        Tabs.Experimental:AddSection("⚔️ Auto Breathing Spin")
+        
+        Tabs.Experimental:AddToggle("AutoBreathingSpinToggle", {
+            Title = "Enable Auto Breathing Spin",
+            Description = "Automatically spin for breathing styles (Kenjutsu)",
+            Default = Config.AutoBreathingSpinEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoBreathingSpinEnabled = v
+            Config.AutoBreathingSpinEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({Title = "[X] Breathing Spin Enabled", Content = "Auto-spinning breathing styles...", Duration = 3})
+            end
+        end)
+        
+        task.spawn(function()
+            while true do
+                if FarmState.AutoBreathingSpinEnabled then
+                    pcall(function()
+                        local startevent = LocalPlayer:FindFirstChild("startevent")
+                        local spins = LocalPlayer:FindFirstChild("statz") and LocalPlayer.statz:FindFirstChild("spins")
+                        if startevent and spins and spins.Value >= 10 then
+                            pcall(function()
+                                startevent:FireServer("spinBREATHING", "breathingstyle")
+                            end)
+                        end
+                    end)
+                end
+                task.wait(10)
+            end
+        end)
+        
+        -- AUTO CODES (NEW)
+        Tabs.Experimental:AddSection("🎁 Auto Twitter Codes")
+        
+        Tabs.Experimental:AddToggle("AutoCodesToggle", {
+            Title = "Enable Auto Codes",
+            Description = "Automatically redeem known Twitter codes",
+            Default = Config.AutoCodesEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoCodesEnabled = v
+            Config.AutoCodesEnabled = v
+            ConfigManager.Save(Config)
+            if v then
+                ui.Fluent:Notify({Title = "[X] Auto Codes Enabled", Content = "Redeeming codes...", Duration = 3})
+            end
+        end)
+        
+        Tabs.Experimental:AddButton({Title = "Redeem All Codes Now", Callback = function()
+            local codes = {
+                "EASTEREXP", "BANEXPLOIT", "NOMOREHACKS", "WildDares", "BossBuild",
+                "GetPranked", "EARN_FRUITS", "Sub2UncleKizaru", "FIGHT4FRUIT",
+                "kittgaming", "TRIPLEABUSE", "Sub2CaptainMaui", "Sub2Fer999",
+                "Enyu_is_Pro", "Magicbus", "JCWK", "Starcodeheo", "Bluxxy",
+                "SUB2GAMERROBOT_EXP1", "Sub2NoobMaster123", "Sub2Daigrock",
+                "Axiore", "TantaiGaming", "StrawHatMaine", "Sub2OfficialNoobie",
+                "TheGreatAce", "SEATROLLIN", "24NOADMIN", "ADMIN_TROLL",
+                "NEWTROLL", "SECRET_ADMIN", "staffbattle", "NOEXPLOIT",
+                "NOOB2ADMIN", "CODESLIDE", "fruitconcepts"
+            }
+            task.spawn(function()
+                for _, code in ipairs(codes) do
+                    pcall(function()
+                        ReplicatedStorage.Remotes.Redeem:InvokeServer(code)
+                    end)
+                    task.wait(0.5)
+                end
+                ui.Fluent:Notify({Title = "[OK] Codes", Content = "Attempted to redeem " .. #codes .. " codes", Duration = 3})
+            end)
+        end})
+        
+        task.spawn(function()
+            while true do
+                if FarmState.AutoCodesEnabled then
+                    local codes = {"EASTEREXP", "BANEXPLOIT", "NOMOREHACKS", "TRIPLEABUSE", "SUB2GAMERROBOT_EXP1"}
+                    for _, code in ipairs(codes) do
+                        pcall(function()
+                            ReplicatedStorage.Remotes.Redeem:InvokeServer(code)
+                        end)
+                        task.wait(2)
+                    end
+                end
+                task.wait(300) -- Every 5 minutes
+            end
+        end)
+        
+        -- CUSTOM WALKSPEED / JUMPPOWER (NEW)
+        Tabs.Experimental:AddSection("🏃 Movement Mods")
+        
+        Tabs.Experimental:AddSlider("CustomWalkSpeedSlider", {
+            Title = "Custom Walk Speed",
+            Description = "Override default walk speed (16 = normal)",
+            Default = Config.CustomWalkSpeed,
+            Min = 16, Max = 500, Rounding = 0,
+            Callback = function(v)
+                FarmState.CustomWalkSpeed = v
+                Config.CustomWalkSpeed = v
+                ConfigManager.Save(Config)
+                pcall(function()
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = v
+                    end
+                end)
+            end
+        })
+        
+        Tabs.Experimental:AddSlider("CustomJumpPowerSlider", {
+            Title = "Custom Jump Power",
+            Description = "Override default jump power (50 = normal)",
+            Default = Config.CustomJumpPower,
+            Min = 50, Max = 500, Rounding = 0,
+            Callback = function(v)
+                FarmState.CustomJumpPower = v
+                Config.CustomJumpPower = v
+                ConfigManager.Save(Config)
+                pcall(function()
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").UseJumpPower = true
+                        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = v
+                    end
+                end)
+            end
+        })
+        
+        Tabs.Experimental:AddButton({Title = "Reset to Default (16/50)", Callback = function()
+            pcall(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+                    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").UseJumpPower = false
+                    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpHeight = 7
+                end
+            end)
+            ui.Fluent:Notify({Title = "[OK] Reset", Content = "Movement reset to default", Duration = 2})
+        end})
         
         -- ANTI RAGDOLL SECTION
         Tabs.Experimental:AddSection("Anti Ragdoll")
@@ -1781,76 +2339,6 @@ return function(Common)
                             local vel = root.AssemblyLinearVelocity
                             if vel.Magnitude > 100 then
                                 root.AssemblyLinearVelocity = Vector3.new(vel.X * 0.1, vel.Y, vel.Z * 0.1)
-                            end
-                        end
-                    end)
-                end
-                task.wait(0.05)
-            end
-        end)
-
-        -- 🆕 ANTI-VOID / FALL SAVE SECTION
-        Tabs.Experimental:AddSection("Anti-Void / Fall Save")
-        
-        Tabs.Experimental:AddToggle("AntiVoidToggle", {
-            Title = "Enable Anti-Void",
-            Description = "Teleports you back to safety if you fall below the map (Y < -400)",
-            Default = Config.AntiVoidEnabled
-        }):OnChanged(function(v)
-            FarmState.AntiVoidEnabled = v
-            Config.AntiVoidEnabled = v
-            ConfigManager.Save(Config)
-        end)
-        
-        task.spawn(function()
-            local lastSafeCFrame = nil
-            while true do
-                if FarmState.AntiVoidEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if root and hum and hum.Health > 0 then
-                            if root.Position.Y > -100 then
-                                lastSafeCFrame = root.CFrame
-                            end
-                            if root.Position.Y < -400 and lastSafeCFrame then
-                                root.CFrame = lastSafeCFrame + Vector3.new(0, 10, 0)
-                                root.AssemblyLinearVelocity = Vector3.zero
-                                root.AssemblyAngularVelocity = Vector3.zero
-                                ui.Fluent:Notify({Title = "[🛡] Anti-Void", Content = "Saved from falling into the void!", Duration = 2})
-                            end
-                        end
-                    end)
-                end
-                task.wait(0.1)
-            end
-        end)
-
-        -- 🆕 NO FALL DAMAGE SECTION
-        Tabs.Experimental:AddSection("No Fall Damage")
-        
-        Tabs.Experimental:AddToggle("NoFallDamageToggle", {
-            Title = "Enable No Fall Damage",
-            Description = "Prevents damage from high falls by resetting downward velocity",
-            Default = Config.NoFallDamageEnabled
-        }):OnChanged(function(v)
-            FarmState.NoFallDamageEnabled = v
-            Config.NoFallDamageEnabled = v
-            ConfigManager.Save(Config)
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.NoFallDamageEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if root and hum and hum.Health > 0 then
-                            local vel = root.AssemblyLinearVelocity
-                            if vel.Y < -50 then
-                                root.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z)
                             end
                         end
                     end)
@@ -2163,18 +2651,22 @@ return function(Common)
         task.spawn(function()
             while true do
                 local activeFeatures = {}
+                if FarmState.NoClipEnabled then table.insert(activeFeatures, "NoClip") end
+                if FarmState.AutoElementSpinEnabled then table.insert(activeFeatures, "ElementSpin") end
+                if FarmState.AutoBreathingSpinEnabled then table.insert(activeFeatures, "BreathingSpin") end
+                if FarmState.AutoCodesEnabled then table.insert(activeFeatures, "AutoCodes") end
                 if FarmState.AntiRagdollEnabled then table.insert(activeFeatures, "AntiRagdoll") end
                 if FarmState.AntiKnockbackEnabled then table.insert(activeFeatures, "AntiKnockback") end
                 if FarmState.ESPEnabled then table.insert(activeFeatures, "ESP") end
                 if FarmState.StunGrabImmunityEnabled then table.insert(activeFeatures, "StunImmunity") end
-                if FarmState.AntiVoidEnabled then table.insert(activeFeatures, "AntiVoid") end
-                if FarmState.NoFallDamageEnabled then table.insert(activeFeatures, "NoFallDamage") end
                 
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 6\n\n%s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
+                    "Active Features: %d / 8\n\n%s\n\nMovement:\n- Walk Speed: %d\n- Jump Power: %d\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
                     #activeFeatures, activeText,
+                    FarmState.CustomWalkSpeed,
+                    FarmState.CustomJumpPower,
                     FarmState.ESPMaxDistance,
                     (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
                 )
@@ -2269,7 +2761,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel + Anti-Void)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel + InstaKill + Experimental)",
             Duration = 5
         })
     end
