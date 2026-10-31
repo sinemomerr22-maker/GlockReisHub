@@ -575,25 +575,25 @@ return function(Common)
         
         -- Map definitions with placeholder PlaceIDs (user will fill in real IDs)
         local Maps = {
-            {Name = "BLAZE (New Ember)", PlaceId = 123456, MinLevel = 0},
-            {Name = "OBELISK (Stone)", PlaceId = 123456, MinLevel = 0},
-            {Name = "NIMBUS (Cloud)", PlaceId = 123456, MinLevel = 0},
-            {Name = "EMBER (Leaf)", PlaceId = 123456, MinLevel = 0},
-            {Name = "JEJUNES", PlaceId = 123456, MinLevel = 0},
-            {Name = "DUNES (Sand)", PlaceId = 123456, MinLevel = 0},
-            {Name = "HAZE (Mist)", PlaceId = 123456, MinLevel = 0},
-            {Name = "VINLAND", PlaceId = 123456, MinLevel = 0},
-            {Name = "TRAINING FIELD", PlaceId = 123456, MinLevel = 100},
-            {Name = "FOREST OF EMBERS", PlaceId = 123456, MinLevel = 300},
-            {Name = "OPEN WORLD", PlaceId = 123456, MinLevel = 0},
-            {Name = "CONQUEST", PlaceId = 123456, MinLevel = 500},
-            {Name = "TEMPEST", PlaceId = 123456, MinLevel = 300},
-            {Name = "GREAT NARUMAKI BRIDGE", PlaceId = 123456, MinLevel = 0},
-            {Name = "SHINDAI VALLEY", PlaceId = 123456, MinLevel = 800},
-            {Name = "SHIKAI FOREST", PlaceId = 123456, MinLevel = 0},
-            {Name = "MOUNT MAKI", PlaceId = 123456, MinLevel = 0},
-            {Name = "RYUJI CAVE", PlaceId = 123456, MinLevel = 0},
-            {Name = "ESPADA", PlaceId = 123456, MinLevel = 0}
+            {Name = "BLAZE (New Ember)", PlaceId = 6986372023, MinLevel = 0},
+            {Name = "OBELISK (Stone)", PlaceId = 4601350809, MinLevel = 0},
+            {Name = "NIMBUS (Cloud)", PlaceId = 4601350656, MinLevel = 0},
+            {Name = "EMBER (Leaf)", PlaceId = 4601350214, MinLevel = 0},
+            {Name = "JEJUNES", PlaceId = 7923764447, MinLevel = 0},
+            {Name = "DUNES (Sand)", PlaceId = 4601350394, MinLevel = 0},
+            {Name = "HAZE (Mist)", PlaceId = 4601350760, MinLevel = 0},
+            {Name = "VINLAND", PlaceId = 5451405681, MinLevel = 0},
+            {Name = "TRAINING FIELD", PlaceId = 5431071837, MinLevel = 100},
+            {Name = "FOREST OF EMBERS", PlaceId = 5447073001, MinLevel = 300},
+            {Name = "OPEN WORLD", PlaceId = 5943872934, MinLevel = 0},
+            {Name = "CONQUEST", PlaceId = 6341670805, MinLevel = 500},
+            {Name = "TEMPEST", PlaceId = 6901575446, MinLevel = 300},
+            {Name = "GREAT NARUMAKI BRIDGE", PlaceId = 5451398863, MinLevel = 0},
+            {Name = "SHINDAI VALLEY", PlaceId = 5451401540, MinLevel = 800},
+            {Name = "SHIKAI FOREST", PlaceId = 6602103757, MinLevel = 0},
+            {Name = "MOUNT MAKI", PlaceId = 5255237254, MinLevel = 0},
+            {Name = "RYUJI CAVE", PlaceId = 5824792748, MinLevel = 0},
+            {Name = "ESPADA", PlaceId = 6444873399, MinLevel = 0}
         }
         
         -- Helper function to get user ID from name
