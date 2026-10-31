@@ -2,8 +2,8 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + InstaKill (M1 Spam + Local Force Kill)
--- // Travel System: Teleport to ALL maps
+-- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
+-- // Travel System (All Maps + Private/Friend Teleport)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -561,6 +561,237 @@ return function(Common)
         end
         
         -- ==========================================
+        -- TRAVEL SYSTEM (ALL MAPS)
+        -- ==========================================
+        Tabs.Travel:AddParagraph({
+            Title = "[T] Travel System",
+            Content = "Teleport to any map in Shindo Life.\n\n" ..
+                "- Public Server: Join random public server\n" ..
+                "- Private Server: Join with code\n" ..
+                "- Join Friend: Teleport to friend's server\n" ..
+                "- Create Private: Start your own server\n\n" ..
+                "🆕 All 19 maps supported with instant teleport!"
+        })
+        
+        -- Map definitions with placeholder PlaceIDs (user will fill in real IDs)
+        local Maps = {
+            {Name = "BLAZE (New Ember)", PlaceId = 123456, MinLevel = 0},
+            {Name = "OBELISK (Stone)", PlaceId = 123456, MinLevel = 0},
+            {Name = "NIMBUS (Cloud)", PlaceId = 123456, MinLevel = 0},
+            {Name = "EMBER (Leaf)", PlaceId = 123456, MinLevel = 0},
+            {Name = "JEJUNES", PlaceId = 123456, MinLevel = 0},
+            {Name = "DUNES (Sand)", PlaceId = 123456, MinLevel = 0},
+            {Name = "HAZE (Mist)", PlaceId = 123456, MinLevel = 0},
+            {Name = "VINLAND", PlaceId = 123456, MinLevel = 0},
+            {Name = "TRAINING FIELD", PlaceId = 123456, MinLevel = 100},
+            {Name = "FOREST OF EMBERS", PlaceId = 123456, MinLevel = 300},
+            {Name = "OPEN WORLD", PlaceId = 123456, MinLevel = 0},
+            {Name = "CONQUEST", PlaceId = 123456, MinLevel = 500},
+            {Name = "TEMPEST", PlaceId = 123456, MinLevel = 300},
+            {Name = "GREAT NARUMAKI BRIDGE", PlaceId = 123456, MinLevel = 0},
+            {Name = "SHINDAI VALLEY", PlaceId = 123456, MinLevel = 800},
+            {Name = "SHIKAI FOREST", PlaceId = 123456, MinLevel = 0},
+            {Name = "MOUNT MAKI", PlaceId = 123456, MinLevel = 0},
+            {Name = "RYUJI CAVE", PlaceId = 123456, MinLevel = 0},
+            {Name = "ESPADA", PlaceId = 123456, MinLevel = 0}
+        }
+        
+        -- Helper function to get user ID from name
+        local function getUserIdFromName(name)
+            local userId = nil
+            pcall(function()
+                userId = Players:GetUserIdFromNameAsync(name)
+            end)
+            return userId
+        end
+        
+        -- Teleport functions
+        local function teleportToPublic(placeId, mapName)
+            ui.Fluent:Notify({
+                Title = "[T] Teleporting",
+                Content = "Joining public server: " .. mapName,
+                Duration = 3
+            })
+            pcall(function()
+                LocalPlayer.startevent:FireServer("rpgteleport", placeId)
+            end)
+        end
+        
+        local function teleportToPrivate(placeId, privateCode, mapName)
+            if not privateCode or privateCode == "" then
+                ui.Fluent:Notify({
+                    Title = "[!] Error",
+                    Content = "Private server code is required!",
+                    Duration = 3
+                })
+                return
+            end
+            
+            ui.Fluent:Notify({
+                Title = "[T] Teleporting",
+                Content = "Joining private server: " .. mapName,
+                Duration = 3
+            })
+            pcall(function()
+                LocalPlayer.startevent:FireServer("teleporttoprivate", privateCode, placeId)
+            end)
+        end
+        
+        local function teleportToFriend(placeId, friendName, mapName)
+            if not friendName or friendName == "" then
+                ui.Fluent:Notify({
+                    Title = "[!] Error",
+                    Content = "Friend name is required!",
+                    Duration = 3
+                })
+                return
+            end
+            
+            local userId = getUserIdFromName(friendName)
+            if not userId or userId <= 0 then
+                ui.Fluent:Notify({
+                    Title = "[!] Error",
+                    Content = "Player not found: " .. friendName,
+                    Duration = 3
+                })
+                return
+            end
+            
+            ui.Fluent:Notify({
+                Title = "[T] Teleporting",
+                Content = "Joining friend: " .. friendName .. " in " .. mapName,
+                Duration = 3
+            })
+            pcall(function()
+                LocalPlayer.startevent:FireServer("rpgteleport", "friend", userId)
+            end)
+        end
+        
+        local function createPrivateServer(placeId, mapName)
+            ui.Fluent:Notify({
+                Title = "[T] Creating Server",
+                Content = "Creating private server: " .. mapName,
+                Duration = 3
+            })
+            pcall(function()
+                LocalPlayer.startevent:FireServer("createprivateserver", placeId)
+            end)
+        end
+        
+        local function teleportToMenu()
+            ui.Fluent:Notify({
+                Title = "[T] Teleporting",
+                Content = "Returning to main menu...",
+                Duration = 3
+            })
+            pcall(function()
+                LocalPlayer.startevent:FireServer("rpgteleport", 4616652839)
+            end)
+        end
+        
+        -- Create map sections
+        for _, map in ipairs(Maps) do
+            Tabs.Travel:AddSection(map.Name)
+            
+            -- Public server button
+            Tabs.Travel:AddButton({
+                Title = "Join Public Server",
+                Description = "Teleport to random public server",
+                Callback = function()
+                    teleportToPublic(map.PlaceId, map.Name)
+                end
+            })
+            
+            -- Private server input + button
+            local privateCodeInput = Tabs.Travel:AddInput("PrivateCode_" .. map.Name:gsub("%s+", "_"), {
+                Title = "Private Server Code",
+                Placeholder = "Enter code...",
+                Finished = true,
+                Callback = function() end
+            })
+            
+            Tabs.Travel:AddButton({
+                Title = "Join Private Server",
+                Description = "Teleport with private code",
+                Callback = function()
+                    local code = privateCodeInput.Value or ""
+                    teleportToPrivate(map.PlaceId, code, map.Name)
+                end
+            })
+            
+            -- Friend join input + button
+            local friendNameInput = Tabs.Travel:AddInput("FriendName_" .. map.Name:gsub("%s+", "_"), {
+                Title = "Friend Username",
+                Placeholder = "Enter username...",
+                Finished = true,
+                Callback = function() end
+            })
+            
+            Tabs.Travel:AddButton({
+                Title = "Join Friend",
+                Description = "Teleport to friend's server",
+                Callback = function()
+                    local name = friendNameInput.Value or ""
+                    teleportToFriend(map.PlaceId, name, map.Name)
+                end
+            })
+            
+            -- Create private server button
+            Tabs.Travel:AddButton({
+                Title = "Create Private Server",
+                Description = "Start your own private server",
+                Callback = function()
+                    createPrivateServer(map.PlaceId, map.Name)
+                end
+            })
+        end
+        
+        -- Return to menu button
+        Tabs.Travel:AddSection("Navigation")
+        Tabs.Travel:AddButton({
+            Title = "Return to Main Menu",
+            Description = "Go back to character selection",
+            Callback = teleportToMenu
+        })
+        
+        -- Travel status display
+        local TravelStatusDisplay = Tabs.Travel:AddParagraph({
+            Title = "Travel Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local currentPlace = game.PlaceId
+                local currentMapName = "Unknown"
+                
+                for _, map in ipairs(Maps) do
+                    if map.PlaceId == currentPlace then
+                        currentMapName = map.Name
+                        break
+                    end
+                end
+                
+                if currentPlace == 4616652839 then
+                    currentMapName = "Main Menu"
+                end
+                
+                TravelStatusDisplay.Content = string.format(
+                    "Current Location: %s\n" ..
+                    "Place ID: %d\n" ..
+                    "Job ID: %s\n\n" ..
+                    "Players in Server: %d\n\n" ..
+                    "Note: Replace PlaceId 123456 with real IDs in code!",
+                    currentMapName,
+                    currentPlace,
+                    game.JobId or "N/A",
+                    #Players:GetPlayers()
+                )
+                task.wait(1)
+            end
+        end)
+        
+        -- ==========================================
         -- CONTINUOUS FACING LOOP
         -- ==========================================
         RunService.RenderStepped:Connect(function()
@@ -581,337 +812,6 @@ return function(Common)
                 else
                     currentTargetNPC = nil
                 end
-            end
-        end)
-        
-        -- ==========================================
-        -- TRAVEL SYSTEM (ALL MAPS)
-        -- ==========================================
-        Tabs.Travel:AddParagraph({
-            Title = "[T] Travel System",
-            Content = "Teleport to any map in Shindo Life.\n\n" ..
-                "🏘️ **Villages:** Ember, Dunes, Nimbus, Haze, Obelisk\n" ..
-                "🗺️ **Special Areas:** Training Field, Forest of Embers, Tempest, Shindai Valley, Dawn Hideout\n" ..
-                "⚔️ **PvP Modes:** Conquest, Arena, War\n" ..
-                "🌍 **Open World:** Shinobi World, World X\n\n" ..
-                "✅ Level requirements checked automatically\n" ..
-                "✅ Uses game's native teleport system\n" ..
-                "✅ Instant CFrame teleport for villages"
-        })
-        
-        -- Map data: name, placeId (nil = village on main map), levelReq, description
-        local TravelMaps = {
-            -- ===== VILLAGES (Main Map - CFrame Teleport) =====
-            {name = "🍃 Ember Village (Leaf)", placeId = nil, spawnSearch = {"spawn", "Spawn", "Konohagakure"}, levelReq = 0, desc = "Konohagakure - Main starting village"},
-            {name = "🏜️ Dunes Village (Sand)", placeId = nil, spawnSearch = {"Sunagakure", "Sand", "Dunes"}, levelReq = 0, desc = "Sunagakure - Desert village"},
-            {name = "☁️ Nimbus Village (Cloud)", placeId = nil, spawnSearch = {"Kumogakure", "Cloud", "Nimbus"}, levelReq = 0, desc = "Kumogakure - Mountain village"},
-            {name = "🌫️ Haze Village (Mist)", placeId = nil, spawnSearch = {"Kirigakure", "Mist", "Haze"}, levelReq = 0, desc = "Kirigakure - Hidden mist village"},
-            {name = "🪨 Obelisk Village (Stone)", placeId = nil, spawnSearch = {"Iwagakure", "Stone", "Obelisk"}, levelReq = 0, desc = "Iwagakure - Rock village"},
-            
-            -- ===== SPECIAL AREAS (PlaceId Teleport) =====
-            {name = "⚔️ Training Field", placeId = 5431071837, levelReq = 100, desc = "Training area - All levels"},
-            {name = "🔥 Forest of Embers", placeId = 5447073001, levelReq = 300, desc = "Advanced training - Fire region"},
-            {name = "🌪️ Tempest Village", placeId = 6901575446, levelReq = 300, desc = "High-level storm area"},
-            {name = "🏔️ Shindai Valley", placeId = 5451401540, levelReq = 800, desc = "End-game valley - Lvl 800+"},
-            {name = "🌅 Dawn Hideout (Akatsuki)", placeId = 5431069982, levelReq = 1000, desc = "Akatsuki base - Max level only"},
-            {name = "🌍 Open World (Shinobi World)", placeId = 5943872934, levelReq = 300, desc = "Open exploration world"},
-            {name = "🌐 World X", placeId = 5943874201, levelReq = 0, desc = "Alternative dimension"},
-            
-            -- ===== PVP MODES =====
-            {name = "⚔️ Conquest", placeId = 6341670805, levelReq = 500, desc = "Team PvP conquest mode"},
-            {name = "🏟️ Arena", placeId = 5307141034, levelReq = 0, desc = "1v1 Arena battles"},
-            {name = "🏟️ Arena X", placeId = 5743370338, levelReq = 600, desc = "Advanced Arena - Lvl 600+"},
-            {name = "🏆 Pro Comp", placeId = 5664803952, levelReq = 1000, desc = "Competitive S+ Rank only"},
-            {name = "🏆 SS Comp", placeId = 6593187011, levelReq = 600, desc = "SS Rank competition"},
-            {name = "⚔️ War Mode", placeId = 5824792748, levelReq = 400, desc = "Large-scale war battles"},
-            
-            -- ===== DUNGEONS & SPECIAL =====
-            {name = "🏰 Dungeon", placeId = 7524809704, levelReq = 300, desc = "Dungeon raids"},
-            {name = "🎁 Rewards Area", placeId = 5451410109, levelReq = 0, desc = "Daily rewards location"},
-            
-            -- ===== ADDITIONAL LOCATIONS =====
-            {name = "🌉 Great Narumaki Bridge", placeId = nil, spawnSearch = {"Narumaki", "Bridge"}, levelReq = 0, desc = "Famous bridge location"},
-            {name = "🌲 Shikai Forest", placeId = nil, spawnSearch = {"ShikaiForest", "Shikai"}, levelReq = 0, desc = "Mysterious forest area"},
-            {name = "⛰️ Mount Maki", placeId = nil, spawnSearch = {"MountMaki", "Maki"}, levelReq = 0, desc = "Mountain training area"},
-            {name = "🕳️ Ryuji Cave", placeId = nil, spawnSearch = {"RyujiCave", "Ryuji"}, levelReq = 0, desc = "Hidden cave system"},
-            {name = "🏝️ Jejunes", placeId = nil, spawnSearch = {"Jejunes"}, levelReq = 0, desc = "Island area"},
-            {name = "⚔️ Vinland", placeId = nil, spawnSearch = {"Vinland"}, levelReq = 0, desc = "Northern territory"},
-            {name = "🗡️ Espada", placeId = nil, spawnSearch = {"Espada"}, levelReq = 0, desc = "Sword training area"},
-            {name = "🔥 Blaze", placeId = nil, spawnSearch = {"Blaze", "NewEmber"}, levelReq = 0, desc = "Fire region"},
-        }
-        
-        -- Helper: Find village spawn point in workspace
-        local function findVillageSpawn(searchNames)
-            -- Try common spawn locations
-            for _, searchName in ipairs(searchNames) do
-                -- Direct child search
-                local found = workspace:FindFirstChild(searchName)
-                if found then
-                    local hrp = found:FindFirstChild("HumanoidRootPart") or found:FindFirstChild("Spawn")
-                    if hrp then return hrp.CFrame end
-                    if found:IsA("BasePart") then return found.CFrame end
-                end
-                
-                -- Search in spawn folder
-                local spawnFolder = workspace:FindFirstChild("spawn") or workspace:FindFirstChild("Spawn")
-                if spawnFolder then
-                    local child = spawnFolder:FindFirstChild(searchName)
-                    if child then
-                        local hrp = child:FindFirstChild("HumanoidRootPart")
-                        if hrp then return hrp.CFrame end
-                        if child:IsA("BasePart") then return child.CFrame end
-                    end
-                    -- If spawnFolder itself is the target
-                    if spawnFolder.Name == searchName then
-                        local hrp = spawnFolder:FindFirstChild("HumanoidRootPart")
-                        if hrp then return hrp.CFrame end
-                        if spawnFolder:IsA("BasePart") then return spawnFolder.CFrame end
-                    end
-                end
-                
-                -- Search in npc folder (some spawns are here)
-                local npcFolder = workspace:FindFirstChild("npc")
-                if npcFolder then
-                    local child = npcFolder:FindFirstChild(searchName)
-                    if child then
-                        local hrp = child:FindFirstChild("HumanoidRootPart")
-                        if hrp then return hrp.CFrame end
-                    end
-                end
-            end
-            
-            -- Fallback: Try main spawn
-            local mainSpawn = workspace:FindFirstChild("spawn") or workspace:FindFirstChild("Spawn")
-            if mainSpawn then
-                local hrp = mainSpawn:FindFirstChild("HumanoidRootPart")
-                if hrp then return hrp.CFrame end
-                if mainSpawn:IsA("BasePart") then return mainSpawn.CFrame end
-            end
-            
-            return nil
-        end
-        
-        -- Helper: Get player level
-        local function getPlayerLevel()
-            local statz = LocalPlayer:FindFirstChild("statz")
-            if not statz then return 0 end
-            local lvl = statz:FindFirstChild("lvl")
-            if not lvl then return 0 end
-            local lvlVal = lvl:FindFirstChild("lvl")
-            if not lvlVal then return 0 end
-            return lvlVal.Value or 0
-        end
-        
-        -- Helper: Teleport to map
-        local function teleportToMap(map)
-            pcall(function()
-                local char = LocalPlayer.Character
-                if not char then
-                    ui.Fluent:Notify({Title = "[!] Error", Content = "No character found", Duration = 3})
-                    return
-                end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then
-                    ui.Fluent:Notify({Title = "[!] Error", Content = "No HumanoidRootPart", Duration = 3})
-                    return
-                end
-                
-                -- Level check
-                if map.levelReq > 0 then
-                    local lvl = getPlayerLevel()
-                    if lvl < map.levelReq then
-                        ui.Fluent:Notify({
-                            Title = "[!] Level Required",
-                            Content = "Need Lvl " .. map.levelReq .. " (Current: " .. lvl .. ")",
-                            Duration = 4
-                        })
-                        return
-                    end
-                end
-                
-                -- Teleport
-                if map.placeId then
-                    -- PlaceId teleport (different server/area)
-                    ui.Fluent:Notify({
-                        Title = "[T] Teleporting...",
-                        Content = "Going to " .. map.name .. " (PlaceId: " .. map.placeId .. ")",
-                        Duration = 3
-                    })
-                    
-                    -- Use game's native teleport system
-                    local startevent = LocalPlayer:FindFirstChild("startevent")
-                    if startevent then
-                        startevent:FireServer("rpgteleport", map.placeId)
-                    else
-                        -- Fallback: Direct TeleportService
-                        TeleportService:Teleport(map.placeId, LocalPlayer)
-                    end
-                else
-                    -- CFrame teleport (village on main map)
-                    local spawnCFrame = findVillageSpawn(map.spawnSearch or {})
-                    if spawnCFrame then
-                        root.CFrame = spawnCFrame + Vector3.new(0, 5, 0) -- Slightly above to avoid clipping
-                        ui.Fluent:Notify({
-                            Title = "[T] Teleported!",
-                            Content = "Arrived at " .. map.name,
-                            Duration = 2
-                        })
-                    else
-                        ui.Fluent:Notify({
-                            Title = "[!] Spawn Not Found",
-                            Content = "Could not find spawn for " .. map.name .. ". Try manual navigation.",
-                            Duration = 4
-                        })
-                    end
-                end
-            end)
-        end
-        
-        -- Create buttons for all maps
-        local mapCategories = {
-            {title = "🏘️ VILLAGES", maps = {}},
-            {title = "🗺️ SPECIAL AREAS", maps = {}},
-            {title = "⚔️ PVP MODES", maps = {}},
-            {title = "🏰 DUNGEONS & OTHER", maps = {}},
-        }
-        
-        -- Categorize maps
-        for _, map in ipairs(TravelMaps) do
-            if map.name:find("Village") or map.name:find("Ember") or map.name:find("Dunes") or 
-               map.name:find("Nimbus") or map.name:find("Haze") or map.name:find("Obelisk") then
-                table.insert(mapCategories[1].maps, map)
-            elseif map.name:find("Training") or map.name:find("Forest") or map.name:find("Tempest") or
-                   map.name:find("Shindai") or map.name:find("Dawn") or map.name:find("Open World") or
-                   map.name:find("World X") then
-                table.insert(mapCategories[2].maps, map)
-            elseif map.name:find("Conquest") or map.name:find("Arena") or map.name:find("War") or
-                   map.name:find("Comp") then
-                table.insert(mapCategories[3].maps, map)
-            else
-                table.insert(mapCategories[4].maps, map)
-            end
-        end
-        
-        -- Create UI for each category
-        for _, category in ipairs(mapCategories) do
-            if #category.maps > 0 then
-                Tabs.Travel:AddSection(category.title)
-                
-                for _, map in ipairs(category.maps) do
-                    local buttonTitle = map.name
-                    if map.levelReq > 0 then
-                        buttonTitle = buttonTitle .. " (Lvl " .. map.levelReq .. "+)"
-                    end
-                    
-                    Tabs.Travel:AddButton({
-                        Title = buttonTitle,
-                        Description = map.desc,
-                        Callback = function()
-                            teleportToMap(map)
-                        end
-                    })
-                end
-            end
-        end
-        
-        -- Additional travel utilities
-        Tabs.Travel:AddSection("🛠️ Travel Utilities")
-        
-        Tabs.Travel:AddButton({
-            Title = "Return to Main Menu",
-            Description = "Go back to character selection",
-            Callback = function()
-                pcall(function()
-                    ui.Fluent:Notify({Title = "[T] Returning", Content = "Going to main menu...", Duration = 2})
-                    LocalPlayer.startevent:FireServer("rpgteleport", 4616652839)
-                end)
-            end
-        })
-        
-        Tabs.Travel:AddButton({
-            Title = "Teleport to Spawn",
-            Description = "Return to village spawn point",
-            Callback = function()
-                pcall(function()
-                    local char = LocalPlayer.Character
-                    if char then
-                        local spawn = workspace:FindFirstChild("spawn") or workspace:FindFirstChild("Spawn")
-                        if spawn then
-                            local hrp = spawn:FindFirstChild("HumanoidRootPart")
-                            if hrp then
-                                char:FindFirstChild("HumanoidRootPart").CFrame = hrp.CFrame + Vector3.new(0, 5, 0)
-                                ui.Fluent:Notify({Title = "[T] Teleported", Content = "Returned to spawn", Duration = 2})
-                            else
-                                char:FindFirstChild("HumanoidRootPart").CFrame = spawn.CFrame + Vector3.new(0, 5, 0)
-                                ui.Fluent:Notify({Title = "[T] Teleported", Content = "Returned to spawn", Duration = 2})
-                            end
-                        end
-                    end
-                end)
-            end
-        })
-        
-        Tabs.Travel:AddButton({
-            Title = "Teleport to Training Log",
-            Description = "Quick access to training dummy",
-            Callback = function()
-                pcall(function()
-                    local npc = workspace:FindFirstChild("npc")
-                    if npc then
-                        local log = npc:FindFirstChild("logtraining")
-                        if log and log:FindFirstChild("HumanoidRootPart") then
-                            LocalPlayer.Character.HumanoidRootPart.CFrame = log.HumanoidRootPart.CFrame
-                            ui.Fluent:Notify({Title = "[T] Teleported", Content = "At training log", Duration = 2})
-                        end
-                    end
-                end)
-            end
-        })
-        
-        -- Travel Status Display
-        local TravelStatusDisplay = Tabs.Travel:AddParagraph({
-            Title = "Travel Status",
-            Content = "Initializing..."
-        })
-        
-        task.spawn(function()
-            while true do
-                local lvl = getPlayerLevel()
-                local currentMap = "Unknown"
-                
-                -- Try to detect current map
-                if placeId == 5431071837 then currentMap = "Training Field"
-                elseif placeId == 5447073001 then currentMap = "Forest of Embers"
-                elseif placeId == 6901575446 then currentMap = "Tempest Village"
-                elseif placeId == 5451401540 then currentMap = "Shindai Valley"
-                elseif placeId == 5431069982 then currentMap = "Dawn Hideout"
-                elseif placeId == 5943872934 then currentMap = "Open World"
-                elseif placeId == 5943874201 then currentMap = "World X"
-                elseif placeId == 6341670805 then currentMap = "Conquest"
-                elseif placeId == 5307141034 then currentMap = "Arena"
-                elseif placeId == 5743370338 then currentMap = "Arena X"
-                elseif placeId == 5824792748 then currentMap = "War Mode"
-                else currentMap = "Main Village (PlaceId: " .. placeId .. ")"
-                end
-                
-                TravelStatusDisplay.Content = string.format(
-                    "Current Location: %s\n" ..
-                    "Player Level: %d\n" ..
-                    "PlaceId: %d\n\n" ..
-                    "Available Maps: %d\n" ..
-                    "Villages: 5\n" ..
-                    "Special Areas: 6\n" ..
-                    "PvP Modes: 6\n" ..
-                    "Other: 8\n\n" ..
-                    "Tip: Some maps require minimum level.\n" ..
-                    "Locked maps will show an error message.",
-                    currentMap,
-                    lvl,
-                    placeId,
-                    #TravelMaps
-                )
-                task.wait(1)
             end
         end)
         
