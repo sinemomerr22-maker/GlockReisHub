@@ -4,10 +4,10 @@
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill)
 -- // Travel System (All Maps + Private/Friend Teleport)
--- // Scroll Sniper (Auto Server Hop + Time-Based) + Scroll Get (Manual)
+-- // Scroll Sniper (Auto Server Hop + Time-Based + AUTO REFRESH) + Scroll Get (Manual)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
--- // 🔧 FIXED: Flexible time parsing for getCurrentGameTime()
+-- // 🔧 FIXED: Flexible time parsing + plain text location + auto-refresh
 -- // ==========================================
 
 return function(Common)
@@ -143,25 +143,16 @@ return function(Common)
             end
         end)
         
-        -- 🔧 FIXED: Parse time with multiple format attempts
         local function parseTimeString(timeStr)
             if not timeStr or timeStr == "" then return nil, nil, nil end
-            
-            -- Try pattern 1: "HH:MM AM/PM" (with space)
             local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s+(%a+)")
-            
-            -- Try pattern 2: "HH:MMAM/PM" (no space)
             if not hour then
                 hour, minute, period = string.match(timeStr, "(%d+):(%d+)(%a+)")
             end
-            
-            -- Try pattern 3: "HH:MM" (24-hour, no period)
             if not hour then
                 hour, minute = string.match(timeStr, "(%d+):(%d+)")
                 period = nil
             end
-            
-            -- Try pattern 4: Just numbers
             if not hour then
                 hour = string.match(timeStr, "(%d+)")
                 if hour then
@@ -169,7 +160,6 @@ return function(Common)
                     period = nil
                 end
             end
-            
             return hour, minute, period
         end
         
@@ -187,7 +177,6 @@ return function(Common)
                             hour = tonumber(hour)
                             minute = tonumber(minute)
                             
-                            -- Convert to 24-hour format
                             if period and hour then
                                 period = period:upper()
                                 if period == "PM" and hour ~= 12 then
@@ -283,6 +272,7 @@ return function(Common)
             ScrollGetEnabled = false,
             ScrollSniperEnabled = false,
             ScrollSniperSelected = {},
+            ScrollSniperAutoRefreshInterval = 60,
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
             AutoRankEnabled = false,
@@ -748,10 +738,12 @@ return function(Common)
             ScrollGetEnabled = Config.ScrollGetEnabled,
             ScrollSniperEnabled = Config.ScrollSniperEnabled,
             ScrollSniperSelected = Config.ScrollSniperSelected or {},
+            ScrollSniperAutoRefreshInterval = Config.ScrollSniperAutoRefreshInterval or 60,
             ScrollSniperStatus = "Idle",
             ScrollSniperCurrent = "",
             ScrollSniperServersHopped = 0,
             ScrollSniperScrollsClaimed = 0,
+            ScrollSniperRefreshCount = 0,
             WarFarmEnabled = Config.WarFarmEnabled,
             AutoChakraEnabled = Config.AutoChakraEnabled,
             AutoRankEnabled = Config.AutoRankEnabled,
@@ -1685,7 +1677,7 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- SCROLL SNIPER (AUTO SERVER HOP + TIME-BASED)
+        -- SCROLL SNIPER (AUTO SERVER HOP + TIME-BASED + AUTO REFRESH)
         -- ==========================================
         Tabs.ScrollSniper:AddParagraph({
             Title = "[S] Scroll Sniper (Auto Server Hop)",
@@ -1700,6 +1692,7 @@ return function(Common)
                 "🆕 20-minute window (time to time+20min)\n" ..
                 "🆕 30s wait per server, then hops\n" ..
                 "🆕 Auto-claims scroll when found\n" ..
+                "🆕 AUTO-REFRESH: Updates scroll list periodically\n" ..
                 "🔧 FIXED: Flexible time parsing + plain text location\n\n" ..
                 "NOTE: Fill Private Server IDs table below!"
         })
@@ -1924,6 +1917,18 @@ return function(Common)
             espada = {
                 "Akww4B", "_7EWQG", "PcO0zJ", "ggCtBP",
             },
+			dawn = {
+				"N3UdV1", "SMVZac", "g9iWZY", "_JQ42s", "Tc-F5O", "5Sl-JR", "foq1rK", "Paz2TB", "G7nHqe", "LnXNae",
+				"99bDJL", "3cjO36", "t4Ha0G", "Skge3S", "uE6PgU", "1Ov66S", "mtwbAn", "17bVCg", "6a0ncn", "jobu2T",
+				"Av_ErS", "R8Shmc", "hWrS00", "Jue8Wx", "_5wxEn", "tyK3b5", "eGNF7g", "YU4NjS", "bX2sAG", "MSu1bf",
+				"CO4iOZ", "jRp6P5", "tNdSA6", "gLTDHo", "zgmKGx", "kh1Ba3", "ggabkX", "6j-TTc", "L9tpaO", "MFRH5m",
+				"McpVJ-", "HmNJop", "pPWxGa", "LZ85AV", "mgcqJX", "3Z6vMe", "B37-CF", "wSgb8o", "dRFpr6", "7PLwc5",
+				"UAAWmU", "6zLwsJ", "tbJ2Ry", "7u52Jw", "McQJh_", "acyMFg", "ZyMghM", "MUsTkc", "Dtv_wE", "GRtGGQ",
+				"sum1fK", "zJ6ofk", "ft6Xrj", "uJojh0", "T_Q4M1", "4nT8oM", "jFiDCs", "iyWXHR", "VpmvJB", "j_1NzC",
+				"cg8K-D", "AtdmWJ", "9XAWbF", "9cuNMe", "Bn-YeA", "Fkh6nV", "0QpPwj", "TrF7MX", "f9kW9X", "_q5mTi",
+				"LUvxGF", "CsRvJN", "_g5raE", "3gOhgr", "fO893o", "agUJCc", "J-N3Mc", "Uqda7H", "AL_vt0", "_7ppL_",
+				"P8pn9b", "avbKjk", "JQrM9g", "G6rkSS", "MumdsK", "QowwNe", "G9Hr0y", "2s-Ee1", "B5FKSk",
+			},
             jejunes = {
                 "9KAwrP", "hWE8in", "swhYEM", "guvf30", "V40gH5", "ZDA2Ee", "21U-bv", "-qhOJe", "Ka3-c0", "eA6Co2",
                 "aQiYne", "lpV0Ca", "mJ37yb", "f-fISM", "xggsbV", "mYRTjm", "ggjYUt", "atbE3T", "J3SSib", "tt19jg",
@@ -1975,18 +1980,6 @@ return function(Common)
                 "MEJYU9", "PNTvo1", "EXzgEd", "fH9dmN", "b-d4wx", "mhCQVF", "2I1sTf", "O7mE0f", "mPdb3G", "s4Z2PN",
                 "m9-yvn", "vcw74g", "00H82o", "fe4a9G", "0nziFE", "mVxcTG", "RXrqhs", "B0KOgs", "A88c15",
             },
-            dawn = {
-		        "N3UdV1", "SMVZac", "g9iWZY", "_JQ42s", "Tc-F5O", "5Sl-JR", "foq1rK", "Paz2TB", "G7nHqe", "LnXNae",
-	        	"99bDJL", "3cjO36", "t4Ha0G", "Skge3S", "uE6PgU", "1Ov66S", "mtwbAn", "17bVCg", "6a0ncn", "jobu2T",
-	        	"Av_ErS", "R8Shmc", "hWrS00", "Jue8Wx", "_5wxEn", "tyK3b5", "eGNF7g", "YU4NjS", "bX2sAG", "MSu1bf",
-	        	"CO4iOZ", "jRp6P5", "tNdSA6", "gLTDHo", "zgmKGx", "kh1Ba3", "ggabkX", "6j-TTc", "L9tpaO", "MFRH5m",
-		        "McpVJ-", "HmNJop", "pPWxGa", "LZ85AV", "mgcqJX", "3Z6vMe", "B37-CF", "wSgb8o", "dRFpr6", "7PLwc5",
-	        	"UAAWmU", "6zLwsJ", "tbJ2Ry", "7u52Jw", "McQJh_", "acyMFg", "ZyMghM", "MUsTkc", "Dtv_wE", "GRtGGQ",
-		        "sum1fK", "zJ6ofk", "ft6Xrj", "uJojh0", "T_Q4M1", "4nT8oM", "jFiDCs", "iyWXHR", "VpmvJB", "j_1NzC",
-		        "cg8K-D", "AtdmWJ", "9XAWbF", "9cuNMe", "Bn-YeA", "Fkh6nV", "0QpPwj", "TrF7MX", "f9kW9X", "_q5mTi",
-		        "LUvxGF", "CsRvJN", "_g5raE", "3gOhgr", "fO893o", "agUJCc", "J-N3Mc", "Uqda7H", "AL_vt0", "_7ppL_",
-		        "P8pn9b", "avbKjk", "JQrM9g", "G6rkSS", "MumdsK", "QowwNe", "G9Hr0y", "2s-Ee1", "B5FKSk",
-	        },
             storm = {
                 "fwJkMu", "sTLf6S", "n9ObLL", "vwJCg7", "F705Ck", "Ma4a6o", "LQ8sOV", "FZTwXs", "V3LOlI", "ZvXZND",
                 "ir6z3z", "94nkGc", "yZ3wL-", "OVjnP1", "bVtQKv", "cew0OJ", "qPdZda", "-NsAub", "bSFIDx", "G6Mkv5",
@@ -2069,12 +2062,6 @@ return function(Common)
             ScrollWidgets = {}
             ScrollData = {}
             
-            ui.Fluent:Notify({
-                Title = "[DEBUG] Refresh Start",
-                Content = "Looking for GLOBALTIME...",
-                Duration = 2
-            })
-            
             local clientTell = workspace:FindFirstChild("GLOBALTIME")
             if not clientTell then 
                 ui.Fluent:Notify({
@@ -2085,12 +2072,6 @@ return function(Common)
                 return 
             end
             
-            ui.Fluent:Notify({
-                Title = "[DEBUG] ✓ GLOBALTIME found",
-                Content = "Looking for clienttell folder...",
-                Duration = 2
-            })
-            
             clientTell = clientTell:FindFirstChild("clienttell")
             if not clientTell then 
                 ui.Fluent:Notify({
@@ -2100,12 +2081,6 @@ return function(Common)
                 })
                 return 
             end
-            
-            ui.Fluent:Notify({
-                Title = "[DEBUG] ✓ clienttell found",
-                Content = "Scanning " .. #clientTell:GetChildren() .. " children...",
-                Duration = 2
-            })
             
             local excludedCount = 0
             local includedCount = 0
@@ -2166,17 +2141,46 @@ return function(Common)
                 end
             end
             
+            FarmState.ScrollSniperRefreshCount = FarmState.ScrollSniperRefreshCount + 1
+            
             ui.Fluent:Notify({
-                Title = "[DEBUG] ✓ Refresh Complete",
-                Content = string.format("Found %d scrolls\n(%d excluded: boss/drop/00:00/01:00)\n\nScrollData: %d entries", 
-                    includedCount, excludedCount, #ScrollData),
-                Duration = 4
+                Title = "[S] Scroll List Refreshed",
+                Content = string.format("Found %d scrolls (%d excluded)\nRefresh #%d", 
+                    includedCount, excludedCount, FarmState.ScrollSniperRefreshCount),
+                Duration = 3
             })
         end
         
         Tabs.ScrollSniper:AddButton({
             Title = "Refresh Scroll List",
             Callback = refreshScrollList
+        })
+        
+        -- 🆕 AUTO-REFRESH INTERVAL SLIDER
+        Tabs.ScrollSniper:AddSlider("ScrollSniperAutoRefreshSlider", {
+            Title = "Auto-Refresh Interval (seconds)",
+            Description = "How often to automatically refresh the scroll list (0 = disabled)",
+            Default = Config.ScrollSniperAutoRefreshInterval,
+            Min = 0, Max = 300, Rounding = 0,
+            Callback = function(v)
+                FarmState.ScrollSniperAutoRefreshInterval = v
+                Config.ScrollSniperAutoRefreshInterval = v
+                ConfigManager.Save(Config)
+                
+                if v == 0 then
+                    ui.Fluent:Notify({
+                        Title = "[S] Auto-Refresh Disabled",
+                        Content = "Scroll list will not auto-refresh",
+                        Duration = 3
+                    })
+                else
+                    ui.Fluent:Notify({
+                        Title = "[S] Auto-Refresh Updated",
+                        Content = "Will refresh every " .. v .. " seconds",
+                        Duration = 3
+                    })
+                end
+            end
         })
         
         Tabs.ScrollSniper:AddButton({
@@ -2261,64 +2265,30 @@ return function(Common)
             end
         end)
         
-        -- 🔧 FIXED: Flexible time parsing with multiple format attempts
         local function getCurrentGameTime()
             local globalTime = workspace:FindFirstChild("GLOBALTIME")
-            if not globalTime then 
-                print("[DEBUG getCurrentGameTime] GLOBALTIME not found")
-                return nil, nil 
-            end
+            if not globalTime then return nil, nil end
             
             local estTime = globalTime:FindFirstChild("globalesttime")
-            if not estTime then 
-                print("[DEBUG getCurrentGameTime] globalesttime not found")
-                return nil, nil 
-            end
-            
-            if not estTime.Value or estTime.Value == "" then 
-                print("[DEBUG getCurrentGameTime] globalesttime.Value is empty")
-                return nil, nil 
-            end
+            if not estTime or not estTime.Value then return nil, nil end
             
             local timeStr = estTime.Value
-            print("[DEBUG getCurrentGameTime] Raw time string: '" .. timeStr .. "'")
-            
-            -- Try pattern 1: "HH:MM AM/PM" (with space)
             local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s+(%a+)")
-            print("[DEBUG getCurrentGameTime] Pattern 1 (HH:MM AM/PM):", hour, minute, period)
             
-            -- Try pattern 2: "HH:MMAM/PM" (no space)
             if not hour then
                 hour, minute, period = string.match(timeStr, "(%d+):(%d+)(%a+)")
-                print("[DEBUG getCurrentGameTime] Pattern 2 (HH:MMAM/PM):", hour, minute, period)
             end
             
-            -- Try pattern 3: "HH:MM" (24-hour, no period)
             if not hour then
                 hour, minute = string.match(timeStr, "(%d+):(%d+)")
                 period = nil
-                print("[DEBUG getCurrentGameTime] Pattern 3 (HH:MM 24h):", hour, minute)
             end
             
-            -- Try pattern 4: Just first number
-            if not hour then
-                hour = string.match(timeStr, "(%d+)")
-                if hour then
-                    minute = 0
-                    period = nil
-                    print("[DEBUG getCurrentGameTime] Pattern 4 (first number):", hour, minute)
-                end
-            end
-            
-            if not hour or not minute then 
-                print("[DEBUG getCurrentGameTime] ❌ FAILED to parse time from: '" .. timeStr .. "'")
-                return nil, nil 
-            end
+            if not hour then return nil, nil end
             
             hour = tonumber(hour)
             minute = tonumber(minute)
             
-            -- Convert to 24-hour format if period exists
             if period then
                 period = period:upper()
                 if period == "PM" and hour ~= 12 then
@@ -2328,7 +2298,6 @@ return function(Common)
                 end
             end
             
-            print("[DEBUG getCurrentGameTime] ✓ Parsed time: " .. hour .. ":" .. minute)
             return hour, minute
         end
         
@@ -2358,7 +2327,6 @@ return function(Common)
             end
             
             local locationLower = location:lower()
-            local matchDetails = {}
             
             for keyword, ids in pairs(ScrollServerIDs) do
                 local keywordLower = keyword:lower()
@@ -2416,37 +2384,11 @@ return function(Common)
             return false
         end
         
-        -- 🔍 DEBUG: Main loop with detailed logging
         task.spawn(function()
-            local debugCycleCount = 0
             while true do
                 if FarmState.ScrollSniperEnabled then
-                    debugCycleCount = debugCycleCount + 1
-                    
                     pcall(function()
                         local currentHour, currentMinute = getCurrentGameTime()
-                        
-                        -- 🔍 DEBUG: Time check (every 10 cycles to avoid spam)
-                        if debugCycleCount % 10 == 1 then
-                            if not currentHour then
-                                ui.Fluent:Notify({
-                                    Title = "[DEBUG] ❌ Time Failed",
-                                    Content = "getCurrentGameTime() returned nil!\n\nCheck console (F9) for details",
-                                    Duration = 4
-                                })
-                            else
-                                ui.Fluent:Notify({
-                                    Title = "[DEBUG] ✓ Time OK",
-                                    Content = string.format(
-                                        "Current: %02d:%02d\nScrollData: %d entries\nSelected: %d",
-                                        currentHour, currentMinute,
-                                        #ScrollData,
-                                        (function() local c = 0; for _, s in ipairs(ScrollData) do if s.selected then c = c + 1 end end; return c end)()
-                                    ),
-                                    Duration = 3
-                                })
-                            end
-                        end
                         
                         if not currentHour then
                             FarmState.ScrollSniperStatus = "Waiting for game time..."
@@ -2461,36 +2403,12 @@ return function(Common)
                             end
                         end
                         
-                        -- 🔍 DEBUG: Active scrolls check (every 10 cycles)
-                        if debugCycleCount % 10 == 2 and #activeScrolls == 0 then
-                            ui.Fluent:Notify({
-                                Title = "[DEBUG] No Active Scrolls",
-                                Content = string.format(
-                                    "Current time: %02d:%02d\n\nNo scrolls in 20-min window.\n\nCheck if scroll times match current time.",
-                                    currentHour, currentMinute
-                                ),
-                                Duration = 4
-                            })
-                        end
-                        
                         if #activeScrolls == 0 then
                             FarmState.ScrollSniperStatus = "No scrolls in time window"
                             FarmState.ScrollSniperCurrent = "Waiting..."
                             task.wait(5)
                             return
                         end
-                        
-                        -- 🔍 DEBUG: Found active scrolls!
-                        ui.Fluent:Notify({
-                            Title = "[DEBUG] 🎯 ACTIVE SCROLLS",
-                            Content = string.format(
-                                "Found %d scroll(s) in time window!\n\nFirst: %s @ %s",
-                                #activeScrolls,
-                                activeScrolls[1].name,
-                                activeScrolls[1].timeStr
-                            ),
-                            Duration = 4
-                        })
                         
                         for _, scrollInfo in ipairs(activeScrolls) do
                             if not FarmState.ScrollSniperEnabled then break end
@@ -2499,19 +2417,6 @@ return function(Common)
                             FarmState.ScrollSniperCurrent = scrollInfo.name
                             
                             local serverIDs, matchInfo, extraInfo = getServerIDsForLocation(scrollInfo.location)
-                            
-                            -- 🔍 DEBUG: Location matching result
-                            ui.Fluent:Notify({
-                                Title = "[DEBUG] Location Match",
-                                Content = string.format(
-                                    "Scroll: %s\nLocation: %s\n\nMatch: %s\nServers: %d",
-                                    scrollInfo.name,
-                                    scrollInfo.location,
-                                    matchInfo,
-                                    #serverIDs
-                                ),
-                                Duration = 4
-                            })
                             
                             if #serverIDs == 0 then
                                 local errorMsg = ""
@@ -2524,19 +2429,12 @@ return function(Common)
                                 end
                                 
                                 ui.Fluent:Notify({
-                                    Title = "[DEBUG] ❌ No Servers",
+                                    Title = "[!] No Server IDs",
                                     Content = errorMsg,
                                     Duration = 5
                                 })
                                 continue
                             end
-                            
-                            ui.Fluent:Notify({
-                                Title = "[DEBUG] ✓ Starting Hop",
-                                Content = string.format("Hopping to %d servers...\nKeyword: '%s'", 
-                                    #serverIDs, tostring(matchInfo)),
-                                Duration = 3
-                            })
                             
                             for i, serverID in ipairs(serverIDs) do
                                 if not FarmState.ScrollSniperEnabled then break end
@@ -2544,35 +2442,9 @@ return function(Common)
                                 FarmState.ScrollSniperStatus = string.format("Server %d/%d: %s", 
                                     i, #serverIDs, serverID)
                                 
-                                -- 🔍 DEBUG: Server hop attempt
-                                ui.Fluent:Notify({
-                                    Title = "[DEBUG] 🚀 Server Hop",
-                                    Content = string.format(
-                                        "Server %d/%d\nID: %s\n\nCalling teleporttoprivate...",
-                                        i, #serverIDs, serverID
-                                    ),
-                                    Duration = 2
-                                })
-                                
-                                local teleportSuccess = false
                                 pcall(function()
                                     LocalPlayer.startevent:FireServer("teleporttoprivate", serverID, game.PlaceId)
-                                    teleportSuccess = true
                                 end)
-                                
-                                if teleportSuccess then
-                                    ui.Fluent:Notify({
-                                        Title = "[DEBUG] ✓ Teleport Sent",
-                                        Content = "Waiting 10s for server load...",
-                                        Duration = 2
-                                    })
-                                else
-                                    ui.Fluent:Notify({
-                                        Title = "[DEBUG] ❌ Teleport Failed",
-                                        Content = "startevent.FireServer failed!",
-                                        Duration = 3
-                                    })
-                                end
                                 
                                 FarmState.ScrollSniperServersHopped = FarmState.ScrollSniperServersHopped + 1
                                 
@@ -2580,13 +2452,6 @@ return function(Common)
                                 
                                 local claimStart = tick()
                                 local claimed = false
-                                
-                                -- 🔍 DEBUG: Claim attempt
-                                ui.Fluent:Notify({
-                                    Title = "[DEBUG] 🔍 Claiming",
-                                    Content = "Searching for scroll for 30s...",
-                                    Duration = 2
-                                })
                                 
                                 while tick() - claimStart < 30 do
                                     if not FarmState.ScrollSniperEnabled then break end
@@ -2596,7 +2461,7 @@ return function(Common)
                                         FarmState.ScrollSniperScrollsClaimed = FarmState.ScrollSniperScrollsClaimed + 1
                                         
                                         ui.Fluent:Notify({
-                                            Title = "[DEBUG] ✅ CLAIMED!",
+                                            Title = "[✓] Scroll Claimed!",
                                             Content = scrollInfo.name .. " from " .. scrollInfo.location,
                                             Duration = 5
                                         })
@@ -2604,14 +2469,6 @@ return function(Common)
                                         break
                                     end
                                     task.wait(2)
-                                end
-                                
-                                if not claimed then
-                                    ui.Fluent:Notify({
-                                        Title = "[DEBUG] ❌ Not Found",
-                                        Content = "Scroll not found on this server.\nTrying next...",
-                                        Duration = 2
-                                    })
                                 end
                                 
                                 if claimed then break end
@@ -2622,10 +2479,22 @@ return function(Common)
                     end)
                 else
                     FarmState.ScrollSniperStatus = "Disabled"
-                    debugCycleCount = 0
                 end
                 
                 task.wait(2)
+            end
+        end)
+        
+        -- 🆕 AUTO-REFRESH LOOP
+        task.spawn(function()
+            while true do
+                local interval = FarmState.ScrollSniperAutoRefreshInterval
+                if interval and interval > 0 then
+                    task.wait(interval)
+                    pcall(refreshScrollList)
+                else
+                    task.wait(5) -- Check every 5 seconds if interval is 0/disabled
+                end
             end
         end)
         
@@ -2659,6 +2528,10 @@ return function(Common)
                     end
                 end
                 
+                local refreshStatus = FarmState.ScrollSniperAutoRefreshInterval > 0 
+                    and string.format("Every %ds", FarmState.ScrollSniperAutoRefreshInterval)
+                    or "Disabled"
+                
                 ScrollSniperStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
                     "🕐 Game Time: %s EST\n" ..
@@ -2666,7 +2539,9 @@ return function(Common)
                     "🎯 Current Target: %s\n" ..
                     "🗺️ Location Match: %s\n" ..
                     "🔄 Servers Hopped: %d\n" ..
-                    "✅ Scrolls Claimed: %d\n\n" ..
+                    "✅ Scrolls Claimed: %d\n" ..
+                    "🔃 Refresh Count: %d\n" ..
+                    "⏱️ Auto-Refresh: %s\n\n" ..
                     "🚫 Auto-Excluded:\n" ..
                     "- 00:00 / 01:00 time scrolls\n" ..
                     "- Location with 'drop' or 'boss'\n" ..
@@ -2692,7 +2567,9 @@ return function(Common)
                     FarmState.ScrollSniperCurrent ~= "" and FarmState.ScrollSniperCurrent or "None",
                     matchInfo,
                     FarmState.ScrollSniperServersHopped,
-                    FarmState.ScrollSniperScrollsClaimed
+                    FarmState.ScrollSniperScrollsClaimed,
+                    FarmState.ScrollSniperRefreshCount,
+                    refreshStatus
                 )
                 task.wait(1)
             end
@@ -3726,7 +3603,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper FIXED + Travel System + InstaKill + LIVE TIME)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper AUTO-REFRESH + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
