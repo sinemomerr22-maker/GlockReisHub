@@ -7,7 +7,7 @@
 -- // Scroll Sniper (Auto Server Hop + Time-Based + AUTO REFRESH + PRE-HOP DELAY)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
--- // 🔧 UPDATED: Hybrid InstaKill - Legit Combo + Force Kill + Auto Downslam
+-- // 🔧 UPDATED: Force Kill after 30s lock + Log NPC filter
 -- // ==========================================
 
 return function(Common)
@@ -306,6 +306,7 @@ return function(Common)
             InstaKillForceLocalKill = true,
             InstaKillM1Spam = true,
             InstaKillComboResetTime = 2.0,
+            InstaKillForceKillTimeout = 30,
             -- Experimental Config
             AntiRagdollEnabled = false,
             AntiKnockbackEnabled = false,
@@ -814,9 +815,11 @@ return function(Common)
             InstaKillForceLocalKill = Config.InstaKillForceLocalKill,
             InstaKillM1Spam = Config.InstaKillM1Spam,
             InstaKillComboResetTime = Config.InstaKillComboResetTime or 2.0,
+            InstaKillForceKillTimeout = Config.InstaKillForceKillTimeout or 30,
             InstaKillKills = 0,
             InstaKillDownslams = 0,
             InstaKillComboHits = 0,
+            InstaKillTimeoutKills = 0,
             -- Experimental State
             AntiRagdollEnabled = Config.AntiRagdollEnabled,
             AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
@@ -1184,7 +1187,7 @@ return function(Common)
         -- ==========================================
         Tabs.Main:AddParagraph({
             Title = "[*] AutoFarm System (FIXED + M1 + UNDERGROUND + PROTECTION)",
-            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- NEW: MISSION PROTECTION - Auto-cancels non-green missions\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
+            Content = "Automatically accepts and completes missions.\n\n- Uses currentmission.Value (primary check)\n- Falls back to MissionStory.Visible (secondary)\n- Level-aware mission selection (699 / 700+)\n- Only kills npctype NPCs (filters out players/bosses)\n- 🆕 FILTERS OUT: NPCs with 'log' in name (training dummies)\n- NEW: M1 melee attacks from UNDERGROUND\n- NEW: Continuous facing toward target (RenderStepped)\n- NEW: Player looks UP at NPC from below ground\n- NEW: MISSION PROTECTION - Auto-cancels non-green missions\n- Waits 1s after accepting mission for server sync\n- Polls every 0.5s for fast response"
         })
         
         Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -1262,6 +1265,17 @@ return function(Common)
             Title = "Mission Protection",
             Content = "If a non-green mission is accidentally accepted,\nthe script will automatically send '!cancel'\nto the chat to abort the mission.\n\nThis prevents getting stuck on red/other color missions."
         })
+        
+        -- 🔧 HELPER: Check if NPC should be skipped (contains "log" in name)
+        local function shouldSkipNPC(npc)
+            if not npc or not npc.Name then return true end
+            local nameLower = npc.Name:lower()
+            -- Skip NPCs with "log" in name (e.g., logtraining, log_dummy, etc.)
+            if string.find(nameLower, "log", 1, true) then
+                return true
+            end
+            return false
+        end
         
         task.spawn(function()
             while true do
@@ -1375,6 +1389,7 @@ return function(Common)
                                             and npc.Humanoid.Health > 0
                                             and npc:FindFirstChild("npctype")
                                             and string.find(npc.Name, "npc")
+                                            and not shouldSkipNPC(npc)
                                             and npc.Head.CFrame.Y > -1000 then
                                             
                                             local npcRoot = npc.HumanoidRootPart
@@ -1422,22 +1437,29 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- INSTAKILL SYSTEM (HYBRID: M1 Spam + Legit Combo + Auto Downslam + Force Kill)
+        -- INSTAKILL SYSTEM (HYBRID: M1 Spam + Legit Combo + Auto Downslam + Force Kill + TIMEOUT KILL)
         -- ==========================================
         Tabs.InstaKill:AddParagraph({
             Title = "[X] InstaKill HYBRID - Multi-Layer Kill System",
             Content = "Combines multiple kill methods for maximum effectiveness.\n\n" ..
-                "🎯 4 Kill Layers (simultaneous):\n" ..
+                "🎯 5 Kill Layers (simultaneous):\n" ..
                 "1️⃣ M1 Spam - Rapid melee requests\n" ..
                 "2️⃣ Legit Combo - Tracks CurrentM1 attribute\n" ..
                 "3️⃣ Auto Downslam - Jump at combo 3 for 4th hit slam\n" ..
-                "4️⃣ Force Local Kill - Sets Health=0, BreakJoints\n\n" ..
+                "4️⃣ Force Local Kill - Sets Health=0, BreakJoints\n" ..
+                "5️⃣ 🆕 TIMEOUT KILL - Force kill after X seconds locked\n\n" ..
                 "🔧 Server Validation Bypass:\n" ..
                 "- Legit combo looks like real player input\n" ..
                 "- Auto jump/downslam uses game mechanics\n" ..
-                "- Force kill is last resort if server ignores M1\n\n" ..
+                "- Force kill is last resort if server ignores M1\n" ..
+                "- Timeout kill guarantees kill on stuck targets\n\n" ..
+                "🚫 Auto-Filtered:\n" ..
+                "- NPCs with 'log' in name (training dummies)\n" ..
+                "- NPCs below map (Y < -1000)\n\n" ..
                 "⚡ Features:\n" ..
                 "- Tracks combo count per target\n" ..
+                "- Tracks lock time per target\n" ..
+                "- Auto force kill after timeout\n" ..
                 "- Resets combo after X seconds of inactivity\n" ..
                 "- Auto-faces target\n" ..
                 "- Optional teleport to target\n\n" ..
@@ -1446,7 +1468,7 @@ return function(Common)
         
         Tabs.InstaKill:AddToggle("InstaKillToggle", {
             Title = "Enable InstaKill HYBRID",
-            Description = "Multi-layer kill system (Legit Combo + M1 Spam + Force Kill)",
+            Description = "Multi-layer kill system (Legit Combo + M1 Spam + Force Kill + Timeout Kill)",
             Default = Config.InstaKillEnabled
         }):OnChanged(function(v)
             FarmState.InstaKillEnabled = v
@@ -1455,7 +1477,7 @@ return function(Common)
             if v then
                 ui.Fluent:Notify({
                     Title = "[X] InstaKill HYBRID ACTIVATED",
-                    Content = "Legit Combo + M1 Spam + Auto Downslam + Force Kill online!",
+                    Content = "Legit Combo + M1 Spam + Auto Downslam + Force Kill + Timeout Kill online!",
                     Duration = 3
                 })
             end
@@ -1525,7 +1547,7 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- 🔧 HYBRID MODE TOGGLES (NEW!)
+        -- 🔧 HYBRID MODE TOGGLES
         Tabs.InstaKill:AddSection("Hybrid Kill Layers")
         
         Tabs.InstaKill:AddToggle("InstaKillHybridToggle", {
@@ -1590,6 +1612,24 @@ return function(Common)
             end
         })
         
+        -- 🆕 FORCE KILL TIMEOUT SLIDER
+        Tabs.InstaKill:AddSlider("InstaKillForceKillTimeoutSlider", {
+            Title = "⏱️ Force Kill Timeout (seconds)",
+            Description = "If locked on target for this long without kill, FORCE KILL (default: 30s)",
+            Default = Config.InstaKillForceKillTimeout,
+            Min = 5, Max = 120, Rounding = 0,
+            Callback = function(v)
+                FarmState.InstaKillForceKillTimeout = v
+                Config.InstaKillForceKillTimeout = v
+                ConfigManager.Save(Config)
+                ui.Fluent:Notify({
+                    Title = "[X] Timeout Updated",
+                    Content = "Force kill after " .. v .. "s of locking",
+                    Duration = 3
+                })
+            end
+        })
+        
         Tabs.InstaKill:AddParagraph({
             Title = "Hybrid InstaKill Mechanics",
             Content = "How HYBRID works (all layers active):\n\n" ..
@@ -1602,18 +1642,24 @@ return function(Common)
                 "📍 STEP 7: Wait minimal delay (0.001s)\n" ..
                 "📍 STEP 8: Fire M1 false (end attack)\n" ..
                 "📍 STEP 9: FORCE LOCAL KILL (Health=0, BreakJoints)\n" ..
-                "📍 STEP 10: Repeat at extreme speed\n\n" ..
+                "📍 🆕 STEP 10: If locked > X seconds, EMERGENCY FORCE KILL\n" ..
+                "📍 STEP 11: Repeat at extreme speed\n\n" ..
                 "🎯 Combo Tracking:\n" ..
                 "- Game tracks CurrentM1 attribute on character\n" ..
                 "- 1-3 = normal M1 hits\n" ..
                 "- Jump at 3 → 4th hit = DOWN SLAM (high damage)\n" ..
                 "- Combo resets after X seconds of inactivity\n\n" ..
+                "⏱️ Timeout Kill:\n" ..
+                "- Tracks first lock time per target\n" ..
+                "- If target not dead after X seconds\n" ..
+                "- Emergency force kill triggered\n" ..
+                "- Prevents getting stuck on immortal NPCs\n\n" ..
                 "This mimics REAL PLAYER behavior + adds force kill as backup!"
         })
         
         -- 🔧 HYBRID INSTAKILL LOGIC
         -- Combo tracker per target
-        local comboTrackers = {} -- [targetModel] = {count = X, lastHit = tick()}
+        local comboTrackers = {} -- [targetModel] = {count = X, lastHit = tick(), firstLocked = tick()}
         
         task.spawn(function()
             while true do
@@ -1628,13 +1674,20 @@ return function(Common)
                             local killCount = 0
                             local downslamCount = 0
                             local comboHits = 0
+                            local timeoutKills = 0
                             local targets = {}
                             
-                            -- Clean up old combo trackers (older than 30s)
+                            -- Clean up old combo trackers (older than 30s or dead/gone)
                             local now = tick()
                             for model, tracker in pairs(comboTrackers) do
                                 if not model or not model.Parent or now - tracker.lastHit > 30 then
                                     comboTrackers[model] = nil
+                                else
+                                    -- Check if humanoid is dead
+                                    local modelHum = model:FindFirstChildOfClass("Humanoid")
+                                    if not modelHum or modelHum.Health <= 0 then
+                                        comboTrackers[model] = nil
+                                    end
                                 end
                             end
                             
@@ -1647,7 +1700,8 @@ return function(Common)
                                             local npcRoot = npc:FindFirstChild("HumanoidRootPart")
                                             local npcHum = npc:FindFirstChildOfClass("Humanoid")
                                             
-                                            if npcRoot and npcHum and npcHum.Health > 0 then
+                                            -- 🔧 SKIP NPCs with "log" in name
+                                            if npcRoot and npcHum and npcHum.Health > 0 and not shouldSkipNPC(npc) then
                                                 local dist = (root.Position - npcRoot.Position).Magnitude
                                                 
                                                 if dist <= FarmState.InstaKillRange then
@@ -1671,7 +1725,7 @@ return function(Common)
                                         local objRoot = obj:FindFirstChild("HumanoidRootPart")
                                         local objHum = obj:FindFirstChildOfClass("Humanoid")
                                         
-                                        if objRoot and objHum and objHum.Health > 0 then
+                                        if objRoot and objHum and objHum.Health > 0 and not shouldSkipNPC(obj) then
                                             local isPlayer = Players:GetPlayerFromCharacter(obj) ~= nil
                                             if not isPlayer then
                                                 local dist = (root.Position - objRoot.Position).Magnitude
@@ -1737,9 +1791,13 @@ return function(Common)
                                     root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
                                 end
                                 
-                                -- 🔧 COMBO TRACKING
+                                -- 🔧 COMBO TRACKING + FIRST LOCK TIME
                                 if not comboTrackers[target.model] then
-                                    comboTrackers[target.model] = {count = 0, lastHit = tick()}
+                                    comboTrackers[target.model] = {
+                                        count = 0, 
+                                        lastHit = tick(),
+                                        firstLocked = tick()
+                                    }
                                 end
                                 
                                 local tracker = comboTrackers[target.model]
@@ -1755,16 +1813,33 @@ return function(Common)
                                     tracker.count = gameCombo
                                 end
                                 
+                                -- 🔧 CHECK TIMEOUT - Force kill if locked too long
+                                local lockDuration = tick() - tracker.firstLocked
+                                local timeout = FarmState.InstaKillForceKillTimeout or 30
+                                local timedOut = lockDuration >= timeout
+                                
+                                if timedOut and target.hum.Health > 0 then
+                                    -- Emergency force kill
+                                    pcall(function()
+                                        target.hum.Health = 0
+                                        target.hum.MaxHealth = 0
+                                        target.hum:ChangeState(Enum.HumanoidStateType.Dead)
+                                        target.model:BreakJoints()
+                                    end)
+                                    timeoutKills = timeoutKills + 1
+                                    -- Reset tracker for this target
+                                    comboTrackers[target.model] = nil
+                                end
+                                
                                 -- 🔧 HYBRID LAYER 1: AUTO JUMP at combo 3
                                 local performedJump = false
                                 if FarmState.InstaKillHybridMode and FarmState.InstaKillAutoJump then
                                     if tracker.count == 3 then
-                                        -- Jump for downslam
                                         pcall(function()
                                             hum:ChangeState(Enum.HumanoidStateType.Jumping)
                                         end)
                                         performedJump = true
-                                        task.wait(0.05) -- Small wait for jump animation
+                                        task.wait(0.05)
                                     end
                                 end
                                 
@@ -1792,7 +1867,6 @@ return function(Common)
                                 if FarmState.InstaKillHybridMode and FarmState.InstaKillAutoDownslam then
                                     if performedJump or tracker.count == 4 then
                                         downslamCount = downslamCount + 1
-                                        -- Reset combo after downslam
                                         tracker.count = 0
                                         pcall(function()
                                             char:SetAttribute("CurrentM1", 0)
@@ -1813,12 +1887,14 @@ return function(Common)
                                 -- Check if target died
                                 if target.hum.Health <= 0 or not target.model.Parent then
                                     killCount = killCount + 1
+                                    comboTrackers[target.model] = nil
                                 end
                             end
                             
                             FarmState.InstaKillKills = FarmState.InstaKillKills + killCount
                             FarmState.InstaKillDownslams = FarmState.InstaKillDownslams + downslamCount
                             FarmState.InstaKillComboHits = FarmState.InstaKillComboHits + comboHits
+                            FarmState.InstaKillTimeoutKills = FarmState.InstaKillTimeoutKills + timeoutKills
                         end
                     end)
                 end
@@ -1836,8 +1912,13 @@ return function(Common)
                 local attacksPerSec = math.floor(1 / (FarmState.InstaKillSpeed or 0.003))
                 
                 local activeTargets = 0
-                for _, _ in pairs(comboTrackers) do
+                local longestLock = 0
+                for model, tracker in pairs(comboTrackers) do
                     activeTargets = activeTargets + 1
+                    local lockTime = tick() - tracker.firstLocked
+                    if lockTime > longestLock then
+                        longestLock = lockTime
+                    end
                 end
                 
                 InstaKillStatusDisplay.Content = string.format(
@@ -1847,30 +1928,39 @@ return function(Common)
                     "💀 Total Kills: %d\n" ..
                     "⬇️ Total Downslams: %d\n" ..
                     "🎯 Combo Hits: %d\n" ..
-                    "👥 Active Targets: %d\n\n" ..
+                    "⏱️ Timeout Kills: %d\n" ..
+                    "👥 Active Targets: %d\n" ..
+                    "🔒 Longest Lock: %.1fs\n\n" ..
                     "🔧 Hybrid Layers:\n" ..
                     "- M1 Spam: %s\n" ..
                     "- Auto Jump (combo 3): %s\n" ..
                     "- Auto Downslam: %s\n" ..
-                    "- Force Local Kill: %s\n\n" ..
+                    "- Force Local Kill: %s\n" ..
+                    "- Timeout Force Kill: %ds\n\n" ..
                     "⚙️ Settings:\n" ..
                     "- Target NPCs: %s\n" ..
                     "- Target Players: %s\n" ..
                     "- Auto-Face: %s\n" ..
                     "- Teleport: %s\n" ..
                     "- Combo Reset: %.1fs\n\n" ..
-                    "Mode: HYBRID (Legit + Force)",
+                    "🚫 Auto-Filtered:\n" ..
+                    "- NPCs with 'log' in name\n" ..
+                    "- NPCs below map (Y<-1000)\n\n" ..
+                    "Mode: HYBRID (Legit + Force + Timeout)",
                     FarmState.InstaKillEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
                     attacksPerSec,
                     FarmState.InstaKillRange,
                     FarmState.InstaKillKills,
                     FarmState.InstaKillDownslams,
                     FarmState.InstaKillComboHits,
+                    FarmState.InstaKillTimeoutKills,
                     activeTargets,
+                    longestLock,
                     FarmState.InstaKillM1Spam and "✓ ON" or "✗ OFF",
                     FarmState.InstaKillAutoJump and "✓ ON" or "✗ OFF",
                     FarmState.InstaKillAutoDownslam and "✓ ON" or "✗ OFF",
                     FarmState.InstaKillForceLocalKill and "✓ ON" or "✗ OFF",
+                    FarmState.InstaKillForceKillTimeout,
                     FarmState.InstaKillTargetNPCs and "YES" or "NO",
                     FarmState.InstaKillTargetPlayers and "YES" or "NO",
                     FarmState.InstaKillFaceTarget and "YES" or "NO",
@@ -1999,9 +2089,24 @@ return function(Common)
             ScrollData = {}
             
             local clientTell = workspace:FindFirstChild("GLOBALTIME")
-            if not clientTell then return end
+            if not clientTell then 
+                ui.Fluent:Notify({
+                    Title = "[DEBUG] ❌ FAILED",
+                    Content = "GLOBALTIME not found in workspace!",
+                    Duration = 4
+                })
+                return 
+            end
+            
             clientTell = clientTell:FindFirstChild("clienttell")
-            if not clientTell then return end
+            if not clientTell then 
+                ui.Fluent:Notify({
+                    Title = "[DEBUG] ❌ FAILED",
+                    Content = "clienttell folder not found in GLOBALTIME!",
+                    Duration = 4
+                })
+                return 
+            end
             
             local excludedCount = 0
             local includedCount = 0
@@ -2435,7 +2540,7 @@ return function(Common)
                                     local zetsu = warserver:FindFirstChild("zetsu")
                                     local round = warserver:FindFirstChild("round")
                                     for _, npc in pairs(npcs:GetChildren()) do
-                                        if npc:IsA("Model") and npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                                        if npc:IsA("Model") and npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 and not shouldSkipNPC(npc) then
                                             if npc:FindFirstChild("megaboss") then
                                                 toTarget(root.Position, npc.HumanoidRootPart.Position, CFrame.new(npc.HumanoidRootPart.Position))
                                                 task.wait(0.5)
@@ -3013,7 +3118,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life (HYBRID InstaKill + Legit Combo + Auto Downslam)",
+            Content = "Loaded: Shindo Life (HYBRID InstaKill + Timeout Kill + Log NPC Filter)",
             Duration = 5
         })
     end
