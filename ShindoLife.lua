@@ -4,6 +4,7 @@
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
 -- // Travel System (All Maps + Private/Friend Teleport)
+-- // Scroll Sniper (Auto Server Hop + Time-Based) + Scroll Get (Manual)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
@@ -26,11 +27,9 @@ return function(Common)
     -- LIVE TIME DISPLAY SYSTEM (ALWAYS VISIBLE)
     -- ==========================================
     task.spawn(function()
-        -- Wait for game to fully load
         if not game:IsLoaded() then game.Loaded:Wait() end
-        task.wait(2) -- Extra wait for workspace to populate
+        task.wait(2)
         
-        -- Create ScreenGui for time display
         local getUI = gethui or function() return game:GetService("CoreGui") end
         local timeGui = Instance.new("ScreenGui")
         timeGui.Name = "GlockTimeDisplay"
@@ -44,30 +43,35 @@ return function(Common)
             timeGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 30)
         end
         
-        -- Main container frame (top-center position)
         local mainFrame = Instance.new("Frame")
         mainFrame.Name = "TimeFrame"
         mainFrame.Size = UDim2.new(0, 280, 0, 50)
-        mainFrame.Position = UDim2.new(0.5, -140, 0, 10) -- Top center
-        mainFrame.BackgroundColor3 = Color3.fromRGB(88, 88, 88)
+        mainFrame.Position = UDim2.new(0.5, -140, 0, 10)
+        mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
         mainFrame.BackgroundTransparency = 0.15
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = timeGui
         
-        -- Rounded corners
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 10)
         corner.Parent = mainFrame
         
-        -- Glowing border
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(243, 244, 243)
+        stroke.Color = Color3.fromRGB(100, 180, 255)
         stroke.Thickness = 2
         stroke.Transparency = 0.3
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         stroke.Parent = mainFrame
-            
-        -- Layout
+        
+        local gradient = Instance.new("UIGradient")
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 50)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 50, 80)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 30, 50))
+        })
+        gradient.Rotation = 90
+        gradient.Parent = mainFrame
+        
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Horizontal
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -75,7 +79,6 @@ return function(Common)
         layout.Padding = UDim.new(0, 8)
         layout.Parent = mainFrame
         
-        -- Clock icon
         local iconLabel = Instance.new("TextLabel")
         iconLabel.Name = "Icon"
         iconLabel.Size = UDim2.new(0, 28, 0, 28)
@@ -87,7 +90,6 @@ return function(Common)
         iconLabel.LayoutOrder = 1
         iconLabel.Parent = mainFrame
         
-        -- Time label
         local timeLabel = Instance.new("TextLabel")
         timeLabel.Name = "TimeText"
         timeLabel.Size = UDim2.new(1, -50, 1, 0)
@@ -101,14 +103,12 @@ return function(Common)
         timeLabel.LayoutOrder = 2
         timeLabel.Parent = mainFrame
         
-        -- Text stroke for readability
         local textStroke = Instance.new("UIStroke")
         textStroke.Color = Color3.fromRGB(0, 0, 0)
         textStroke.Thickness = 1
         textStroke.Transparency = 0.5
         textStroke.Parent = timeLabel
         
-        -- Draggable functionality
         local dragging = false
         local dragStart = nil
         local startPos = nil
@@ -142,7 +142,6 @@ return function(Common)
             end
         end)
         
-        -- Time update function
         local function updateTime()
             pcall(function()
                 local globalTime = workspace:FindFirstChild("GLOBALTIME")
@@ -153,23 +152,18 @@ return function(Common)
                         if timeValue and timeValue ~= "" then
                             timeLabel.Text = "EST: " .. timeValue
                             
-                            -- Color based on time of day
                             local hour = tonumber(string.match(timeValue, "(%d+)"))
                             if hour then
                                 if hour >= 6 and hour < 12 then
-                                    -- Morning: warm yellow
                                     timeLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
                                     stroke.Color = Color3.fromRGB(255, 180, 50)
                                 elseif hour >= 12 and hour < 18 then
-                                    -- Afternoon: bright cyan
                                     timeLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
                                     stroke.Color = Color3.fromRGB(50, 180, 255)
                                 elseif hour >= 18 and hour < 21 then
-                                    -- Evening: orange
                                     timeLabel.TextColor3 = Color3.fromRGB(255, 150, 80)
                                     stroke.Color = Color3.fromRGB(255, 100, 50)
                                 else
-                                    -- Night: blue/purple
                                     timeLabel.TextColor3 = Color3.fromRGB(150, 130, 255)
                                     stroke.Color = Color3.fromRGB(100, 80, 200)
                                 end
@@ -186,10 +180,8 @@ return function(Common)
             end)
         end
         
-        -- Initial update
         updateTime()
         
-        -- Listen for changes to globalesttime
         local function hookTimeValue()
             pcall(function()
                 local globalTime = workspace:WaitForChild("GLOBALTIME", 30)
@@ -206,7 +198,6 @@ return function(Common)
         
         hookTimeValue()
         
-        -- Also poll every 1 second as backup (in case Changed event doesn't fire)
         task.spawn(function()
             while timeGui and timeGui.Parent do
                 updateTime()
@@ -214,7 +205,6 @@ return function(Common)
             end
         end)
         
-        -- Subtle pulse animation on the border
         task.spawn(function()
             while mainFrame and mainFrame.Parent do
                 local tweenIn = TweenService:Create(stroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
@@ -246,7 +236,9 @@ return function(Common)
             AutoFarmM1Cooldown = 0.3,
             AutoFarmAttackDistance = -8,
             AutoFarmAttackBehind = 0,
+            ScrollGetEnabled = false,
             ScrollSniperEnabled = false,
+            ScrollSniperSelected = {},
             WarFarmEnabled = false, WarAutoReset = true,
             AutoChakraEnabled = false, AutoChakraThreshold = 100000,
             AutoRankEnabled = false,
@@ -265,7 +257,6 @@ return function(Common)
             AutoSkillVEnabled = false, AutoSkillBEnabled = false,
             AutoSkillNEnabled = false, AutoSkillQEnabled = false,
             AutoSkillEEnabled = false, AutoSkillSpamSpeed = 0.2,
-            -- InstaKill Config
             InstaKillEnabled = false,
             InstaKillRange = 60,
             InstaKillSpeed = 0.003,
@@ -273,7 +264,6 @@ return function(Common)
             InstaKillTargetPlayers = true,
             InstaKillFaceTarget = true,
             InstaKillTeleportToTarget = false,
-            -- Experimental Config
             AntiRagdollEnabled = false,
             AntiKnockbackEnabled = false,
             ESPEnabled = false,
@@ -386,7 +376,7 @@ return function(Common)
         
         Tabs.Main:AddParagraph({
             Title = "System Status",
-            Content = "Config: PERSISTENT (Auto-Save)\nAnti-AFK: 12h+ Proof\nDynamic Updates: POLLING-BASED\nTarget Match: CASE-INSENSITIVE\nDropdown State: HARDENED\n🆕 LIVE TIME DISPLAY: Top-center (draggable)"
+            Content = "Config: PERSISTENT (Auto-Save)\nAnti-AFK: 12h+ Proof\nDynamic Updates: POLLING-BASED\nTarget Match: CASE-INSENSITIVE\nDropdown State: HARDENED"
         })
         
         local Settings = {
@@ -662,7 +652,6 @@ return function(Common)
                 end
                 local spinsDisplay = Settings.CurrentSpins >= 0 and tostring(Settings.CurrentSpins) or "Loading..."
                 
-                -- Get current time from GLOBALTIME
                 local currentTime = "N/A"
                 pcall(function()
                     local gt = workspace:FindFirstChild("GLOBALTIME")
@@ -674,17 +663,7 @@ return function(Common)
                     end
                 end)
                 
-                StatusDisplay.Content = string.format(
-                    "Status: %s\n\n🕐 Current Time (EST): %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", 
-                    Settings.Status, 
-                    currentTime,
-                    table.concat(slotValues, "\n"), 
-                    spinsDisplay, 
-                    Settings.TotalSpinsDone, 
-                    Settings.MinSpinsToRejoin, 
-                    Settings.SpinDelay, 
-                    targetText
-                )
+                StatusDisplay.Content = string.format("Status: %s\n\n🕐 Current Time (EST): %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", Settings.Status, currentTime, table.concat(slotValues, "\n"), spinsDisplay, Settings.TotalSpinsDone, Settings.MinSpinsToRejoin, Settings.SpinDelay, targetText)
                 task.wait(0.3)
             end
         end)
@@ -697,7 +676,8 @@ return function(Common)
         Tabs.Travel = ui.Window:AddTab({ Title = "Travel", Icon = "map" })
         Tabs.Godmode = ui.Window:AddTab({ Title = "Godmode", Icon = "shield" })
         Tabs.InstaKill = ui.Window:AddTab({ Title = "InstaKill", Icon = "crosshair" })
-        Tabs.Scroll = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "book" })
+        Tabs.ScrollSniper = ui.Window:AddTab({ Title = "Scroll Sniper", Icon = "clock" })
+        Tabs.ScrollGet = ui.Window:AddTab({ Title = "Scroll Get", Icon = "book" })
         Tabs.War = ui.Window:AddTab({ Title = "War Farm", Icon = "shield" })
         Tabs.Quests = ui.Window:AddTab({ Title = "Quest Maker", Icon = "list" })
         Tabs.Stats = ui.Window:AddTab({ Title = "Auto Stats", Icon = "trending-up" })
@@ -711,7 +691,13 @@ return function(Common)
             AutoFarmUseM1 = Config.AutoFarmUseM1,
             AutoFarmAttackDistance = Config.AutoFarmAttackDistance or -8,
             AutoFarmAttackBehind = Config.AutoFarmAttackBehind or 0,
+            ScrollGetEnabled = Config.ScrollGetEnabled,
             ScrollSniperEnabled = Config.ScrollSniperEnabled,
+            ScrollSniperSelected = Config.ScrollSniperSelected or {},
+            ScrollSniperStatus = "Idle",
+            ScrollSniperCurrent = "",
+            ScrollSniperServersHopped = 0,
+            ScrollSniperScrollsClaimed = 0,
             WarFarmEnabled = Config.WarFarmEnabled,
             AutoChakraEnabled = Config.AutoChakraEnabled,
             AutoRankEnabled = Config.AutoRankEnabled,
@@ -734,7 +720,6 @@ return function(Common)
             AutoSkillQEnabled = Config.AutoSkillQEnabled,
             AutoSkillEEnabled = Config.AutoSkillEEnabled,
             AutoSkillSpamSpeed = Config.AutoSkillSpamSpeed or 0.2,
-            -- InstaKill State
             InstaKillEnabled = Config.InstaKillEnabled,
             InstaKillRange = Config.InstaKillRange or 60,
             InstaKillSpeed = Config.InstaKillSpeed or 0.003,
@@ -743,7 +728,6 @@ return function(Common)
             InstaKillFaceTarget = Config.InstaKillFaceTarget,
             InstaKillTeleportToTarget = Config.InstaKillTeleportToTarget,
             InstaKillKills = 0,
-            -- Experimental State
             AntiRagdollEnabled = Config.AntiRagdollEnabled,
             AntiKnockbackEnabled = Config.AntiKnockbackEnabled,
             ESPEnabled = Config.ESPEnabled,
@@ -807,7 +791,6 @@ return function(Common)
                 "🆕 LIVE TIME DISPLAY at top of screen (draggable)"
         })
         
-        -- Map definitions with real PlaceIDs
         local Maps = {
             {Name = "BLAZE (New Ember)", PlaceId = 6986372023, MinLevel = 0},
             {Name = "OBELISK (Stone)", PlaceId = 4601350809, MinLevel = 0},
@@ -830,7 +813,6 @@ return function(Common)
             {Name = "ESPADA", PlaceId = 6444873399, MinLevel = 0}
         }
         
-        -- Helper function to get user ID from name
         local function getUserIdFromName(name)
             local userId = nil
             pcall(function()
@@ -839,7 +821,6 @@ return function(Common)
             return userId
         end
         
-        -- Teleport functions
         local function teleportToPublic(placeId, mapName)
             ui.Fluent:Notify({
                 Title = "[T] Teleporting",
@@ -923,11 +904,9 @@ return function(Common)
             end)
         end
         
-        -- Create map sections
         for _, map in ipairs(Maps) do
             Tabs.Travel:AddSection(map.Name)
             
-            -- Public server button
             Tabs.Travel:AddButton({
                 Title = "Join Public Server",
                 Description = "Teleport to random public server",
@@ -936,7 +915,6 @@ return function(Common)
                 end
             })
             
-            -- Private server input + button
             local privateCodeInput = Tabs.Travel:AddInput("PrivateCode_" .. map.Name:gsub("%s+", "_"), {
                 Title = "Private Server Code",
                 Placeholder = "Enter code...",
@@ -953,7 +931,6 @@ return function(Common)
                 end
             })
             
-            -- Friend join input + button
             local friendNameInput = Tabs.Travel:AddInput("FriendName_" .. map.Name:gsub("%s+", "_"), {
                 Title = "Friend Username",
                 Placeholder = "Enter username...",
@@ -970,7 +947,6 @@ return function(Common)
                 end
             })
             
-            -- Create private server button
             Tabs.Travel:AddButton({
                 Title = "Create Private Server",
                 Description = "Start your own private server",
@@ -980,7 +956,6 @@ return function(Common)
             })
         end
         
-        -- Return to menu button
         Tabs.Travel:AddSection("Navigation")
         Tabs.Travel:AddButton({
             Title = "Return to Main Menu",
@@ -988,7 +963,6 @@ return function(Common)
             Callback = teleportToMenu
         })
         
-        -- Travel status display (with live time)
         local TravelStatusDisplay = Tabs.Travel:AddParagraph({
             Title = "Travel Status",
             Content = "Initializing..."
@@ -1010,7 +984,6 @@ return function(Common)
                     currentMapName = "Main Menu"
                 end
                 
-                -- Get current time from GLOBALTIME
                 local currentTime = "N/A"
                 pcall(function()
                     local gt = workspace:FindFirstChild("GLOBALTIME")
@@ -1222,7 +1195,6 @@ return function(Common)
             Content = "If a non-green mission is accidentally accepted,\nthe script will automatically send '!cancel'\nto the chat to abort the mission.\n\nThis prevents getting stuck on red/other color missions."
         })
         
-        -- AutoFarm logic with mission protection
         task.spawn(function()
             while true do
                 if FarmState.AutoFarmEnabled and LocalPlayer.Character then
@@ -1296,7 +1268,6 @@ return function(Common)
                                                         task.wait(0.3)
                                                         clientTalk:FireServer("accept")
                                                         
-                                                        -- MISSION PROTECTION
                                                         task.wait(0.5)
                                                         local acceptedMission = LocalPlayer:FindFirstChild("currentmission")
                                                         if acceptedMission and acceptedMission.Value ~= nil and acceptedMission.Value ~= "" then
@@ -1493,7 +1464,6 @@ return function(Common)
                 "This overwhelms the server with M1 requests AND locally destroys the target's humanoid."
         })
         
-        -- INSTAKILL LOGIC - M1 SPAM ENGINE + LOCAL FORCE KILL
         task.spawn(function()
             while true do
                 if FarmState.InstaKillEnabled and LocalPlayer.Character then
@@ -1507,9 +1477,7 @@ return function(Common)
                             local killCount = 0
                             local targets = {}
                             
-                            -- Collect all valid targets
                             if FarmState.InstaKillTargetNPCs then
-                                -- Scan workspace.npc folder
                                 local npcs = workspace:FindFirstChild("npc")
                                 if npcs then
                                     for _, npc in pairs(npcs:GetChildren()) do
@@ -1534,7 +1502,6 @@ return function(Common)
                                     end
                                 end
                                 
-                                -- Scan workspace for any other NPCs
                                 for _, obj in pairs(workspace:GetChildren()) do
                                     if obj:IsA("Model") and obj ~= char then
                                         local objRoot = obj:FindFirstChild("HumanoidRootPart")
@@ -1559,7 +1526,6 @@ return function(Common)
                                 end
                             end
                             
-                            -- Add players if targeting enabled
                             if FarmState.InstaKillTargetPlayers then
                                 for _, player in pairs(Players:GetPlayers()) do
                                     if player ~= LocalPlayer and player.Character then
@@ -1583,28 +1549,23 @@ return function(Common)
                                 end
                             end
                             
-                            -- Sort by distance (closest first)
                             table.sort(targets, function(a, b) return a.distance < b.distance end)
                             
-                            -- Attack all targets with M1 spam + Local Force Kill
                             for _, target in ipairs(targets) do
                                 if not target.hum or not target.root.Parent then
                                     continue
                                 end
                                 
-                                -- Teleport to target if enabled
                                 if FarmState.InstaKillTeleportToTarget then
                                     local behindOffset = -target.root.CFrame.LookVector * 3
                                     local targetCFrame = CFrame.new(target.root.Position + behindOffset)
                                     root.CFrame = targetCFrame
                                 end
                                 
-                                -- Face the target
                                 if FarmState.InstaKillFaceTarget then
                                     root.CFrame = CFrame.lookAt(root.Position, target.root.Position)
                                 end
                                 
-                                -- 🆕 FORCE LOCAL KILL (Stubborn Health & Humanoid Reset)
                                 pcall(function()
                                     target.hum.Health = 0
                                     target.hum.MaxHealth = 0
@@ -1612,21 +1573,16 @@ return function(Common)
                                     target.model:BreakJoints()
                                 end)
                                 
-                                -- SPAM M1 ATTACK
-                                -- Fire mouse1 true (start attack)
                                 pcall(function()
                                     combat.update:FireServer("mouse1", true)
                                 end)
                                 
-                                -- Minimal delay
                                 task.wait(FarmState.InstaKillSpeed)
                                 
-                                -- Fire mouse1 false (end attack)
                                 pcall(function()
                                     combat.update:FireServer("mouse1", false)
                                 end)
                                 
-                                -- Check if target died
                                 if target.hum.Health <= 0 or not target.model.Parent then
                                     killCount = killCount + 1
                                 end
@@ -1640,7 +1596,6 @@ return function(Common)
             end
         end)
         
-        -- InstaKill Status Display
         local InstaKillStatusDisplay = Tabs.InstaKill:AddParagraph({
             Title = "InstaKill Status",
             Content = "Initializing..."
@@ -1676,25 +1631,478 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- SCROLL SNIPER
+        -- SCROLL SNIPER (AUTO SERVER HOP + TIME-BASED)
         -- ==========================================
-        Tabs.Scroll:AddParagraph({
-            Title = "[S] Scroll Sniper",
-            Content = "Automatically detects and collects spawned scrolls.\n\n- Scans workspace.GLOBALTIME and workspace\n- Instant teleport to scroll location\n- Auto-collect with click detector"
+        Tabs.ScrollSniper:AddParagraph({
+            Title = "[S] Scroll Sniper (Auto Server Hop)",
+            Content = "Automatically hunts scrolls based on spawn time.\n\n" ..
+                "🆕 Reads ALL scrolls from GLOBALTIME.clienttell\n" ..
+                "🆕 Filters out BOSSDROP scrolls\n" ..
+                "🆕 Shows location, time (HH:MM), rarity\n" ..
+                "🆕 Select scrolls to hunt\n" ..
+                "🆕 Auto server hops to private servers\n" ..
+                "🆕 20-minute window (time to time+20min)\n" ..
+                "🆕 30s wait per server, then hops\n" ..
+                "🆕 Auto-claims scroll when found\n\n" ..
+                "NOTE: Fill Private Server IDs table below!"
         })
         
-        Tabs.Scroll:AddToggle("ScrollSniperToggle", {
+        -- ==========================================
+        -- PRIVATE SERVER ID TABLE (USER FILLS THIS)
+        -- ==========================================
+        -- Format: {location_keyword = {placeId1, placeId2, ...}}
+        -- Location matching is case-insensitive substring match
+        local ScrollServerIDs = {
+            -- Example (user should fill these):
+            -- ember = {123456, 789012},
+            -- blaze = {111111, 222222},
+            -- obelisk = {333333},
+            -- nimbus = {444444},
+            -- dunes = {555555},
+            -- haze = {666666},
+            -- vinland = {777777},
+            -- forest = {888888},
+            -- valley = {999999},
+            -- tempest = {101010},
+            -- narumaki = {121212},
+            -- training = {131313},
+            -- conquest = {141414},
+            -- maki = {151515},
+            -- ryuji = {161616},
+            -- espada = {171717},
+            -- jejunes = {181818},
+            -- bridge = {191919},
+            -- shikai = {202020},
+        }
+        
+        -- ==========================================
+        -- SCROLL DATA STRUCTURE
+        -- ==========================================
+        local ScrollData = {}
+        local ScrollWidgets = {}
+        
+        local function parseScrollTime(scroll)
+            local getTime = scroll:FindFirstChild("gettime")
+            if not getTime then return nil, nil end
+            
+            local hr = getTime:FindFirstChild("hr")
+            local min = getTime:FindFirstChild("min")
+            
+            if not hr or not min then return nil, nil end
+            
+            local hour = tonumber(hr.Value)
+            local minute = tonumber(min.Value)
+            
+            return hour, minute
+        end
+        
+        local function formatTime(hour, minute)
+            if not hour or not minute then return "??:??" end
+            return string.format("%02d:%02d", hour, minute)
+        end
+        
+        local function getScrollLocation(scroll)
+            local loc = scroll:FindFirstChild("location")
+            return loc and loc.Value or "Unknown"
+        end
+        
+        local function getScrollRarity(scroll)
+            local rarity = scroll:FindFirstChild("rarity")
+            return rarity and rarity.Value or "?"
+        end
+        
+        local function isBossDrop(scroll)
+            local name = scroll.Name:lower()
+            return string.find(name, "bossdrop") ~= nil
+        end
+        
+        local function refreshScrollList()
+            -- Clear existing widgets
+            for _, widget in pairs(ScrollWidgets) do
+                pcall(function() widget:Destroy() end)
+            end
+            ScrollWidgets = {}
+            ScrollData = {}
+            
+            local clientTell = workspace:FindFirstChild("GLOBALTIME")
+            if not clientTell then return end
+            
+            clientTell = clientTell:FindFirstChild("clienttell")
+            if not clientTell then return end
+            
+            for _, scroll in pairs(clientTell:GetChildren()) do
+                if scroll:IsA("StringValue") and not isBossDrop(scroll) then
+                    local hour, minute = parseScrollTime(scroll)
+                    local location = getScrollLocation(scroll)
+                    local rarity = getScrollRarity(scroll)
+                    
+                    if hour and minute then
+                        local scrollInfo = {
+                            name = scroll.Name,
+                            instance = scroll,
+                            hour = hour,
+                            minute = minute,
+                            timeStr = formatTime(hour, minute),
+                            location = location,
+                            rarity = rarity .. "/1",
+                            selected = false
+                        }
+                        
+                        table.insert(ScrollData, scrollInfo)
+                        
+                        -- Create widget
+                        local isSelected = table.find(FarmState.ScrollSniperSelected, scroll.Name) ~= nil
+                        scrollInfo.selected = isSelected
+                        
+                        local widget = Tabs.ScrollSniper:AddToggle("Scroll_" .. scroll.Name, {
+                            Title = scroll.Name,
+                            Description = string.format("📍 %s | ⏰ %s | 💎 %s", 
+                                location, scrollInfo.timeStr, scrollInfo.rarity),
+                            Default = isSelected
+                        }):OnChanged(function(v)
+                            scrollInfo.selected = v
+                            
+                            if v then
+                                if not table.find(FarmState.ScrollSniperSelected, scroll.Name) then
+                                    table.insert(FarmState.ScrollSniperSelected, scroll.Name)
+                                end
+                            else
+                                local idx = table.find(FarmState.ScrollSniperSelected, scroll.Name)
+                                if idx then
+                                    table.remove(FarmState.ScrollSniperSelected, idx)
+                                end
+                            end
+                            
+                            Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
+                            ConfigManager.Save(Config)
+                        end)
+                        
+                        table.insert(ScrollWidgets, widget)
+                    end
+                end
+            end
+            
+            ui.Fluent:Notify({
+                Title = "[S] Scroll List Refreshed",
+                Content = "Found " .. #ScrollData .. " scrolls",
+                Duration = 3
+            })
+        end
+        
+        Tabs.ScrollSniper:AddButton({
+            Title = "Refresh Scroll List",
+            Callback = refreshScrollList
+        })
+        
+        Tabs.ScrollSniper:AddToggle("ScrollSniperToggle", {
             Title = "Enable Scroll Sniper",
+            Description = "Auto server hop to selected scrolls at their spawn time",
             Default = Config.ScrollSniperEnabled
         }):OnChanged(function(v)
             FarmState.ScrollSniperEnabled = v
             Config.ScrollSniperEnabled = v
             ConfigManager.Save(Config)
+            
+            if v then
+                ui.Fluent:Notify({
+                    Title = "[S] Scroll Sniper Enabled",
+                    Content = "Hunting " .. #FarmState.ScrollSniperSelected .. " scrolls",
+                    Duration = 3
+                })
+            else
+                FarmState.ScrollSniperStatus = "Disabled"
+            end
+        end)
+        
+        -- ==========================================
+        -- TIME COMPARISON HELPERS
+        -- ==========================================
+        local function getCurrentGameTime()
+            local globalTime = workspace:FindFirstChild("GLOBALTIME")
+            if not globalTime then return nil, nil end
+            
+            local estTime = globalTime:FindFirstChild("globalesttime")
+            if not estTime or not estTime.Value then return nil, nil end
+            
+            -- Parse "HH:MM AM/PM" format
+            local timeStr = estTime.Value
+            local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s*(%a+)")
+            
+            if not hour or not minute then return nil, nil end
+            
+            hour = tonumber(hour)
+            minute = tonumber(minute)
+            
+            -- Convert to 24-hour format
+            if period then
+                period = period:upper()
+                if period == "PM" and hour ~= 12 then
+                    hour = hour + 12
+                elseif period == "AM" and hour == 12 then
+                    hour = 0
+                end
+            end
+            
+            return hour, minute
+        end
+        
+        local function isTimeInWindow(scrollHour, scrollMinute, currentHour, currentMinute)
+            -- Convert to minutes since midnight
+            local scrollTotal = scrollHour * 60 + scrollMinute
+            local currentTotal = currentHour * 60 + currentMinute
+            
+            -- 20-minute window
+            local windowEnd = scrollTotal + 20
+            
+            -- Handle day wrap-around
+            if windowEnd >= 1440 then
+                windowEnd = windowEnd - 1440
+                if currentTotal >= scrollTotal or currentTotal <= windowEnd then
+                    return true
+                end
+            else
+                if currentTotal >= scrollTotal and currentTotal <= windowEnd then
+                    return true
+                end
+            end
+            
+            return false
+        end
+        
+        local function getServerIDsForLocation(location)
+            local locationLower = location:lower()
+            
+            for keyword, ids in pairs(ScrollServerIDs) do
+                if string.find(locationLower, keyword:lower()) then
+                    return ids
+                end
+            end
+            
+            return {}
+        end
+        
+        -- ==========================================
+        -- SCROLL CLAIM FUNCTION (from existing code)
+        -- ==========================================
+        local function claimScroll(scrollName)
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not root then return false end
+            
+            -- Check workspace.GLOBALTIME
+            local globalTime = workspace:FindFirstChild("GLOBALTIME")
+            if globalTime then
+                for _, obj in pairs(globalTime:GetChildren()) do
+                    if obj:IsA("Model") and obj:FindFirstChild("sh") then
+                        local sh = obj.sh
+                        if sh.Position.Y > -1000 and sh.Position.Y < 2000 then
+                            local invoke = sh:FindFirstChild("invoke")
+                            local clickDetector = sh:FindFirstChild("ClickDetector")
+                            
+                            if invoke and clickDetector then
+                                toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
+                                task.wait(0.5)
+                                invoke:FireServer(LocalPlayer)
+                                fireclickdetector(clickDetector)
+                                return true
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- Check workspace directly
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and obj:FindFirstChild("sh") then
+                    local sh = obj.sh
+                    if sh.Position.Y > -1000 and sh.Position.Y < 2000 then
+                        local invoke = sh:FindFirstChild("invoke")
+                        local clickDetector = sh:FindFirstChild("ClickDetector")
+                        
+                        if invoke and clickDetector then
+                            toTarget(root.Position, sh.Position, CFrame.new(sh.Position))
+                            task.wait(0.5)
+                            invoke:FireServer(LocalPlayer)
+                            fireclickdetector(clickDetector)
+                            return true
+                        end
+                    end
+                end
+            end
+            
+            return false
+        end
+        
+        -- ==========================================
+        -- SCROLL SNIPER MAIN LOOP
+        -- ==========================================
+        task.spawn(function()
+            while true do
+                if FarmState.ScrollSniperEnabled then
+                    pcall(function()
+                        local currentHour, currentMinute = getCurrentGameTime()
+                        
+                        if not currentHour then
+                            FarmState.ScrollSniperStatus = "Waiting for game time..."
+                            task.wait(2)
+                            return
+                        end
+                        
+                        -- Find scrolls in time window
+                        local activeScrolls = {}
+                        for _, scrollInfo in ipairs(ScrollData) do
+                            if scrollInfo.selected and isTimeInWindow(scrollInfo.hour, scrollInfo.minute, currentHour, currentMinute) then
+                                table.insert(activeScrolls, scrollInfo)
+                            end
+                        end
+                        
+                        if #activeScrolls == 0 then
+                            FarmState.ScrollSniperStatus = "No scrolls in time window"
+                            FarmState.ScrollSniperCurrent = "Waiting..."
+                            task.wait(5)
+                            return
+                        end
+                        
+                        -- Process each active scroll
+                        for _, scrollInfo in ipairs(activeScrolls) do
+                            if not FarmState.ScrollSniperEnabled then break end
+                            
+                            FarmState.ScrollSniperStatus = "Hunting: " .. scrollInfo.name
+                            FarmState.ScrollSniperCurrent = scrollInfo.name
+                            
+                            local serverIDs = getServerIDsForLocation(scrollInfo.location)
+                            
+                            if #serverIDs == 0 then
+                                ui.Fluent:Notify({
+                                    Title = "[!] No Server IDs",
+                                    Content = "No private servers for " .. scrollInfo.location,
+                                    Duration = 3
+                                })
+                                continue
+                            end
+                            
+                            -- Try each server
+                            for i, serverID in ipairs(serverIDs) do
+                                if not FarmState.ScrollSniperEnabled then break end
+                                
+                                FarmState.ScrollSniperStatus = string.format("Server %d/%d: %s", 
+                                    i, #serverIDs, serverID)
+                                
+                                -- Teleport to private server
+                                pcall(function()
+                                    LocalPlayer.startevent:FireServer("teleporttoprivate", serverID, game.PlaceId)
+                                end)
+                                
+                                FarmState.ScrollSniperServersHopped = FarmState.ScrollSniperServersHopped + 1
+                                
+                                -- Wait for server to load
+                                task.wait(10)
+                                
+                                -- Try to claim scroll for 30 seconds
+                                local claimStart = tick()
+                                local claimed = false
+                                
+                                while tick() - claimStart < 30 do
+                                    if not FarmState.ScrollSniperEnabled then break end
+                                    
+                                    if claimScroll(scrollInfo.name) then
+                                        claimed = true
+                                        FarmState.ScrollSniperScrollsClaimed = FarmState.ScrollSniperScrollsClaimed + 1
+                                        
+                                        ui.Fluent:Notify({
+                                            Title = "[✓] Scroll Claimed!",
+                                            Content = scrollInfo.name .. " from " .. scrollInfo.location,
+                                            Duration = 5
+                                        })
+                                        
+                                        break
+                                    end
+                                    
+                                    task.wait(2)
+                                end
+                                
+                                if claimed then break end
+                            end
+                            
+                            -- Wait before next scroll
+                            task.wait(5)
+                        end
+                    end)
+                else
+                    FarmState.ScrollSniperStatus = "Disabled"
+                end
+                
+                task.wait(2)
+            end
+        end)
+        
+        -- Scroll Sniper Status Display
+        local ScrollSniperStatusDisplay = Tabs.ScrollSniper:AddParagraph({
+            Title = "Scroll Sniper Status",
+            Content = "Initializing..."
+        })
+        
+        task.spawn(function()
+            while true do
+                local selectedCount = 0
+                for _, scrollInfo in ipairs(ScrollData) do
+                    if scrollInfo.selected then selectedCount = selectedCount + 1 end
+                end
+                
+                local currentHour, currentMinute = getCurrentGameTime()
+                local gameTimeStr = currentHour and formatTime(currentHour, currentMinute) or "??:??"
+                
+                ScrollSniperStatusDisplay.Content = string.format(
+                    "Status: %s\n\n" ..
+                    "🕐 Game Time: %s EST\n" ..
+                    "📜 Selected Scrolls: %d / %d\n" ..
+                    "🎯 Current Target: %s\n" ..
+                    "🔄 Servers Hopped: %d\n" ..
+                    "✅ Scrolls Claimed: %d\n\n" ..
+                    "Window: Time to Time+20min\n" ..
+                    "Wait: 30s per server\n\n" ..
+                    "NOTE: Fill ScrollServerIDs table in code!",
+                    FarmState.ScrollSniperEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
+                    gameTimeStr,
+                    selectedCount,
+                    #ScrollData,
+                    FarmState.ScrollSniperCurrent ~= "" and FarmState.ScrollSniperCurrent or "None",
+                    FarmState.ScrollSniperServersHopped,
+                    FarmState.ScrollSniperScrollsClaimed
+                )
+                task.wait(1)
+            end
+        end)
+        
+        -- Auto-refresh scroll list on startup
+        task.spawn(function()
+            task.wait(5)
+            refreshScrollList()
+        end)
+        
+        -- ==========================================
+        -- SCROLL GET (MANUAL - OLD SCROLL SNIPER)
+        -- ==========================================
+        Tabs.ScrollGet:AddParagraph({
+            Title = "[S] Scroll Get (Manual)",
+            Content = "Manually teleport to and claim spawned scrolls.\n\n" ..
+                "- Scans workspace.GLOBALTIME and workspace\n" ..
+                "- Instant teleport to scroll location\n" ..
+                "- Auto-collect with click detector\n\n" ..
+                "NOTE: This is the old scroll sniper (manual mode)"
+        })
+        
+        Tabs.ScrollGet:AddToggle("ScrollGetToggle", {
+            Title = "Enable Scroll Get",
+            Default = Config.ScrollGetEnabled
+        }):OnChanged(function(v)
+            FarmState.ScrollGetEnabled = v
+            Config.ScrollGetEnabled = v
+            ConfigManager.Save(Config)
         end)
         
         task.spawn(function()
             while true do
-                if FarmState.ScrollSniperEnabled and LocalPlayer.Character then
+                if FarmState.ScrollGetEnabled and LocalPlayer.Character then
                     pcall(function()
                         local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         if not root then return end
@@ -2203,14 +2611,13 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- EXPERIMENTAL FEATURES (NO KILLAURA - MOVED TO INSTAKILL TAB)
+        -- EXPERIMENTAL FEATURES
         -- ==========================================
         Tabs.Experimental:AddParagraph({
             Title = "[X] EXPERIMENTAL FEATURES",
             Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam + Local Force Kill) has been moved to its own dedicated tab."
         })
         
-        -- ANTI RAGDOLL SECTION
         Tabs.Experimental:AddSection("Anti Ragdoll")
         
         Tabs.Experimental:AddToggle("AntiRagdollToggle", {
@@ -2249,7 +2656,6 @@ return function(Common)
             end
         end)
         
-        -- ANTI KNOCKBACK SECTION
         Tabs.Experimental:AddSection("Anti Knockback")
         
         Tabs.Experimental:AddToggle("AntiKnockbackToggle", {
@@ -2292,7 +2698,6 @@ return function(Common)
             end
         end)
         
-        -- ESP SECTION
         Tabs.Experimental:AddSection("ESP (Extra Sensory Perception)")
         
         Tabs.Experimental:AddToggle("ESPToggle", {
@@ -2341,7 +2746,6 @@ return function(Common)
             ConfigManager.Save(Config)
         end)
         
-        -- ESP Storage
         local ESPHighlights = {}
         local ESPBillboards = {}
         
@@ -2520,7 +2924,6 @@ return function(Common)
             if player.Character and FarmState.ESPEnabled then createESPForPlayer(player) end
         end
         
-        -- STUN/GRAB IMMUNITY SECTION
         Tabs.Experimental:AddSection("Stun/Grab Immunity")
         
         Tabs.Experimental:AddToggle("StunGrabImmunityToggle", {
@@ -2587,7 +2990,6 @@ return function(Common)
             end
         end)
         
-        -- EXPERIMENTAL STATUS DISPLAY
         local ExperimentalStatusDisplay = Tabs.Experimental:AddParagraph({
             Title = "Experimental Features Status",
             Content = "Initializing..."
@@ -2700,7 +3102,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel System + InstaKill + LIVE TIME)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
