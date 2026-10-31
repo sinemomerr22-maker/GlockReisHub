@@ -4,6 +4,7 @@
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
 -- // Travel System (All Maps + Private/Friend Teleport)
+-- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
 -- // ==========================================
 
@@ -20,6 +21,225 @@ return function(Common)
     local placeId = game.PlaceId
     local isShindoMenu = (placeId == 4616652839)
     local isShindoInGame = not isShindoMenu
+    
+    -- ==========================================
+    -- LIVE TIME DISPLAY SYSTEM (ALWAYS VISIBLE)
+    -- ==========================================
+    task.spawn(function()
+        -- Wait for game to fully load
+        if not game:IsLoaded() then game.Loaded:Wait() end
+        task.wait(2) -- Extra wait for workspace to populate
+        
+        -- Create ScreenGui for time display
+        local getUI = gethui or function() return game:GetService("CoreGui") end
+        local timeGui = Instance.new("ScreenGui")
+        timeGui.Name = "GlockTimeDisplay"
+        timeGui.ResetOnSpawn = false
+        timeGui.DisplayOrder = 999
+        timeGui.IgnoreGuiInset = true
+        timeGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        
+        pcall(function() timeGui.Parent = getUI() end)
+        if not timeGui.Parent then
+            timeGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 30)
+        end
+        
+        -- Main container frame (top-center position)
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "TimeFrame"
+        mainFrame.Size = UDim2.new(0, 280, 0, 50)
+        mainFrame.Position = UDim2.new(0.5, -140, 0, 10) -- Top center
+        mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+        mainFrame.BackgroundTransparency = 0.15
+        mainFrame.BorderSizePixel = 0
+        mainFrame.Parent = timeGui
+        
+        -- Rounded corners
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = mainFrame
+        
+        -- Glowing border
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(100, 180, 255)
+        stroke.Thickness = 2
+        stroke.Transparency = 0.3
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Parent = mainFrame
+        
+        -- Inner gradient for premium look
+        local gradient = Instance.new("UIGradient")
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 50)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 50, 80)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 30, 50))
+        })
+        gradient.Rotation = 90
+        gradient.Parent = mainFrame
+        
+        -- Layout
+        local layout = Instance.new("UIListLayout")
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.VerticalAlignment = Enum.VerticalAlignment.Center
+        layout.Padding = UDim.new(0, 8)
+        layout.Parent = mainFrame
+        
+        -- Clock icon
+        local iconLabel = Instance.new("TextLabel")
+        iconLabel.Name = "Icon"
+        iconLabel.Size = UDim2.new(0, 28, 0, 28)
+        iconLabel.BackgroundTransparency = 1
+        iconLabel.Text = "⏰"
+        iconLabel.TextSize = 22
+        iconLabel.Font = Enum.Font.GothamBold
+        iconLabel.TextColor3 = Color3.fromRGB(100, 180, 255)
+        iconLabel.LayoutOrder = 1
+        iconLabel.Parent = mainFrame
+        
+        -- Time label
+        local timeLabel = Instance.new("TextLabel")
+        timeLabel.Name = "TimeText"
+        timeLabel.Size = UDim2.new(1, -50, 1, 0)
+        timeLabel.BackgroundTransparency = 1
+        timeLabel.Text = "Loading time..."
+        timeLabel.TextSize = 18
+        timeLabel.Font = Enum.Font.GothamBold
+        timeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        timeLabel.TextYAlignment = Enum.TextYAlignment.Center
+        timeLabel.LayoutOrder = 2
+        timeLabel.Parent = mainFrame
+        
+        -- Text stroke for readability
+        local textStroke = Instance.new("UIStroke")
+        textStroke.Color = Color3.fromRGB(0, 0, 0)
+        textStroke.Thickness = 1
+        textStroke.Transparency = 0.5
+        textStroke.Parent = timeLabel
+        
+        -- Draggable functionality
+        local dragging = false
+        local dragStart = nil
+        local startPos = nil
+        
+        mainFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainFrame.Position
+            end
+        end)
+        
+        mainFrame.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement 
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                mainFrame.Position = UDim2.new(
+                    startPos.X.Scale, 
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, 
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+        
+        -- Time update function
+        local function updateTime()
+            pcall(function()
+                local globalTime = workspace:FindFirstChild("GLOBALTIME")
+                if globalTime then
+                    local estTime = globalTime:FindFirstChild("globalesttime")
+                    if estTime and estTime:IsA("StringValue") then
+                        local timeValue = estTime.Value
+                        if timeValue and timeValue ~= "" then
+                            timeLabel.Text = "EST: " .. timeValue
+                            
+                            -- Color based on time of day
+                            local hour = tonumber(string.match(timeValue, "(%d+)"))
+                            if hour then
+                                if hour >= 6 and hour < 12 then
+                                    -- Morning: warm yellow
+                                    timeLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
+                                    stroke.Color = Color3.fromRGB(255, 180, 50)
+                                elseif hour >= 12 and hour < 18 then
+                                    -- Afternoon: bright cyan
+                                    timeLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
+                                    stroke.Color = Color3.fromRGB(50, 180, 255)
+                                elseif hour >= 18 and hour < 21 then
+                                    -- Evening: orange
+                                    timeLabel.TextColor3 = Color3.fromRGB(255, 150, 80)
+                                    stroke.Color = Color3.fromRGB(255, 100, 50)
+                                else
+                                    -- Night: blue/purple
+                                    timeLabel.TextColor3 = Color3.fromRGB(150, 130, 255)
+                                    stroke.Color = Color3.fromRGB(100, 80, 200)
+                                end
+                            end
+                        else
+                            timeLabel.Text = "EST: --:--"
+                        end
+                    else
+                        timeLabel.Text = "EST: Not found"
+                    end
+                else
+                    timeLabel.Text = "GLOBALTIME: Missing"
+                end
+            end)
+        end
+        
+        -- Initial update
+        updateTime()
+        
+        -- Listen for changes to globalesttime
+        local function hookTimeValue()
+            pcall(function()
+                local globalTime = workspace:WaitForChild("GLOBALTIME", 30)
+                if globalTime then
+                    local estTime = globalTime:WaitForChild("globalesttime", 30)
+                    if estTime then
+                        estTime.Changed:Connect(function()
+                            updateTime()
+                        end)
+                    end
+                end
+            end)
+        end
+        
+        hookTimeValue()
+        
+        -- Also poll every 1 second as backup (in case Changed event doesn't fire)
+        task.spawn(function()
+            while timeGui and timeGui.Parent do
+                updateTime()
+                task.wait(1)
+            end
+        end)
+        
+        -- Subtle pulse animation on the border
+        task.spawn(function()
+            while mainFrame and mainFrame.Parent do
+                local tweenIn = TweenService:Create(stroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                    Transparency = 0.6
+                })
+                local tweenOut = TweenService:Create(stroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                    Transparency = 0.2
+                })
+                tweenIn:Play()
+                tweenIn.Completed:Wait()
+                tweenOut:Play()
+                tweenOut.Completed:Wait()
+            end
+        end)
+    end)
     
     -- Config
     local DefaultConfig
@@ -176,7 +396,7 @@ return function(Common)
         
         Tabs.Main:AddParagraph({
             Title = "System Status",
-            Content = "Config: PERSISTENT (Auto-Save)\nAnti-AFK: 12h+ Proof\nDynamic Updates: POLLING-BASED\nTarget Match: CASE-INSENSITIVE\nDropdown State: HARDENED"
+            Content = "Config: PERSISTENT (Auto-Save)\nAnti-AFK: 12h+ Proof\nDynamic Updates: POLLING-BASED\nTarget Match: CASE-INSENSITIVE\nDropdown State: HARDENED\n🆕 LIVE TIME DISPLAY: Top-center (draggable)"
         })
         
         local Settings = {
@@ -451,7 +671,30 @@ return function(Common)
                     end
                 end
                 local spinsDisplay = Settings.CurrentSpins >= 0 and tostring(Settings.CurrentSpins) or "Loading..."
-                StatusDisplay.Content = string.format("Status: %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", Settings.Status, table.concat(slotValues, "\n"), spinsDisplay, Settings.TotalSpinsDone, Settings.MinSpinsToRejoin, Settings.SpinDelay, targetText)
+                
+                -- Get current time from GLOBALTIME
+                local currentTime = "N/A"
+                pcall(function()
+                    local gt = workspace:FindFirstChild("GLOBALTIME")
+                    if gt then
+                        local est = gt:FindFirstChild("globalesttime")
+                        if est and est.Value then
+                            currentTime = est.Value
+                        end
+                    end
+                end)
+                
+                StatusDisplay.Content = string.format(
+                    "Status: %s\n\n🕐 Current Time (EST): %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", 
+                    Settings.Status, 
+                    currentTime,
+                    table.concat(slotValues, "\n"), 
+                    spinsDisplay, 
+                    Settings.TotalSpinsDone, 
+                    Settings.MinSpinsToRejoin, 
+                    Settings.SpinDelay, 
+                    targetText
+                )
                 task.wait(0.3)
             end
         end)
@@ -570,10 +813,11 @@ return function(Common)
                 "- Private Server: Join with code\n" ..
                 "- Join Friend: Teleport to friend's server\n" ..
                 "- Create Private: Start your own server\n\n" ..
-                "🆕 All 19 maps supported with instant teleport!"
+                "🆕 All 19 maps supported with instant teleport!\n" ..
+                "🆕 LIVE TIME DISPLAY at top of screen (draggable)"
         })
         
-        -- Map definitions with placeholder PlaceIDs (user will fill in real IDs)
+        -- Map definitions with real PlaceIDs
         local Maps = {
             {Name = "BLAZE (New Ember)", PlaceId = 6986372023, MinLevel = 0},
             {Name = "OBELISK (Stone)", PlaceId = 4601350809, MinLevel = 0},
@@ -754,7 +998,7 @@ return function(Common)
             Callback = teleportToMenu
         })
         
-        -- Travel status display
+        -- Travel status display (with live time)
         local TravelStatusDisplay = Tabs.Travel:AddParagraph({
             Title = "Travel Status",
             Content = "Initializing..."
@@ -776,13 +1020,26 @@ return function(Common)
                     currentMapName = "Main Menu"
                 end
                 
+                -- Get current time from GLOBALTIME
+                local currentTime = "N/A"
+                pcall(function()
+                    local gt = workspace:FindFirstChild("GLOBALTIME")
+                    if gt then
+                        local est = gt:FindFirstChild("globalesttime")
+                        if est and est.Value then
+                            currentTime = est.Value
+                        end
+                    end
+                end)
+                
                 TravelStatusDisplay.Content = string.format(
                     "Current Location: %s\n" ..
+                    "🕐 Server Time (EST): %s\n" ..
                     "Place ID: %d\n" ..
                     "Job ID: %s\n\n" ..
-                    "Players in Server: %d\n\n" ..
-                    "Note: Replace PlaceId 123456 with real IDs in code!",
+                    "Players in Server: %d",
                     currentMapName,
+                    currentTime,
                     currentPlace,
                     game.JobId or "N/A",
                     #Players:GetPlayers()
@@ -2453,7 +2710,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel System + InstaKill)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
