@@ -7,7 +7,6 @@
 -- // Scroll Sniper (Auto Server Hop + Time-Based) + Scroll Get (Manual)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
 -- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity
--- // 🔍 DEBUG MODE ENABLED
 -- // ==========================================
 
 return function(Common)
@@ -23,38 +22,6 @@ return function(Common)
     local placeId = game.PlaceId
     local isShindoMenu = (placeId == 4616652839)
     local isShindoInGame = not isShindoMenu
-    
-    -- ==========================================
-    -- 🔍 DEBUG HELPER
-    -- ==========================================
-    local DEBUG_ENABLED = true
-    local lastDebugNotify = {}
-    
-    local function debugNotify(title, content, duration, throttleKey)
-        if not DEBUG_ENABLED then return end
-        
-        -- Throttle: Aynı bildirim 10 saniyede bir tekrarlanmasın
-        if throttleKey then
-            local now = tick()
-            if lastDebugNotify[throttleKey] and (now - lastDebugNotify[throttleKey]) < 10 then
-                return
-            end
-            lastDebugNotify[throttleKey] = now
-        end
-        
-        pcall(function()
-            ui.Fluent:Notify({
-                Title = "🔍 " .. title,
-                Content = content,
-                Duration = duration or 5
-            })
-        end)
-    end
-    
-    local function debugPrint(msg)
-        if not DEBUG_ENABLED then return end
-        print("[GlockDebug] " .. tostring(msg))
-    end
     
     -- ==========================================
     -- LIVE TIME DISPLAY SYSTEM (ALWAYS VISIBLE)
@@ -831,8 +798,7 @@ return function(Common)
                 "- Join Friend: Teleport to friend's server\n" ..
                 "- Create Private: Start your own server\n\n" ..
                 "🆕 All 19 maps supported with instant teleport!\n" ..
-                "🆕 LIVE TIME DISPLAY at top of screen (draggable)\n" ..
-                "🔍 DEBUG MODE ENABLED"
+                "🆕 LIVE TIME DISPLAY at top of screen (draggable)"
         })
         
         local Maps = {
@@ -1676,12 +1642,10 @@ return function(Common)
         
         -- ==========================================
         -- SCROLL SNIPER (AUTO SERVER HOP + TIME-BASED)
-        -- 🔍 DEBUG MODE - Her adımda bildirim
         -- ==========================================
         Tabs.ScrollSniper:AddParagraph({
-            Title = "[S] Scroll Sniper (Auto Server Hop) 🔍 DEBUG",
+            Title = "[S] Scroll Sniper (Auto Server Hop)",
             Content = "Automatically hunts scrolls based on spawn time.\n\n" ..
-                "🔍 DEBUG MODE: Her adımda bildirim gelecek!\n" ..
                 "🆕 Reads ALL scrolls from GLOBALTIME.clienttell\n" ..
                 "🆕 Filters out BOSSDROP scrolls\n" ..
                 "🆕 🚫 EXCLUDES: 00:00/01:00 time scrolls\n" ..
@@ -2046,28 +2010,60 @@ return function(Common)
             ScrollWidgets = {}
             ScrollData = {}
             
-            -- 🔍 DEBUG: GLOBALTIME kontrolü
+            -- 🔍 DEBUG: Starting refresh
+            ui.Fluent:Notify({
+                Title = "[DEBUG] Refresh Start",
+                Content = "Looking for GLOBALTIME...",
+                Duration = 2
+            })
+            
             local clientTell = workspace:FindFirstChild("GLOBALTIME")
             if not clientTell then 
-                debugNotify("Refresh", "❌ GLOBALTIME folder NOT FOUND!", 5, "refresh_notime")
+                ui.Fluent:Notify({
+                    Title = "[DEBUG] ❌ FAILED",
+                    Content = "GLOBALTIME not found in workspace!",
+                    Duration = 4
+                })
                 return 
             end
+            
+            ui.Fluent:Notify({
+                Title = "[DEBUG] ✓ GLOBALTIME found",
+                Content = "Looking for clienttell folder...",
+                Duration = 2
+            })
             
             clientTell = clientTell:FindFirstChild("clienttell")
             if not clientTell then 
-                debugNotify("Refresh", "❌ clienttell subfolder NOT FOUND!", 5, "refresh_noclient")
+                ui.Fluent:Notify({
+                    Title = "[DEBUG] ❌ FAILED",
+                    Content = "clienttell folder not found in GLOBALTIME!",
+                    Duration = 4
+                })
                 return 
             end
             
+            ui.Fluent:Notify({
+                Title = "[DEBUG] ✓ clienttell found",
+                Content = "Scanning " .. #clientTell:GetChildren() .. " children...",
+                Duration = 2
+            })
+            
             local excludedCount = 0
             local includedCount = 0
-            local totalChildren = #clientTell:GetChildren()
-            
-            -- 🔍 DEBUG: Toplam çocuk sayısı
-            debugNotify("Refresh", "📂 Scanning " .. totalChildren .. " items in clienttell...", 4, "refresh_scan")
+            local debugFirstScroll = nil
             
             for _, scroll in pairs(clientTell:GetChildren()) do
                 if scroll:IsA("StringValue") then
+                    -- Capture first scroll for debug
+                    if not debugFirstScroll then
+                        debugFirstScroll = {
+                            name = scroll.Name,
+                            location = getScrollLocation(scroll),
+                            hour = parseScrollTime(scroll)
+                        }
+                    end
+                    
                     if not shouldExcludeScroll(scroll) then
                         local hour, minute = parseScrollTime(scroll)
                         local location = getScrollLocation(scroll)
@@ -2122,23 +2118,26 @@ return function(Common)
                 end
             end
             
-            -- 🔍 DEBUG: Sonuç bildirimi
-            debugNotify("Refresh", string.format(
-                "✅ Found %d scrolls\n" ..
-                "🚫 Excluded: %d (boss/drop/00:00/01:00)\n" ..
-                "📊 Total items: %d",
-                includedCount, excludedCount, totalChildren
-            ), 6, "refresh_done")
-            
-            -- İlk 3 scroll'u göster
-            if #ScrollData > 0 then
-                local preview = ""
-                for i = 1, math.min(3, #ScrollData) do
-                    local s = ScrollData[i]
-                    preview = preview .. string.format("\n%d. %s @ %s (%s)", i, s.name, s.timeStr, s.location)
-                end
-                debugNotify("Scroll Preview", preview, 8, "refresh_preview")
+            -- 🔍 DEBUG: Show first scroll details
+            if debugFirstScroll then
+                ui.Fluent:Notify({
+                    Title = "[DEBUG] First Scroll",
+                    Content = string.format(
+                        "Name: %s\nLocation: %s\nTime: %s",
+                        debugFirstScroll.name,
+                        debugFirstScroll.location,
+                        debugFirstScroll.hour and formatTime(debugFirstScroll.hour, select(2, parseScrollTime(debugFirstScroll.instance))) or "N/A"
+                    ),
+                    Duration = 4
+                })
             end
+            
+            ui.Fluent:Notify({
+                Title = "[DEBUG] ✓ Refresh Complete",
+                Content = string.format("Found %d scrolls\n(%d excluded: boss/drop/00:00/01:00)\n\nScrollData: %d entries", 
+                    includedCount, excludedCount, #ScrollData),
+                Duration = 4
+            })
         end
         
         Tabs.ScrollSniper:AddButton({
@@ -2174,7 +2173,11 @@ return function(Common)
                 Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
                 ConfigManager.Save(Config)
                 
-                debugNotify("Select All", "✅ Selected " .. #ScrollData .. " scrolls for hunting", 4, "selectall")
+                ui.Fluent:Notify({
+                    Title = "[✓] All Selected",
+                    Content = "Selected " .. #ScrollData .. " scrolls for hunting",
+                    Duration = 3
+                })
             end
         })
         
@@ -2196,7 +2199,11 @@ return function(Common)
                 Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
                 ConfigManager.Save(Config)
                 
-                debugNotify("Deselect All", "❌ Deselected all scrolls", 3, "deselectall")
+                ui.Fluent:Notify({
+                    Title = "[✓] All Cleared",
+                    Content = "Deselected all scrolls",
+                    Duration = 3
+                })
             end
         })
         
@@ -2210,10 +2217,13 @@ return function(Common)
             ConfigManager.Save(Config)
             
             if v then
-                debugNotify("Sniper Enabled", "🎯 Hunting " .. #FarmState.ScrollSniperSelected .. " scrolls\nDebug mode: ON", 5, "sniper_on")
+                ui.Fluent:Notify({
+                    Title = "[S] Scroll Sniper Enabled",
+                    Content = "Hunting " .. #FarmState.ScrollSniperSelected .. " scrolls",
+                    Duration = 3
+                })
             else
                 FarmState.ScrollSniperStatus = "Disabled"
-                debugNotify("Sniper Disabled", "⏸️ Scroll Sniper stopped", 3, "sniper_off")
             end
         end)
         
@@ -2328,60 +2338,61 @@ return function(Common)
             return false
         end
         
-        -- 🔍 DEBUG: Ana Scroll Sniper döngüsü - her adımda bildirim
+        -- 🔍 DEBUG: Main loop with detailed logging
         task.spawn(function()
-            local lastTimeDebug = 0
-            local loopCount = 0
-            
+            local debugCycleCount = 0
             while true do
                 if FarmState.ScrollSniperEnabled then
-                    loopCount = loopCount + 1
+                    debugCycleCount = debugCycleCount + 1
                     
                     pcall(function()
-                        -- 🔍 DEBUG: Zaman kontrolü
                         local currentHour, currentMinute = getCurrentGameTime()
+                        
+                        -- 🔍 DEBUG: Time check (every 10 cycles to avoid spam)
+                        if debugCycleCount % 10 == 1 then
+                            if not currentHour then
+                                ui.Fluent:Notify({
+                                    Title = "[DEBUG] ❌ Time Failed",
+                                    Content = "getCurrentGameTime() returned nil!\n\nCheck GLOBALTIME.globalesttime",
+                                    Duration = 4
+                                })
+                            else
+                                ui.Fluent:Notify({
+                                    Title = "[DEBUG] ✓ Time OK",
+                                    Content = string.format(
+                                        "Current: %02d:%02d\nScrollData: %d entries\nSelected: %d",
+                                        currentHour, currentMinute,
+                                        #ScrollData,
+                                        (function() local c = 0; for _, s in ipairs(ScrollData) do if s.selected then c = c + 1 end end; return c end)()
+                                    ),
+                                    Duration = 3
+                                })
+                            end
+                        end
                         
                         if not currentHour then
                             FarmState.ScrollSniperStatus = "Waiting for game time..."
-                            debugNotify("Time Error", "❌ getCurrentGameTime() returned nil!\nCheck GLOBALTIME.globalesttime", 5, "time_error")
-                            task.wait(5)
+                            task.wait(2)
                             return
                         end
                         
-                        -- Her 60 saniyede bir zaman bildirimi
-                        if tick() - lastTimeDebug > 60 then
-                            lastTimeDebug = tick()
-                            debugNotify("Game Time", string.format(
-                                "🕐 Current: %02d:%02d\n" ..
-                                "📜 Total scrolls: %d\n" ..
-                                "🎯 Selected: %d\n" ..
-                                "🔁 Loop #: %d",
-                                currentHour, currentMinute,
-                                #ScrollData,
-                                (function() local c=0; for _,s in ipairs(ScrollData) do if s.selected then c=c+1 end end; return c end)(),
-                                loopCount
-                            ), 6, "time_update")
-                        end
-                        
-                        -- 🔍 DEBUG: Aktif scroll kontrolü
                         local activeScrolls = {}
                         for _, scrollInfo in ipairs(ScrollData) do
-                            if scrollInfo.selected then
-                                local inWindow = isTimeInWindow(scrollInfo.hour, scrollInfo.minute, currentHour, currentMinute)
-                                if inWindow then
-                                    table.insert(activeScrolls, scrollInfo)
-                                    debugNotify("Window Match", string.format(
-                                        "✅ %s is IN window!\n" ..
-                                        "⏰ Spawn: %02d:%02d\n" ..
-                                        "🕐 Now: %02d:%02d\n" ..
-                                        "📍 Location: %s",
-                                        scrollInfo.name,
-                                        scrollInfo.hour, scrollInfo.minute,
-                                        currentHour, currentMinute,
-                                        scrollInfo.location
-                                    ), 6, "window_" .. scrollInfo.name)
-                                end
+                            if scrollInfo.selected and isTimeInWindow(scrollInfo.hour, scrollInfo.minute, currentHour, currentMinute) then
+                                table.insert(activeScrolls, scrollInfo)
                             end
+                        end
+                        
+                        -- 🔍 DEBUG: Active scrolls check (every 10 cycles)
+                        if debugCycleCount % 10 == 2 and #activeScrolls == 0 then
+                            ui.Fluent:Notify({
+                                Title = "[DEBUG] No Active Scrolls",
+                                Content = string.format(
+                                    "Current time: %02d:%02d\n\nNo scrolls in 20-min window.\n\nCheck if scroll times match current time.",
+                                    currentHour, currentMinute
+                                ),
+                                Duration = 4
+                            })
                         end
                         
                         if #activeScrolls == 0 then
@@ -2391,8 +2402,17 @@ return function(Common)
                             return
                         end
                         
-                        -- Aktif scroll bulundu!
-                        debugNotify("Active Scrolls", "🎯 " .. #activeScrolls .. " scroll(s) ready to hunt!", 4, "active_found")
+                        -- 🔍 DEBUG: Found active scrolls!
+                        ui.Fluent:Notify({
+                            Title = "[DEBUG] 🎯 ACTIVE SCROLLS",
+                            Content = string.format(
+                                "Found %d scroll(s) in time window!\n\nFirst: %s @ %s",
+                                #activeScrolls,
+                                activeScrolls[1].name,
+                                activeScrolls[1].timeStr
+                            ),
+                            Duration = 4
+                        })
                         
                         for _, scrollInfo in ipairs(activeScrolls) do
                             if not FarmState.ScrollSniperEnabled then break end
@@ -2400,31 +2420,45 @@ return function(Common)
                             FarmState.ScrollSniperStatus = "Hunting: " .. scrollInfo.name
                             FarmState.ScrollSniperCurrent = scrollInfo.name
                             
-                            -- 🔍 DEBUG: Lokasyon eşleşmesi
                             local serverIDs, matchInfo, extraInfo = getServerIDsForLocation(scrollInfo.location)
+                            
+                            -- 🔍 DEBUG: Location matching result
+                            ui.Fluent:Notify({
+                                Title = "[DEBUG] Location Match",
+                                Content = string.format(
+                                    "Scroll: %s\nLocation: %s\n\nMatch: %s\nServers: %d",
+                                    scrollInfo.name,
+                                    scrollInfo.location,
+                                    matchInfo,
+                                    #serverIDs
+                                ),
+                                Duration = 4
+                            })
                             
                             if #serverIDs == 0 then
                                 local errorMsg = ""
                                 if matchInfo == "empty_location" then
                                     errorMsg = "Location is empty/unknown for " .. scrollInfo.name
                                 elseif matchInfo == "no_match" then
-                                    errorMsg = "No server IDs for location: '" .. tostring(extraInfo) .. "'\n\nAvailable keywords: " .. table.concat((function() local k={}; for kw,_ in pairs(ScrollServerIDs) do table.insert(k,kw) end; return k end)(), ", ")
+                                    errorMsg = "No server IDs for location: '" .. tostring(extraInfo) .. "'"
                                 else
                                     errorMsg = "No private servers for " .. scrollInfo.location
                                 end
                                 
-                                debugNotify("No Server IDs", "❌ " .. errorMsg, 8, "no_ids_" .. scrollInfo.name)
+                                ui.Fluent:Notify({
+                                    Title = "[DEBUG] ❌ No Servers",
+                                    Content = errorMsg,
+                                    Duration = 5
+                                })
                                 continue
                             end
                             
-                            -- 🔍 DEBUG: Lokasyon eşleşti!
-                            debugNotify("Location Matched", string.format(
-                                "✅ Location: %s\n" ..
-                                "🔑 Keyword: '%s'\n" ..
-                                "📡 Servers: %d\n" ..
-                                "🚀 Starting server hop...",
-                                scrollInfo.location, tostring(matchInfo), #serverIDs
-                            ), 6, "matched_" .. scrollInfo.name)
+                            ui.Fluent:Notify({
+                                Title = "[DEBUG] ✓ Starting Hop",
+                                Content = string.format("Hopping to %d servers...\nKeyword: '%s'", 
+                                    #serverIDs, tostring(matchInfo)),
+                                Duration = 3
+                            })
                             
                             for i, serverID in ipairs(serverIDs) do
                                 if not FarmState.ScrollSniperEnabled then break end
@@ -2432,67 +2466,74 @@ return function(Common)
                                 FarmState.ScrollSniperStatus = string.format("Server %d/%d: %s", 
                                     i, #serverIDs, serverID)
                                 
-                                -- 🔍 DEBUG: Teleport başlıyor
-                                debugNotify("Teleporting", string.format(
-                                    "🚀 Server %d/%d\n" ..
-                                    "🔑 Code: %s\n" ..
-                                    "📍 Target: %s\n" ..
-                                    "⏰ Time: %s",
-                                    i, #serverIDs, serverID,
-                                    scrollInfo.name, scrollInfo.timeStr
-                                ), 4, "tp_" .. serverID)
+                                -- 🔍 DEBUG: Server hop attempt
+                                ui.Fluent:Notify({
+                                    Title = "[DEBUG] 🚀 Server Hop",
+                                    Content = string.format(
+                                        "Server %d/%d\nID: %s\n\nCalling teleporttoprivate...",
+                                        i, #serverIDs, serverID
+                                    ),
+                                    Duration = 2
+                                })
                                 
-                                local tpOk, tpErr = pcall(function()
+                                local teleportSuccess = false
+                                pcall(function()
                                     LocalPlayer.startevent:FireServer("teleporttoprivate", serverID, game.PlaceId)
+                                    teleportSuccess = true
                                 end)
                                 
-                                if not tpOk then
-                                    debugNotify("TP Error", "❌ Teleport failed: " .. tostring(tpErr), 5, "tp_error")
+                                if teleportSuccess then
+                                    ui.Fluent:Notify({
+                                        Title = "[DEBUG] ✓ Teleport Sent",
+                                        Content = "Waiting 10s for server load...",
+                                        Duration = 2
+                                    })
                                 else
-                                    debugNotify("TP Sent", "✅ Remote fired successfully\nWaiting 10s for load...", 3, "tp_ok_" .. serverID)
+                                    ui.Fluent:Notify({
+                                        Title = "[DEBUG] ❌ Teleport Failed",
+                                        Content = "startevent.FireServer failed!",
+                                        Duration = 3
+                                    })
                                 end
                                 
                                 FarmState.ScrollSniperServersHopped = FarmState.ScrollSniperServersHopped + 1
                                 
                                 task.wait(10)
                                 
-                                -- 🔍 DEBUG: Claim başlıyor
-                                debugNotify("Claiming", "🔍 Searching for scroll in server...", 3, "claim_start_" .. serverID)
-                                
                                 local claimStart = tick()
                                 local claimed = false
-                                local claimAttempts = 0
+                                
+                                -- 🔍 DEBUG: Claim attempt
+                                ui.Fluent:Notify({
+                                    Title = "[DEBUG] 🔍 Claiming",
+                                    Content = "Searching for scroll for 30s...",
+                                    Duration = 2
+                                })
                                 
                                 while tick() - claimStart < 30 do
                                     if not FarmState.ScrollSniperEnabled then break end
-                                    claimAttempts = claimAttempts + 1
                                     
                                     if claimScroll(scrollInfo.name) then
                                         claimed = true
                                         FarmState.ScrollSniperScrollsClaimed = FarmState.ScrollSniperScrollsClaimed + 1
                                         
-                                        debugNotify("SCROLL CLAIMED!", string.format(
-                                            "🎉 %s\n" ..
-                                            "📍 From: %s\n" ..
-                                            "🔑 Server: %s\n" ..
-                                            "🔁 Attempts: %d",
-                                            scrollInfo.name, scrollInfo.location, serverID, claimAttempts
-                                        ), 8, "claimed_" .. scrollInfo.name)
+                                        ui.Fluent:Notify({
+                                            Title = "[DEBUG] ✅ CLAIMED!",
+                                            Content = scrollInfo.name .. " from " .. scrollInfo.location,
+                                            Duration = 5
+                                        })
                                         
                                         break
                                     end
-                                    
                                     task.wait(2)
                                 end
                                 
                                 if not claimed then
-                                    debugNotify("Claim Failed", string.format(
-                                        "❌ Could not find %s\n" ..
-                                        "🔑 Server: %s\n" ..
-                                        "🔁 Attempts: %d\n" ..
-                                        "➡️ Trying next server...",
-                                        scrollInfo.name, serverID, claimAttempts
-                                    ), 5, "claim_fail_" .. serverID)
+                                    ui.Fluent:Notify({
+                                        Title = "[DEBUG] ❌ Not Found",
+                                        Content = "Scroll not found on this server.\nTrying next...",
+                                        Duration = 2
+                                    })
                                 end
                                 
                                 if claimed then break end
@@ -2503,6 +2544,7 @@ return function(Common)
                     end)
                 else
                     FarmState.ScrollSniperStatus = "Disabled"
+                    debugCycleCount = 0
                 end
                 
                 task.wait(2)
@@ -2540,7 +2582,6 @@ return function(Common)
                 end
                 
                 ScrollSniperStatusDisplay.Content = string.format(
-                    "🔍 DEBUG MODE ACTIVE\n\n" ..
                     "Status: %s\n\n" ..
                     "🕐 Game Time: %s EST\n" ..
                     "📜 Selected Scrolls: %d / %d\n" ..
@@ -3606,9 +3647,9 @@ return function(Common)
         
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
-            Title = "GlockreisHub 🔍 DEBUG",
-            Content = "Loaded: Shindo Life In-Game\n🔍 Scroll Sniper DEBUG MODE ENABLED\nAll steps will show notifications!",
-            Duration = 6
+            Title = "GlockreisHub",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper DEBUG + Travel System + InstaKill + LIVE TIME)",
+            Duration = 5
         })
     end
 end
