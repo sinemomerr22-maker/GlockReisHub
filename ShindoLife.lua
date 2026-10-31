@@ -49,7 +49,7 @@ return function(Common)
         mainFrame.Name = "TimeFrame"
         mainFrame.Size = UDim2.new(0, 280, 0, 50)
         mainFrame.Position = UDim2.new(0.5, -140, 0, 10) -- Top center
-        mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+        mainFrame.BackgroundColor3 = Color3.fromRGB(88, 88, 88)
         mainFrame.BackgroundTransparency = 0.15
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = timeGui
@@ -61,22 +61,12 @@ return function(Common)
         
         -- Glowing border
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(100, 180, 255)
+        stroke.Color = Color3.fromRGB(243, 244, 243)
         stroke.Thickness = 2
         stroke.Transparency = 0.3
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         stroke.Parent = mainFrame
-        
-        -- Inner gradient for premium look
-        local gradient = Instance.new("UIGradient")
-        gradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 50)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 50, 80)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 30, 50))
-        })
-        gradient.Rotation = 90
-        gradient.Parent = mainFrame
-        
+            
         -- Layout
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Horizontal
