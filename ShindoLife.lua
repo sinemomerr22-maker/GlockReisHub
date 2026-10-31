@@ -3,8 +3,7 @@
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
 -- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
--- // Travel (Map Teleports + Private/Join Friend)
--- // Experimental: AntiRagdoll, AntiKnockback, ESP, StunImmunity, WorldX, NoGrip
+-- // Travel (All Maps) + Experimental (No Dash CD, Auto QTE, Nanami Ratio)
 -- // ==========================================
 
 return function(Common)
@@ -16,6 +15,7 @@ return function(Common)
     local RunService = Common.RunService
     local UserInputService = Common.UserInputService
     local Players = Common.Players
+    local VIM = game:GetService("VirtualInputManager")
     
     local placeId = game.PlaceId
     local isShindoMenu = (placeId == 4616652839)
@@ -73,7 +73,10 @@ return function(Common)
             ESPMaxDistance = 500,
             ESPFillColor = {R = 255, G = 0, B = 0},
             ESPOutlineColor = {R = 255, G = 255, B = 0},
-            StunGrabImmunityEnabled = false
+            StunGrabImmunityEnabled = false,
+            NoDashCooldownEnabled = false,
+            AutoQTEEnabled = false,
+            AutoNanamiEnabled = false
         }
     end
     
@@ -529,8 +532,9 @@ return function(Common)
                 (Config.ESPOutlineColor and Config.ESPOutlineColor.B or 0)/255
             ),
             StunGrabImmunityEnabled = Config.StunGrabImmunityEnabled,
-            WorldXSideQuestEnabled = false,
-            NoGripEnabled = false,
+            NoDashCooldown = Config.NoDashCooldownEnabled or false,
+            AutoQTE = Config.AutoQTEEnabled or false,
+            AutoNanami = Config.AutoNanamiEnabled or false,
             WarCount = 0,
             ChakraThreshold = Config.AutoChakraThreshold,
             StatsAdded = {ninjutsu = 0, taijutsu = 0, chakra = 0, health = 0},
@@ -560,6 +564,112 @@ return function(Common)
                     end
                 end
             end)
+        end
+        
+        -- ==========================================
+        -- EXPERIMENTAL FUNCTIONS (Extracted from Decompiled MainScript)
+        -- ==========================================
+        
+        -- NO DASH COOLDOWN
+        local noDashConn = nil
+        local function enableNoDashCooldown()
+            if noDashConn then return end
+            pcall(function()
+                local ok, movCtrl = pcall(function() return require(LocalPlayer.PlayerScripts.Controllers.Character.MovementController) end)
+                if not ok or not movCtrl then return end
+                local dashFn = movCtrl.DashRequest
+                if not dashFn then return end
+                noDashConn = RunService.RenderStepped:Connect(function()
+                    pcall(function()
+                        debug.setupvalue(dashFn, 4, 0)
+                        debug.setupvalue(dashFn, 6, 999)
+                    end)
+                end)
+            end)
+        end
+        local function disableNoDashCooldown()
+            if noDashConn then noDashConn:Disconnect() noDashConn = nil end
+        end
+
+        -- AUTO QTE
+        local qteConn = nil
+        local lastQtePress = 0
+        local function handleQTE(qteGui)
+            task.spawn(function()
+                while qteGui.Parent and FarmState.AutoQTE do
+                    local delayInterval = 1 / 15
+                    if tick() - lastQtePress < delayInterval then task.wait() continue end
+                    local pc = qteGui:FindFirstChild("QTE_PC", true)
+                    local mob = qteGui:FindFirstChild("QTE_MOBILE", true)
+                    if pc and pc.Text:match("^%a$") then
+                        local kc = Enum.KeyCode[pc.Text]
+                        if kc then
+                            lastQtePress = tick()
+                            VIM:SendKeyEvent(true, kc, false, game)
+                            task.delay(0.02, function() VIM:SendKeyEvent(false, kc, false, game) end)
+                        end
+                    elseif mob then
+                        lastQtePress = tick()
+                        local pos = mob.AbsolutePosition + mob.AbsoluteSize * 0.5
+                        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+                        task.delay(0.02, function() VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0) end)
+                    end
+                    task.wait(0.05)
+                end
+            end)
+        end
+        local function startAutoQTE()
+            if qteConn then return end
+            local pg = LocalPlayer:WaitForChild("PlayerGui")
+            qteConn = pg.ChildAdded:Connect(function(c)
+                if c.Name == "QTE" and FarmState.AutoQTE then handleQTE(c) end
+            end)
+            for _, c in ipairs(pg:GetChildren()) do
+                if c.Name == "QTE" and FarmState.AutoQTE then handleQTE(c) end
+            end
+        end
+        local function stopAutoQTE()
+            if qteConn then qteConn:Disconnect() qteConn = nil end
+        end
+
+        -- AUTO NANAMI RATIO
+        local nanamiConn = nil
+        local function startNanami()
+            if nanamiConn then return end
+            pcall(function()
+                local Effects = ReplicatedStorage:WaitForChild("Knit"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("NanamiService"):WaitForChild("RE"):WaitForChild("Effects")
+                nanamiConn = Effects.OnClientEvent:Connect(function(...)
+                    if not FarmState.AutoNanami then return end
+                    local args = {...}
+                    if args[1] == "SpawnRatio" then
+                        local attacker, target, billboard, hitFlag, duration, spawnTime = args[2], args[3], args[4], args[5], args[6], args[7]
+                        if attacker == LocalPlayer and type(duration) == "number" and type(spawnTime) == "number" then
+                            task.spawn(function()
+                                local HIT_Y = 0.30
+                                local lead = math.clamp(LocalPlayer:GetNetworkPing(), 0, 0.12)
+                                local fireLocalT = spawnTime + (1 - HIT_Y) * duration - lead
+                                while FarmState.AutoNanami do
+                                    if hitFlag and hitFlag.Value == true then return end
+                                    if billboard and billboard.Parent == nil then return end
+                                    local now = workspace:GetServerTimeNow()
+                                    if now > spawnTime + duration then return end
+                                    if now >= fireLocalT then break end
+                                    RunService.Heartbeat:Wait()
+                                end
+                                if not FarmState.AutoNanami then return end
+                                if hitFlag and hitFlag.Value == true then return end
+                                pcall(function()
+                                    local RightActivated = ReplicatedStorage.Knit.Knit.Services.NanamiService.RE.RightActivated
+                                    RightActivated:FireServer(target)
+                                end)
+                            end)
+                        end
+                    end
+                end)
+            end)
+        end
+        local function stopNanami()
+            if nanamiConn then nanamiConn:Disconnect() nanamiConn = nil end
         end
         
         -- ==========================================
@@ -1727,75 +1837,76 @@ return function(Common)
         end)
         
         -- ==========================================
-        -- TRAVEL (MAP TELEPORTS)
+        -- TRAVEL (MAP TELEPORTER)
         -- ==========================================
         Tabs.Travel:AddParagraph({
-            Title = "[T] Map Teleports",
-            Content = "Teleport to different Shindo Life maps.\nChecks level requirements before teleporting."
+            Title = "[T] Map Teleporter",
+            Content = "Teleport to any RPG map or game mode in Shindo Life.\nUses the game's native rpgteleport remote.\n\nNote: Some maps require a minimum level to enter."
         })
         
-        local TeleportLocations = {
-            {Name = "Menu (Character Select)", PlaceId = 4616652839, MinLvl = 0},
-            {Name = "Training Fields", PlaceId = 5431071837, MinLvl = 100},
-            {Name = "Storm Village", PlaceId = 5084678830, MinLvl = 200},
-            {Name = "Forest of Embers", PlaceId = 5447073001, MinLvl = 300},
-            {Name = "Tempest Village", PlaceId = 6901575446, MinLvl = 300},
-            {Name = "Shinobi World", PlaceId = 5943872934, MinLvl = 300},
-            {Name = "Shindai Valley", PlaceId = 5451401540, MinLvl = 800},
-            {Name = "Dawn Hideout (Akatsuki)", PlaceId = 5431069982, MinLvl = 1000},
+        local mapList = {
+            {Name = "Main Menu (Spawn)", PlaceId = 4616652839, Req = 0},
+            {Name = "Training Fields", PlaceId = 5431071837, Req = 100},
+            {Name = "Storm Village", PlaceId = 5084678830, Req = 200},
+            {Name = "Forest of Embers", PlaceId = 5447073001, Req = 300},
+            {Name = "Tempest Village", PlaceId = 6901575446, Req = 300},
+            {Name = "Shinobi World (All Villages)", PlaceId = 5943872934, Req = 300},
+            {Name = "Dawn Hideout (Akatsuki)", PlaceId = 5431069982, Req = 1000},
+            {Name = "Shindai Valley", PlaceId = 5451401540, Req = 800},
+            {Name = "World X (Hardcore)", PlaceId = 5943874201, Req = 0},
+            {Name = "War Mode", PlaceId = 5824792748, Req = 400},
+            {Name = "Conquest", PlaceId = 6341670805, Req = 500},
+            {Name = "Dungeon", PlaceId = 7524809704, Req = 300},
+            {Name = "Arena X", PlaceId = 5743370338, Req = 600},
+            {Name = "Arena (Comp)", PlaceId = 5664805984, Req = 600},
+            {Name = "Pro Arena", PlaceId = 5664803952, Req = 1000},
+            {Name = "Arena 2", PlaceId = 5307141034, Req = 0},
+            {Name = "Free / Rewards", PlaceId = 5451410109, Req = 0}
         }
         
-        for _, loc in ipairs(TeleportLocations) do
-            Tabs.Travel:AddButton({Title = "Teleport to " .. loc.Name, Callback = function()
-                pcall(function()
-                    local lvl = 0
-                    local statz = LocalPlayer:FindFirstChild("statz")
-                    if statz and statz:FindFirstChild("lvl") and statz.lvl:FindFirstChild("lvl") then
-                        lvl = statz.lvl.lvl.Value
-                    end
-                    
-                    if lvl >= loc.MinLvl or loc.PlaceId == 4616652839 then
-                        LocalPlayer.startevent:FireServer("rpgteleport", loc.PlaceId)
-                        ui.Fluent:Notify({Title = "[T] Travel", Content = "Teleporting to " .. loc.Name .. "...", Duration = 3})
-                    else
-                        ui.Fluent:Notify({Title = "[!] Level Required", Content = "You need Lvl " .. loc.MinLvl .. " to enter " .. loc.Name, Duration = 3})
-                    end
-                end)
-            end})
+        Tabs.Travel:AddSection("RPG Maps & Game Modes")
+        for _, map in ipairs(mapList) do
+            Tabs.Travel:AddButton({
+                Title = map.Name .. (map.Req > 0 and " (Lvl " .. map.Req .. "+)" or ""),
+                Callback = function()
+                    pcall(function()
+                        LocalPlayer.startevent:FireServer("rpgteleport", map.PlaceId)
+                        ui.Fluent:Notify({Title = "[T] Travel", Content = "Teleporting to " .. map.Name, Duration = 2})
+                    end)
+                end
+            })
         end
         
-        Tabs.Travel:AddSection("Private Server & Friends")
-        
-        Tabs.Travel:AddInput("PrivateCodeInput", {
+        Tabs.Travel:AddSection("Private Servers")
+        local psCode = ""
+        Tabs.Travel:AddInput("PSCodeInput", {
             Title = "Private Server Code",
-            Placeholder = "Enter private code...",
+            Placeholder = "Enter code...",
             Finished = true,
-            Callback = function(text)
-                if text and text ~= "" then
+            Callback = function(v) psCode = v end
+        })
+        
+        Tabs.Travel:AddButton({
+            Title = "Join Private Server",
+            Callback = function()
+                if psCode and psCode ~= "" then
                     pcall(function()
-                        LocalPlayer.startevent:FireServer("teleporttoprivate", text)
-                        ui.Fluent:Notify({Title = "[T] Travel", Content = "Joining Private Server...", Duration = 3})
+                        LocalPlayer.startevent:FireServer("teleporttoprivate", psCode, nil)
+                        ui.Fluent:Notify({Title = "[T] PS Join", Content = "Joining private server...", Duration = 2})
                     end)
+                else
+                    ui.Fluent:Notify({Title = "[T] Error", Content = "Enter a valid code", Duration = 2})
                 end
             end
         })
         
-        Tabs.Travel:AddInput("FriendNameInput", {
-            Title = "Friend Username",
-            Placeholder = "Enter Roblox username...",
-            Finished = true,
-            Callback = function(text)
-                if text and text ~= "" then
-                    pcall(function()
-                        local userId = Players:GetUserIdFromNameAsync(text)
-                        if userId and userId > 0 then
-                            LocalPlayer.startevent:FireServer("rpgteleport", "friend", userId)
-                            ui.Fluent:Notify({Title = "[T] Travel", Content = "Joining friend " .. text .. "...", Duration = 3})
-                        else
-                            ui.Fluent:Notify({Title = "[!] Error", Content = "User not found.", Duration = 3})
-                        end
-                    end)
-                end
+        Tabs.Travel:AddButton({
+            Title = "Create Private Server (Current Map)",
+            Callback = function()
+                pcall(function()
+                    LocalPlayer.startevent:FireServer("createprivateserver", game.PlaceId)
+                    ui.Fluent:Notify({Title = "[T] PS Create", Content = "Creating private server...", Duration = 2})
+                end)
             end
         })
         
@@ -1806,6 +1917,41 @@ return function(Common)
             Title = "[X] EXPERIMENTAL FEATURES",
             Content = "WARNING: These features are experimental and may cause:\n- Server detection / kicks\n- Visual glitches\n- Performance issues\n\nUse at your own risk in private servers!\n\nNOTE: InstaKill (M1 spam + Local Force Kill) has been moved to its own dedicated tab."
         })
+        
+        Tabs.Experimental:AddSection("Advanced Combat Mods")
+        
+        Tabs.Experimental:AddToggle("NoDashCooldownToggle", {
+            Title = "No Dash Cooldown",
+            Description = "Removes the cooldown between dashes (hooks MovementController)",
+            Default = Config.NoDashCooldownEnabled
+        }):OnChanged(function(v)
+            FarmState.NoDashCooldown = v
+            Config.NoDashCooldownEnabled = v
+            ConfigManager.Save(Config)
+            if v then enableNoDashCooldown() else disableNoDashCooldown() end
+        end)
+        
+        Tabs.Experimental:AddToggle("AutoQTEToggle", {
+            Title = "Auto QTE",
+            Description = "Automatically presses the correct keys during QTE events",
+            Default = Config.AutoQTEEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoQTE = v
+            Config.AutoQTEEnabled = v
+            ConfigManager.Save(Config)
+            if v then startAutoQTE() else stopAutoQTE() end
+        end)
+        
+        Tabs.Experimental:AddToggle("AutoNanamiToggle", {
+            Title = "Auto Nanami Ratio",
+            Description = "Automatically hits the perfect ratio timing for Nanami",
+            Default = Config.AutoNanamiEnabled
+        }):OnChanged(function(v)
+            FarmState.AutoNanami = v
+            Config.AutoNanamiEnabled = v
+            ConfigManager.Save(Config)
+            if v then startNanami() else stopNanami() end
+        end)
         
         -- ANTI RAGDOLL SECTION
         Tabs.Experimental:AddSection("Anti Ragdoll")
@@ -1886,100 +2032,6 @@ return function(Common)
                     end)
                 end
                 task.wait(0.05)
-            end
-        end)
-        
-        -- WORLD X & MOVEMENT HACKS SECTION
-        Tabs.Experimental:AddSection("World X & Movement Hacks")
-        
-        Tabs.Experimental:AddToggle("WorldXSideQuestToggle", {
-            Title = "World X Side Quest Farm",
-            Description = "Auto completes side quests in World X (PlaceId 5943874201)",
-            Default = false
-        }):OnChanged(function(v)
-            FarmState.WorldXSideQuestEnabled = v
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.WorldXSideQuestEnabled and game.PlaceId == 5943874201 then
-                    pcall(function()
-                        local village = LocalPlayer:FindFirstChild("yourvillage") and LocalPlayer.yourvillage.Value
-                        local currentmission = LocalPlayer:FindFirstChild("currentmission")
-                        if currentmission and currentmission.Value == nil then
-                            local getmission = workspace:FindFirstChild("sidequest") and workspace.sidequest:FindFirstChild("getmission")
-                            if getmission then
-                                for _, v in pairs(getmission:GetChildren()) do
-                                    if v.Name == "rankd" and v:FindFirstChild("village") and v.village.Value == village and v:FindFirstChild("ClickDetector") then
-                                        local invoke = v:FindFirstChild("invoke")
-                                        if invoke then invoke:FireServer() end
-                                        fireclickdetector(v.ClickDetector)
-                                    end
-                                end
-                            end
-                        else
-                            local sidequest = workspace:FindFirstChild("sidequest")
-                            if sidequest and village then
-                                local folders = {"weeds", "dirt", "grafitti"}
-                                for _, fName in ipairs(folders) do
-                                    local folder = sidequest:FindFirstChild(fName)
-                                    if folder then
-                                        local vFolder = folder:FindFirstChild(village)
-                                        if vFolder then
-                                            for _, v in pairs(vFolder:GetChildren()) do
-                                                if v:FindFirstChild("ClickDetector") and v:FindFirstChild("taken") and v.taken.Value == true then
-                                                    fireclickdetector(v.ClickDetector)
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                local groceries = sidequest:FindFirstChild("groceries")
-                                if groceries then
-                                    local vFolder = groceries:FindFirstChild(village)
-                                    if vFolder then
-                                        for _, v in pairs(vFolder:GetChildren()) do
-                                            if v:FindFirstChild("taken") and v.taken.Value == true then
-                                                LocalPlayer.Character.HumanoidRootPart.CFrame = v.CFrame
-                                            end
-                                        end
-                                    end
-                                end
-                                local deliver = sidequest:FindFirstChild("deliver")
-                                if deliver then
-                                    for _, v in pairs(deliver:GetChildren()) do
-                                        if v.Name == "point" and v:FindFirstChild("taken") and v.taken.Value == true then
-                                            LocalPlayer.Character.HumanoidRootPart.CFrame = v.CFrame
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                end
-                task.wait(0.5)
-            end
-        end)
-        
-        Tabs.Experimental:AddToggle("NoGripToggle", {
-            Title = "No Grip / Anti-Root",
-            Description = "Prevents character from being rooted/gripped (sets WalkSpeed to 200 if 0)",
-            Default = false
-        }):OnChanged(function(v)
-            FarmState.NoGripEnabled = v
-        end)
-        
-        task.spawn(function()
-            while true do
-                if FarmState.NoGripEnabled and LocalPlayer.Character then
-                    pcall(function()
-                        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                        if hum and hum.WalkSpeed == 0 then
-                            hum.WalkSpeed = 200
-                        end
-                    end)
-                end
-                task.wait(0.1)
             end
         end)
         
@@ -2291,13 +2343,14 @@ return function(Common)
                 if FarmState.AntiKnockbackEnabled then table.insert(activeFeatures, "AntiKnockback") end
                 if FarmState.ESPEnabled then table.insert(activeFeatures, "ESP") end
                 if FarmState.StunGrabImmunityEnabled then table.insert(activeFeatures, "StunImmunity") end
-                if FarmState.WorldXSideQuestEnabled then table.insert(activeFeatures, "WorldX Farm") end
-                if FarmState.NoGripEnabled then table.insert(activeFeatures, "NoGrip") end
+                if FarmState.NoDashCooldown then table.insert(activeFeatures, "NoDashCD") end
+                if FarmState.AutoQTE then table.insert(activeFeatures, "AutoQTE") end
+                if FarmState.AutoNanami then table.insert(activeFeatures, "AutoNanami") end
                 
                 local activeText = #activeFeatures > 0 and table.concat(activeFeatures, ", ") or "None"
                 
                 ExperimentalStatusDisplay.Content = string.format(
-                    "Active Features: %d / 6\n\n%s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
+                    "Active Features: %d / 7\n\n%s\n\nESP Stats:\n- Max Range: %d studs\n- Players Tracked: %d\n\nNote: InstaKill moved to dedicated tab",
                     #activeFeatures, activeText,
                     FarmState.ESPMaxDistance,
                     (function() local count = 0; for _ in pairs(ESPHighlights) do count = count + 1 end; return count end)()
@@ -2393,7 +2446,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel + InstaKill M1 Spam + Local Force Kill)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Travel + Combat Mods)",
             Duration = 5
         })
     end
