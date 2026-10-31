@@ -663,7 +663,17 @@ return function(Common)
                     end
                 end)
                 
-                StatusDisplay.Content = string.format("Status: %s\n\n🕐 Current Time (EST): %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", Settings.Status, currentTime, table.concat(slotValues, "\n"), spinsDisplay, Settings.TotalSpinsDone, Settings.MinSpinsToRejoin, Settings.SpinDelay, targetText)
+                StatusDisplay.Content = string.format(
+                    "Status: %s\n\n🕐 Current Time (EST): %s\n\n%s\n\nSpins Left: %s\nTotal Spins: %d\nRejoin at: %d\nDelay: %.2fs\n\nTargets: %s", 
+                    Settings.Status, 
+                    currentTime,
+                    table.concat(slotValues, "\n"), 
+                    spinsDisplay, 
+                    Settings.TotalSpinsDone, 
+                    Settings.MinSpinsToRejoin, 
+                    Settings.SpinDelay, 
+                    targetText
+                )
                 task.wait(0.3)
             end
         end)
@@ -1650,343 +1660,292 @@ return function(Common)
         })
         
         local ScrollServerIDs = {
-	ember = {
-		"72ivGo", "BqXz77", "hb4TbR", "h8UN7d", "wN6mFD", "mEjOEA", "L9D1Vq", "13Dj9p", "rojuE4", "L-AzLu",
-		"LcRxLd", "atdWrW", "ufVgLu", "eIC7LA", "BPlBfp", "KFqY40", "_S7oDc", "Tg0_Au", "z5KMRG", "56fXqz",
-		"xN9mN4", "sA7E2A", "de6zJf", "UppJUd", "4MrhMZ", "ywiAQh", "CHZLms", "NlNRDa", "YMJAEr", "IcSnCp",
-		"L4s0py", "PM_yEk", "FfPxyL", "2M4ieq", "GPaih2", "t4n-wt", "ZKa1xh", "voFC4Z", "9gAS_H", "xiWsYq",
-		"Ap1ytv", "S3ngKz", "T6f9X7", "xiZZHA", "S5Me6u", "pPn5VX", "dgagtt", "0dNJVL", "fpwGKg", "lCnqSi",
-		"dc2q_T", "A6iJnw", "OPWJTw", "Zfn6nW", "GmBpOs", "xkbIMy", "u4pkQ1", "1kjoS9", "96H_n7", "yNtKe1",
-		"H9PCO-", "D5thR4", "BCTeP-", "HWPCvV", "7NRGod", "eEElGM", "7_rVaj", "f-zJKQ", "uyU38u", "jW2xJD",
-		"Eh_0EC", "S4Hn-M", "kDnYz6", "antObl", "9wUbJJ", "O7Fkk2", "gsU8mp", "CbMr_T", "9U8LPy", "xoDP4P",
-		"GHdF4r", "sBm_se", "6rko4P", "cN73ya", "UcF4JD", "UtAZlc", "UaXCZk", "ZsFFhZ", "kRAquT", "6NoJgJ",
-		"mt_O2A", "TUdAxo", "eHRHrd", "SxPxu0", "8CGAZH", "CeeBds", "FxhgFM", "BSkZ_n", "OxGgP9", "sssUE9",
-		"SUVs0F", "p5HiOJ", "wLAJX0", "ungkgo", "kUVqRr", "b5ceSi", "chTNe3", "vQ9-BW", "KYG1sq", "tdqgZW",
-		"jyQ3P3", "oYrUR1", "1YOVXZ", "pWnvjd", "Cvs3SS", "KBDjoX", "LAmvYt", "Zqs3Pu", "mW2FoJ", "U2vUrD",
-		"MKys9H", "DEfkMX", "_EXVbM", "FUDgke", "YCePOO", "JUZVBU", "xvFoUq", "_bSq9N", "Ljvff8", "5rz1jq",
-		"A-kRqJ", "8Pw1Ps", "GLPBmU", "_30BAS", "cs1gM5", "SQxoGz", "jkAYFg", "04SWhD", "c6Yfut", "7ErB6Q",
-		"Mz0SYU", "B_72Ob", "vDjzXh", "8pOKv9", "uubfNm", "RceAzV", "qAw1n7", "OXMU1i", "yfmCsw", "3JfSZz",
-		"WMYUAY", "1zPns-", "UQiDdq", "ozw1Mm", "vRxjZQ", "9dokXE", "uxJJdB", "kJTrGz", "FsENu0", "0d9sD5",
-		"X3na7A", "4cpiq_", "LhddGz", "ZsTeKH", "ZRLUoK", "ktOuCE", "Pu-q_c", "QZU7ky", "gpea_7", "MB6SJW",
-		"faXJyz", "09xhRe", "atL9hB", "7Lvj8H", "g0kiz1", "R0iyRs", "DPqYpO", "nmYVJ7", "QArKzc", "jmsbDG",
-		"44puHp", "Q812zF", "M3jgMW", "5mkGoT", "WptNLd", "o9DLRZ", "tkqyBR", "P5OdyM", "h4GAdK", "WsdUgm",
-		"dNsDRE", "zphst5", "SfY2sW", "4qVoLS", "bBwnVe", "2JaspW", "zE_f6v", "Ryt_Zf", "8CTs1m", "wJsLZe",
-		"ACZySD", "uS9XxA", "VvPHt9", "DOrvCW", "tPWQWV", "VqkLJs", "snJvZH", "1ALgoY", "vVDOAn", "k3BAAM",
-		"2FFxzR", "w6Nsno", "DALyaw", "DD7WuX", "1fbK1m", "JO4vZb", "nxAw9U", "v08r6q", "qMdBgO", "XCmrXX",
-		"1bnsym", "_S-hBL", "zhOSC6", "Vp9XSm", "Trmqqm", "k7VNo2", "QYLNta", "dNe5nS", "jmTF12", "sMQC7L",
-		"vSvFKS", "w9fjk1", "sDgpUW", "UrCpGJ", "_DYvBx", "HS9UPW", "BYpYRK", "DyNRsn", "dgFsS5", "eKNPDc",
-		"ZZgYiT", "3gFj7D", "K9gRXl", "b7IpCK", "voL4oL", "Lbgd0H", "q3mdfL", "YM3fj0", "L1XXQa", "nRBS92",
-		"D1NQVx", "wxf1h-", "u5jtbL", "sQpsNr", "KCEX_r", "83ppMG", "CRRvye", "cqkzAR", "sR_MMu", "TGqtm2",
-		"byj8Y8", "GzAAyt", "Trm8CJ", "BsUdJX", "9_bkek", "bqE5im", "G60Qcs", "VopJBa", "QqwGbL", "KrFZni",
-		"j3ZC7W", "LueVBN", "8vmL2y", "3soPN1", "yKMMdm",
-	},
-	blaze = {
-		"oetXZ6", "v44Bd-", "cXXokm", "utcpPx", "kk0Ivx", "bSYHfJ", "nIvabw", "nnANqa", "5aQksY", "Vx1VH4",
-		"pSgj2U", "yYqHFg", "HZ5fHS", "xk55Hb", "VWtj3x", "OF2o67", "GDxN-O", "SBiTde", "5uBjmD", "jgfTo2",
-		"00VdTG", "2xUsba", "y1yXRB", "ScrPMj", "P1kfFb", "HeRPjT", "JO9afK", "Bkqnyi", "kJ66_d", "yDjqNr",
-		"JC2kyC", "fvRGhV", "nFwKdO", "V8PBmA", "xEMGMw", "3kdok-", "V86iuz", "KQrgT6", "FCxzkn", "sH-925",
-		"M5pJP9", "sta7Rh", "CEWQRL", "ikoOpy", "UGOgOS", "i-szVw", "0YRVhs", "iG7E81", "amSL-y", "THvUfE",
-		"zYjBov", "S87mGN", "bCp3iz", "RUxSVc", "WxN0vr", "qf68tG",
-	},
-	obelisk = {
-		"1r-1iU", "ylgHKH", "rzyQWX", "EvRA8H", "DrFQ6t", "aWs6Po", "phyKYA", "WDm6HV", "G1Hdb4", "0goLRB",
-		"U6FaMn", "Z8mGSt", "dcDBR6", "bO8kvU", "mn_xGR", "eLapCt", "8KArxS", "kyM9e0", "ozFZJ6", "WWpFZJ",
-		"MLmOFm", "Wd9r_h", "Ce6dEk", "vHRaZA", "p7agqj", "eMXePh", "LYE3SG", "Mx3e3s", "K4q9Jf", "Edv8uH",
-		"MWrt6c", "24vKA0", "2ThCfw", "8y8Noq", "jQiHp5", "J4HuaK", "Y-yPtF", "BFIVk5", "FTEyfW", "GrdLFY",
-		"8vQTVP", "18mHIn", "gXk0Kv", "_JgFUI", "3DayPA", "MFHOUg", "zUeUBj", "WEhhel", "CjdUGG", "ru4wag",
-		"tpNXsS", "3c94O8", "6mCtFo", "PadPpk", "xg5IR7", "09DvCs", "ALfSDo", "uUU1-r", "5d-88a", "DsjagO",
-		"f2gU8h", "oRFLRc", "uMTFU-", "mGaO6P", "KQmhGQ", "z58fM6", "UbgjOY", "97BHrm", "QVcbYR", "pu9eKj",
-		"G8-EoL", "s3_Rcc", "2tZtRn", "8eR6D3", "s-EuYy", "Fgg5UL", "_JPL0e", "czVWuA", "NmH38c", "RjOXLB",
-		"VRvL2O", "wdT4g5", "G5RqHA", "OAtd0C", "Bz5RQq", "xeLbYv", "OJscUo", "mHAZtS", "Ctadha", "fG4Lgo",
-		"cTMZL7", "3rjpoN", "G2DE29", "4zGwwE", "e5tbEr", "9dokwY", "8ZydHf", "M5z_t0", "ETgE9X", "Muo_65",
-		"yTYxDU", "Wrm89X", "KyJvee", "h23Ok_", "nhP3aF", "P4cu6X", "9C5Eq7", "Pyzx03", "RU2sTg", "us_Enc",
-		"8ZV6sW", "StvooT", "h8jvmy", "Ksjtvp", "EagaGx", "9wXR-R", "aEG4S3", "Rax-zt", "yhsKA2", "BXz902",
-		"gt93NS", "0nsn18", "RnOqf0", "q1gSsj", "u3TUdx", "hGKMts", "QtFx8W", "tJygcs", "4UwtAD", "XstV76",
-		"n49Z8d", "v3o3tL", "YNccZg", "JatC7H", "M3aWJa", "H5CWBv", "33KzX2", "YBTh12", "BCjhP0", "8S951k",
-		"OjXxdg", "NyjA1f", "66Q-qd", "40OsFu", "SrhB9W", "dSPp0F", "Ame5L_", "BoqePB", "UYBUNw", "A6Dv24",
-		"tMkHqz", "LTv36K", "LMmVdB", "YEXQLa", "AgtLcn", "69p42W", "E-4_o-", "EEkmMc", "7XzwT9", "MKh9UQ",
-		"nCBVFL", "yqA6di", "z8eWPA", "wFfisH", "Fh3i-k", "Uno_ha", "_ofQq6", "y65keN", "fRe_4G", "8JwEUQ",
-		"Y-2W6Q", "4WQmJj", "_kHpEk", "O32yWD", "1NKOuP", "0_D_DT", "fDq2LG", "uisHy2", "qThOEp", "FWuWMN",
-		"uoCyLX", "BMKuQT", "c22vBd", "VxwSf4", "DA8vsO",
-	},
-	nimbus = {
-		"cdeLvT", "EnQsaj", "gg-K9s", "-2fmeY", "5pc1Pr", "8tr7iE", "8rE4r5", "utRdr3", "w1wF1v", "V0G5cn",
-		"3yuoU_", "k1dwzw", "KrEckV", "KZR0Ta", "MTVXrF", "Rl573L", "DgEjVF", "DxvS0I", "9Hi-G4", "nbBnO0",
-		"hm1-HC", "vxde84", "yTnUvM", "EuP2oj", "ASVC6V", "msvWWa", "69ebaA", "6QQuvt", "rFsoiV", "sAw7-r",
-		"DU2EgD", "MGwmRc", "o4i-I9", "mQ0jKr", "-fvLt0", "W_zmtA", "-LLpIH", "hVRr3I", "jeSReA", "YrAMoG",
-		"1yvI7G", "O2VD24", "9mGZDI", "c18AoA", "E91YeK", "fTVjjZ", "RUmJQU", "HH5XGe", "Y9bgra", "DaBl7T",
-		"KPAWCt", "4RRCga", "Ygb1G7", "3lnkA6", "dypA5l", "Zs9SDi", "VZvcVX", "D9Y236", "6SZj5k", "h-GzXA",
-		"YzX17x", "YL77hP", "ifYdRS", "AZK7Cd", "dsIW3V", "o1lWNs", "u1z_Le", "M8t44p", "ASVOku", "0SbrMF",
-		"vbMnNN", "0nFNWT", "mZN9-y", "U5fGcw", "FE-JMj", "ch2B9Z", "WB6f4Z", "iFnkSi", "3KaZn-", "ZOuZ9V",
-		"j6E2gX", "2a2gwJ", "Ro-Uam", "JBW_bR", "Iq9gY_", "Lm7IcV", "RXFJm-", "reGDxL", "LYZyXG", "YKtExO",
-		"oMFeZc", "vENja8", "spUHJd", "srZQrF", "hBFA49", "YXo2fd", "R0Mysj", "PQTn2K", "4uN3gM", "4XZ6D8",
-		"ztRqdD", "WUrew9", "tSsMoG", "arJgfw", "NMpeUF", "2f0PZt", "DBp9O0", "Z66rPO", "DDEkzo", "hOEM59",
-		"Ru3bzm", "k5rDA5", "hfNMf_", "UU7fVF", "J6MeA6", "1Su91f", "SDBD4T", "woWVh_", "JbaEgu", "qdy8uR",
-		"siZSB8", "Zd1ko4", "wottW_", "HJ5D3N", "emejZA", "qwPFRV", "ZD_CBn", "uPDavK", "35hwDY", "JxM5xH",
-		"yEraTG", "_eYnoc", "GD-3Xv", "jrK5hZ", "Zm_QZ2", "4LTBso", "Fr9fRs", "nXQw7r", "_Zy2pU", "q3vgbD",
-		"YcVgf6", "TQwd-1", "ezEMtS", "PKs_yL", "k_Bosk", "VaGUJF", "vtczSi", "VQNfsb", "jCFfPb", "pE4ojt",
-		"WS7uL_", "0qA3Y2", "Qy4GvJ", "AWv4Dy", "UXfG7p", "vXHzKE", "xGVKS3", "2zGsS2", "gQPabn", "s--rOQ",
-		"Pc2_ki", "uwggoU", "r0SEht", "cNhF-2", "0uhVFt", "NmuFrf", "EJT_dD", "tf6uwA", "VQqnXg", "Og9_Rw",
-		"imPpVM", "t9DdHg", "p91RTC", "HAOyYs", "IcTyvU", "jEE0Kv", "BJGqU4", "kcccBn", "XXJ5GZ", "uzTYM7",
-		"KEs5Mr", "B5k_LS", "VnamFH", "lGuzZy", "X5gW2c", "DXDc53", "ajZCQ4", "mXdq4s", "hlO3q-", "qXcG3Q",
-		"xn_bkC", "B9Uf7K", "3fFE0a", "UokYmc", "bpRj_J", "7Jgqqj", "9xbVsU", "pHV-r8", "xCurgw", "cvXyX2",
-		"p1rSoO", "90pbW5", "Tr2g-g", "2w8ksR", "wMc4CN", "JK0g7Q", "mpST_c", "mYuS6U", "LAr34x", "4Sdif2",
-		"WqkFyX", "QCdHjB", "9ZDMTk", "RW8X_T", "Co9ctL", "u9oAar", "fFZj57", "8megja", "Bvq2rM", "OgMz5m",
-		"nfgyQY", "RnB_qM", "1z-hQ9", "7EZvCE", "7mnvHv", "PeXZex", "O8UnJH", "xO9ga1", "hFgAqN", "Xdsv6q",
-		"bdZMYD", "MaNXhQ", "Ot9_sd", "8LoCB3", "ku8-dR", "M6wtq0", "0H3j2M",
-	},
-	dunes = {
-		"kjHLQh", "JyD9oK", "c_qb3A", "1QaPSq", "DJNZD1", "j6T2pq", "0uP7b7", "_34jSv", "bbCK0r", "BOIX9J",
-		"i0np8q", "gjezo2", "DBDdn5", "KH-sCe", "PHSFUE", "GwOERh", "cK34vW", "VKft58", "cd45mY", "mK285c",
-		"0oR33t", "hBBm8z", "DEsxis", "jsa_JX", "iT_pya", "tOuUav", "ytwBtB", "aHZElq", "jVlwFh", "OQzhBW",
-		"8OyPal", "AJYQdj", "dZrONC", "TrAulx", "tCumNq", "ABPTGy", "LUaHAY", "979f5G", "0bH64Z", "jslyOK",
-		"CItjVX", "VVqgC5", "uTKrGT", "3qIYHD", "vBgNHv", "5Nxv-u", "DfX4Ef", "td2p72", "tx1CPC", "wZKFSi",
-		"v08Fl2", "iIGh28", "eKV4q3", "F2DP_d", "wEHWxx", "91WKO3", "5Qk8sk", "7tNYtC", "0258mW", "0K4i81",
-		"OeR3rh", "Q4oUKN", "ApG-EZ", "PnT75N", "CJ5wLx", "tycpnO", "O4XrZk", "GqHQkM", "o-QgoF", "3zuqKX",
-		"otPaBW", "ub9jMc", "ChDFGt", "UKydZv", "8y2Emi", "SeEFkV", "WC8uP7", "oLd8md", "DqSnnv", "D91x3Y",
-		"5UEgCH", "QFoxbP", "_KTfgq", "MFNtd_", "z1R73g", "DMUaXm", "p2zoOC", "GDVrV5", "p3ghWd", "SLB2cK",
-		"9oHBKO", "TdswV2", "h_7PW8", "Yfa2Nx", "e5AF56", "GCa3Af", "VPre3-", "O7UMcw", "EpJvb4", "JQhuPL",
-		"XRhBkq", "0q3NdM", "7ewRGF", "a7Qw7w", "mw6_uH", "OFWbaY", "AWh5g-", "8U-hwz", "8mE8Cz", "muT44E",
-		"mm7tmQ", "DPGfmL", "1fErxH", "7ttFkM", "0st9RX", "ArPPuu", "jSkko1", "QVb1Oy", "QDLD6T", "0LA1RZ",
-		"donYFd", "pCGk_4", "pb6SHF", "dYWJ-R", "xdfqBV", "4Nr34A", "yvpQXo", "uyZdWB", "U2LmCB", "ytDCnf",
-		"hJZcbH", "hqL2gD", "EQEvHi", "1Kc9Pn", "d7VxTc", "sebYXD", "PngyGi", "7f7KEn", "FiYBiH", "fVw1aa",
-		"PHrYKv", "6pfjSR", "JPseGP", "pdqe6N", "rWGVZx", "hNc8oB", "0qO3s-", "P2hsW3", "oSLX-6", "AuwSb7",
-		"8PRize", "dRm_jB", "daJrLD", "U2bW6B", "PMWQAo", "nbKuwg", "O1S48D", "eavk6X", "gOwUmB", "FFApKK",
-		"MxMqkE", "gyRZBq", "z8Zp7X", "B3qAQu", "O_UVyp", "9OeU-o", "GqPgCG", "4Udk1k", "5J8hCv",
-	},
-	haze = {
-		"k_EA5-", "SzpGCP", "uJHNVe", "8Qonjc", "xiteS3", "n5QW-C", "IuUYEJ", "dPwoz2", "DHLMcU", "xzDec3",
-		"y3mBGn", "328q0x", "mNMYKT", "GqTBzF", "P-KW7B", "G59Mi8", "Qeq74Z", "FPvTxa", "Pgp-G2", "s5w8ZR",
-		"Nwmp98", "eF6PCu", "ap-L47", "hJ8rtP", "3wF4pq", "YaFgwF", "DAsg9N", "4xuLXp", "nvL_Sb", "p1wCAt",
-		"BGMbRE", "2LvuBX", "QtX2MX", "yWzxmS", "q4oR4k", "wW0pM9", "PZsLoS", "UHBVp6", "DaeRB5", "a6pHGN",
-		"cjUN-W", "QXQTqS", "-gbkXx", "_WX6Qz", "zDQ3Tf", "E-zWby", "M0edch", "mLEJ4z", "81cYgo", "YGjc0k",
-		"a2kDLL", "jkfLAJ", "hHJ3m7", "NcBOc8", "c_1wCP", "K2_Zxd", "oZWwbW", "WaxU6c", "rACjNC", "khQWNN",
-		"JQb7HY", "RoKPkb", "zTfrwf", "ocgSvg", "2W3390", "jSmD9g", "uR9r1G", "mpUjsQ", "8Kw54_", "xXp-Zg",
-		"SuuE1H", "pE_z4G", "rQ3VCJ", "yWKCc5", "ZbPeKU", "2awO1W", "548dQN", "Zp3r_B", "2iiUPR", "GD_nrU",
-		"uU7-ef", "m6MuYt", "rhPhrK", "F0QD23", "3FTY2X", "Tq0Epo", "LmnOeW", "LTQqmH", "1MO_87", "XQP05R",
-		"mDQuHR", "2hBUOe", "S1cR-O", "d7jacs", "4aMVh0", "CBqF8x", "NyYpLe", "etasO1", "fUvY4_", "EmgT7M",
-		"9tmmWX", "OKrErt",
-	},
-	vinland = {
-		"9PZUzn", "QRw2Rt", "mLwFTZ", "aZb1jP", "Ei_8OL", "AP8dXx", "_fVhwa", "OkJXnt", "Ot0Hrn", "VZVAcs",
-		"wKGBbj", "9zew35", "4PrRoK", "_A2jSJ", "muM0gn", "chJTLM", "iaBXsj", "BVB0Zu", "ERJtrm", "QSLpW2",
-		"hhAwJL", "OHSeFD", "RRWxp4", "6oCBWJ", "Ze9nyt", "MvuXNh", "hFi_Rr", "xqdqY9", "o_rM0Z", "7kV9N_",
-		"saLMrG", "WFx0r5", "iSMnJm", "K26t6Y", "hRmG8p", "D8RV-a", "oHeTpn", "bGFYtg", "AmSTyi", "u8aN6U",
-		"ytvDo3", "FfFT1b", "uL3XYq", "2X6oay", "Pq_4se", "qKkdJY", "ZuNMRQ", "jf9xJb", "_02gaY", "HAVpNo",
-		"A5a3CL", "zJFReR", "gUn7H7", "aiy5Pv", "D1Q-PQ", "UN3zxL", "krqs6m", "SMO_Y1", "NU7gKV", "gCb62t",
-		"jbWndN", "NB9Cn5", "ZTxUnk", "KF1loD", "T625xx", "6zPdQC", "46qYUA", "Ekfz2t", "tBSBuq", "XMrkBi",
-		"NCbuxn", "_Uh_Kx", "W-hUcN", "_huiKB", "dCEZ42", "9U_wJr", "X_2-m6", "twPOqe", "PucpvX", "e0SPqJ",
-		"8Q958-", "NDVFK_", "4ghe_6", "MTSp2E", "NUPUQF", "XQf46G", "AVDs18", "hTiOfF", "azpYV0", "3TtVZV",
-		"9QCpQ1", "n1HqKD", "6n_NNu", "D0wOpL", "wOP_UD", "z4O55W", "3ypNv0", "d8JFNF", "-93yfL", "N9jyZc",
-		"eUclSG", "o1SkpH", "nyjgVx", "WqcztZ", "76fBbq", "w6UKd5", "Yw5BPN", "D6yTE-", "0zJVoX", "3eFtfO",
-		"NrnukE", "fycdqQ", "KIsbQ_", "mfwci-", "dgR_da", "XJa1dJ", "QBN15K", "GFZ1L-", "mcOHjs", "dHQoeu",
-		"2LsOsp", "cygBio", "sRsnd8", "UplsX4", "jj-iZx", "KUAIoy", "GIdQeb", "n62GsH", "Q6tRNv", "z5MX20",
-		"td7aTp", "1Gs41a", "6lbj2Z", "FpE_3e", "ozfuTQ", "YvX8z_", "gCT-4b", "qwOghd", "eYWUj_", "z4uJP-",
-		"gM6PCR", "jYq0yD", "tcucju", "dHfdOU", "bYHU0h", "JW0wGk", "PwWlxK", "GS_2nI", "X0mKAW", "9mGUcb",
-	},
-	forest = {
-		"PtyUCG", "QqeKj9", "Bp66ht", "0YjmTf", "1XjC0A", "EXgFws", "g3YHu6", "r8j0DO", "bbzc8a", "SnpGFN",
-		"ZEavDD", "AtqYsx", "CpF3mt", "O_EhTf", "7uixdR", "FrOKMP", "6p4zRS", "ru-xOn", "1RxZXa", "S2Fxx-",
-		"ZL0867", "NBaEpL", "KTds-P", "V58o74", "59_Tfr", "soksfX", "FVwA6c", "SGy28e", "hSCOWY", "1LzeME",
-		"ErdOLV", "Z6vghd", "jpLbfk", "rPprag", "vTTSgM", "pVLc9y", "bwU1HU", "yMkhAd", "r6cNCF", "wTTuFk",
-		"ZVbbA-", "RF_kWT", "pwzhUx", "X9tWQ6", "UPZjnj", "d4y2Cw", "SNLkDX", "tjS6F0", "3DLqyR", "xxKdfu",
-		"A0tpTu",
-	},
-	valley = {
-		"CwUcdw", "6WtZU5", "zQOd95", "PcYb2t", "Rik4AY", "kbWUiN", "OSX5pn", "j2xkXy", "amTKZ4", "HZ73Uz",
-		"zpSPQ3", "uNmDUC", "dsbPap", "UJTkiY", "uPnGFS", "PcLWXv", "tOc6NI", "Dx5HXV", "1nhjzU", "cN47nA",
-		"AFyav9", "0hd0Dq", "67hMtE", "RJ_osx", "8QTsTh", "9mbpz6", "sYe4D-", "y0q8-3", "RTzCOb", "OaMjoZ",
-		"hUE_0O", "janeqc", "kLEqNP", "V8tnKf", "AH7uLs", "aoVKmH", "J0Xgau", "fwRGeC", "SUWUfO", "9S90eU",
-		"9nGdRq", "rSccSk", "tjhOtv", "hR67d2", "bkarof", "X4cjq1", "cQNrYn", "GWhhBy", "NSEaBC", "s-oFTA",
-		"AM_Jy-", "LKThR1", "RuqHC-", "gd52Eo", "P3hQxk", "bGC41C", "WjQs04", "_hskCQ", "nfd1S8", "V9LMdR",
-		"D7ZbRe", "QtPcQm", "aKEBLs", "f-dChp", "QPTsnX", "Zf-Mne", "aCjQJ5", "pDg1xE", "Y8N7uU", "Jvu4xp",
-		"zpxCLu", "LTMPm4", "GnS9f8", "7rhgEp", "vW5FEq", "G4MoPD", "_6dPxJ", "uS9Kac", "8yS6xi", "fV_0T1",
-		"MoViBq", "qbqHaw", "9ShuqZ", "pU_-Q5", "k38Psn", "dQ9LGM", "FiJw2d", "a3vKxa", "xYcLVA", "meD8zx",
-		"DkyGnu", "YsGbTH", "dfjBpd", "aoilqQ", "3BC5UC", "pnJA-W", "FTEdAS", "0u10_P", "aUjZOe", "rePW1z",
-		"0QWfcY", "u6d1kr", "zTZrxV", "mjIuKB", "RTZSt2", "V0KbEd", "jo_twK", "_RlSEe", "1u1Qa7", "eDdDK3",
-		"hM_NEl", "bnd9hg", "xs2ex8", "udrGSV", "T1qTXg", "TMmqXj", "B-Y1Ur", "nNx8to", "6aYFb9", "JcWINp",
-		"IStWXT", "qa5Cm6", "n0KRPO", "Vjn2ag", "zjefKP", "W94SK0", "nLRJJT", "o9ilgb", "Li8JXA", "oo7V5e",
-		"IKfA7V", "4wdOHk", "suJrjY", "qGY0lM", "Sl2QIO", "pGjgp4", "X2lDNQ", "QGrQAc", "WpcJfE", "27J2Uj",
-		"lM8yje", "qonYLZ", "1eRi-N", "8nzqo-", "DdK4hQ", "K_QgsL", "ynPAha", "bIr6eA", "LSAvOb", "u_8Nsd",
-		"RKwiNk", "cedsOz", "cMKfYV", "XBE9Sc", "u3yPxi", "DXgJhn", "8bX3JH", "tZaVIk", "pu3QHf", "OYJgqH",
-		"MjkT5m", "yrFdl1", "BN-9og", "NPjbBb", "MuSbQT", "L1hWO6", "MFFpKK", "dXzjun", "k_3h4C", "TrX6Pr",
-		"pvuTZX", "R-5ip3", "xoncEY", "q8qDYb", "66idLf", "AWGUbo", "ameY6L", "5S-2y1",
-	},
-	tempest = {
-		"clM8Ya", "hiusw7", "mPstuG", "ajmbsg", "QeC90r", "clBYIY", "VGTIH_", "Me0N18", "hbpHqG", "ExvyLL",
-		"4aTrwy", "KiiLWd", "7DLeZ5", "TGqHes", "rm3zlk", "GdLf5x", "kGzK24", "wwUl_X", "2B4cJP", "MQNZS1",
-		"ovzAqp", "1WSvLV", "yMODbc", "jsKAFU", "om40he", "7K3_s2", "xXAy5T", "peWrO0", "WEe7XR", "JgjgF0",
-		"tkN4P4", "nMQZrQ", "4gdXEA", "Qc-oFj", "ganq4R", "qt7y49", "D_ox7q", "fQUQYh", "OpyKRm", "76CgQ0",
-		"NV3JfY", "D-hkZN", "tfr9uN", "YA1ztL", "RLV7jo", "3VG6fN", "bdh8GG", "6LNHXK", "hHVY5s", "TTuFC3",
-		"RSjQsz", "vAw0Zw", "N5Wo1K", "yP4X_a", "LYjwAM", "bGKEak", "DGV7h_", "hrGhUP", "rVfAQX", "nbFJPg",
-		"Vzv0ss", "xUQL1m", "dja-bC", "BhQoDg", "3msTOh", "kAK--6", "cv95dY", "Qktj0v", "Z0O9yo", "vLZVGJ",
-		"2KFoRM", "PeZDYW", "Efw5xv", "f2c_k6", "gCOR-h", "tNyBrn", "E0-uHK", "C59dsV", "m-QqGR", "3x47Xw",
-		"y-uWDo", "JSAtLB", "M4VHkx", "HHEZAx", "aEGYuK", "49EbRS", "ZR8dSJ", "dx0C1T", "0u5_-o", "HBUbpx",
-		"UEWX7o", "29tPAh", "QnGgRk", "fd9x_9", "aCa368", "51orXp", "NVu1WG", "MfdUNo", "NbL4BB", "HOvFtr",
-		"nrCCus", "Y_f9Ua", "Ynmoba", "0M84pP", "W_Qyy-", "qsNbs1", "UtNyb2", "Y1vWkX", "SxsAkP", "e4CaNV",
-		"oK6UMZ", "vnej7C", "LbNFFX", "cuiD9V", "ix3HBq", "SNYywm", "W1rpn9", "iyssuo", "aH2RJf", "ctm8St",
-		"Mjm-ga", "FosAre", "uzC2R7", "WBQUJ_", "08HGnz", "6zrCDv", "NBm9fA", "m18REp", "k3KLeh", "bT9aAT",
-		"GRQZQB", "jQgko_", "5G4OSX", "HcJyCo", "pc7yF3", "3GtSGH", "QZZ-Xf", "07fmMt", "QxM6og", "YWZoMR",
-		"2WPk9G", "mvOsPo", "nhfi2y", "z5o52L", "zDsap0", "ZXc7ys", "go-Mp4", "RTHgom", "5H9Gvo", "SndzyE",
-		"k-VZLc", "XVaLcP", "2LS2yC", "ErsRpy", "SKjkgz", "dO1qwK", "7F8uYZ", "PEBYKE", "xF5dfh",
-	},
-	narumaki = {
-		"_NeQsx", "OZNRd7", "4TaPeU", "sgdMpU", "i4QN9v", "AYYqFf", "Dbzn6u", "3L8Ygu", "eHNDMc", "jVZ3_o",
-		"Qfcn9U", "d9pHeZ", "KZoWPL", "KTD-nL", "HAiPmD", "_XmpKL", "qyYZEO", "vtgHhu", "3LAHby", "3b1-cU",
-		"qHbjmE", "zP6ThL", "mpHkti", "tO6cgK", "mWgRGu", "x7PKS2", "Jb0q5S", "UTzbZm", "NtPS2w", "w5sDFC",
-		"ueobFe", "NBXgvz", "j7HB2h", "Kw8uXx", "kBpYSV", "RST3T9", "KoBnyr", "A8tP0x", "bgk58F", "xmZ2s4",
-		"6eLfPN", "6u9Eq1", "z7BPQz", "0FuAAh", "eVdX8a", "T1V_uR", "30YSZ-", "DsSpuQ", "mCeujT", "TpppdP",
-		"970EfD", "uzb6qH", "oVbO5W", "aXm_vk", "yFPoTw", "q5ka9e",
-	},
-	training = {
-		"5doj-B", "_gDIcA", "yPDCX7", "IVGMx8", "WxUb20", "u5mJ_j", "80GFb1", "37S6b9", "-_bGsT", "JsUU-Z",
-		"32a934", "55XWav", "8jovyH", "_ObYgM", "bBpOy0", "5ETvhC", "6sMurh", "azsAGY", "KGkQCx", "ZbMw-Q",
-		"11r70l", "EgV2KR", "1ChuDd", "rdG19N", "G04KZw", "vGGphK", "m9kdhz", "LordQ9", "HwtTTt", "Kr_O_V",
-		"4fRtk_", "8qSNkM", "ncmnVp", "VB_oMH", "ZMx-pO", "JbEVKV", "_ATBoD", "hQcQHk", "ZddHgf", "w5DxwY",
-		"OgjQOC", "AyYn4h", "Gb-c1U", "eVVW8e", "X2Y7yu", "kpM4eM", "cubSgX", "r1Ynkn", "2_Z9aK", "vWrNeS",
-		"VZoiZs", "TsvXp8", "mwqEsk",
-	},
-	conquest = {
-		"bfkuxr", "HDfPFe",
-	},
-	maki = {
-		"-6z_r7", "nA_CTN", "Kk1_HH", "dKwBq6", "vFZ8_J", "Lonn2a", "kHra48", "u_4P8C", "a9teAc", "WLPkGu",
-		"mffEM2", "m7jT4j", "bFMwMB", "1Zw1RM", "vX913P", "NJUVNZ", "7xzE85", "Jn2DMW", "NxcONg", "O6fCSp",
-		"e7qgBd", "xuzc29", "BquxoB", "bc1Vry", "3uEOQg", "nk_0HN", "jiuKwM", "K-26se", "Qw7T-P", "5M1ttA",
-		"EynhE-", "z4LqW8", "rdGp_9", "ddt_Uf", "1SNU6P", "Z8GmqQ", "NqD0tt", "G-XTnq", "uhUNRu", "A4s2KW",
-		"Eoc77j", "nRZzRq", "UQztSc", "bybUvA", "7LqcZy", "v7gWXw", "rdJSX9", "nFQS83", "exNUVp", "LOsuPF",
-		"NK5sKb", "r3wdkw", "ivouM3", "M5snNQ", "b8JVqb", "0P6fnO",
-	},
-	ryuji = {
-		"xyUudp", "AzUVp0", "t4WbZM", "yhZxnu", "pNq6X4", "LVVskV", "khvmYj", "MdcfAc", "mdREeN", "OZNEA0",
-		"JmrzED", "8VXYDi", "5giQHc", "G9Hlda", "3V1iR8", "DXvnGI", "hv8T6J", "XRwYU0", "sujDw5", "fXO8Sd",
-		"FAmNg5", "izLDaG", "MDF7Ve", "pX-PzQ", "mXmk7E", "ly4wOl", "SdPyK-", "oXtQHb", "Hq2nHx", "y8J_8T",
-		"v3ezvl",
-	},
-	espada = {
-		"Akww4B", "_7EWQG", "PcO0zJ", "ggCtBP",
-	},
-	jejunes = {
-		"9KAwrP", "hWE8in", "swhYEM", "guvf30", "V40gH5", "ZDA2Ee", "21U-bv", "-qhOJe", "Ka3-c0", "eA6Co2",
-		"aQiYne", "lpV0Ca", "mJ37yb", "f-fISM", "xggsbV", "mYRTjm", "ggjYUt", "atbE3T", "J3SSib", "tt19jg",
-		"5EuQzD", "v7o994", "eFJ-vT", "Q8KGOE", "dfx5W7", "BnvsTw", "bEHsFn", "GXvGCO", "wfU87k", "4zSQUP",
-		"3juFj7", "T-c-MK", "O4_MQv", "1gNmXv", "FFQu59", "HrghPQ", "EPg9BV", "bsaAH1", "BLJn7m", "acTm4H",
-		"21H4Lh", "u1cDhu", "aMeKUb", "4-bpj_", "xN_6Wr", "Yn3EjG", "O8XLEU", "kF-eY1", "ca6KLh", "F3819t",
-		"aXxUNW", "w2SUe2", "38V487", "1XxLs_", "9cr9S5", "gZzJJm", "F0rOeM", "k7uk5P", "N3NmGF", "hU1zzL",
-		"1aFDnX", "XF5TTC", "2XoQXu", "UR7xs9", "nd-OFS", "vwmr6u", "rzEi3T", "i-cQvZ", "iFzeQ_", "9ic--K",
-		"nZRZ8x", "hq9Zf1", "MiOP4a", "E7BHUx", "gTywSu", "dYQnDy", "4ijsJX", "16VHoD", "CkwN5P", "uAVNOv",
-		"Nc4wF_", "voUue9", "8G9BhD", "sS6FGF", "YFZMBo", "8BYMU2", "ObZhka", "MGfqK0", "D58LnP", "mA9Uqo",
-		"Cegy3u", "o2vM9L", "jYy894", "08itCg", "nT5ih2", "md3kKh", "bLsRt-", "H-zAz0", "6FiYqQ", "B0aBDx",
-		"KP3BE1", "FT0cV0", "NRdRZ9", "MgLCEU", "RP3DR7", "b4UY5X", "030b33", "vDinuC", "L9D0ff", "FgkQU-",
-		"2CA6f3", "HW_uVx", "QZKEYw", "Qb93PU", "L-uBUV", "UvJj_8", "MEQbOg", "mcMQX-", "Rv6kZ7", "8ncOQD",
-		"s-w3zn", "wJgscr", "G4U81i", "gnmDPN", "0Pj2rc", "GAdz9x", "P5gH8d", "rsUCFa", "8pQYQJ", "GDX_m1",
-		"OGWomV", "oArdxT", "QSHs97", "KtWESX", "_oLa_r", "ZKcMaH", "TnaiA9", "adf88e", "Ou8hrv", "_1ggv3",
-		"qvQEK3", "LPreHN", "5XE7U6", "JTaaUw", "KZcWxe", "9E70VU", "zcjPPa", "qzQHeW", "GfYkfj", "pYem64",
-		"Le1vGb", "rDrPpO", "SZxu67", "ero5Zg", "iy4GNM", "cu4b00", "KuYSQt", "byjjMM", "VP6k5P", "onJS7p",
-		"gkUQXJ", "0uQCxK", "qwraj1", "bNOxnb", "jTgjEm", "xZAd5o", "rr8XJy", "rE9dB2", "kaqh72", "RWxiTG",
-		"Vyt_Uh", "SXX26K", "Jh_xNV", "eQszqH", "9P3ao0", "gD1BQt", "duMXNl", "wmdN69", "U60ku_", "tRkCsd",
-		"DWHyug", "5sOyHU", "4j5P9J", "u8ABwK", "ZUjq8T", "i6NlIw", "5uZqit", "fOROH2", "h7gQsc", "yGlmMp",
-		"Vo7JBY", "C89EbW", "jqbbmd", "boLsrZ", "Ltf-c4", "g6qvMu", "6rSiB6", "DJjVXF", "_BI9VE", "m_iFMa",
-		"WYkR9f", "iMFOlV", "Q0Uxr4", "Q9hN4I", "dz1cr6", "yi_qi2", "zjtfFE", "YMzTfY", "JNvakV", "0e7UAM",
-		"JUStD5", "7k9v8n", "jPD_iB", "7348VJ", "wa1jK3", "iUTQYm", "jHsF-E", "3T3SvN", "0-uFaO", "v5k55H",
-		"x40SVk", "H7yUV3", "fxPhVp", "Fx-T7K", "N-Yc5C", "tt2v6j", "Oynm4i", "zhpBmf", "Rg3jcN",
-	},
-	bridge = {
-		"4bh-U_", "Obqa6S", "huxZuh", "HqUaek", "LNW1yY", "TgVMJI", "09qkoP", "bcTdUh", "mLuOOA", "DgIndz",
-		"FzqC-S", "2QIsEf", "vTd6gX", "KdG-CE", "bUs0Cb", "Q-JZcl", "TQb-up", "8FQLSj", "tyRlB3", "eWe26L",
-		"zfg5QC", "_VEh8a", "s7Jmna", "ZW0y8z", "WYdq58", "FMKOS5", "XAMqZD", "b_1aC-", "M7LDFT", "n6e2NQ",
-		"NVnERa", "o9Hc4e", "nbn0-Y", "4ADD9y", "y_gDXn", "t1AkPJ", "y5sADH", "U12wpj", "tf6OXm", "KMoAiF",
-		"H4zUzS", "jqsLgu", "rxQjcp", "0OP12A", "Fh-3N8", "GPpnZ4", "fOsAo2", "rB9_wn", "O8f-6o", "SBXMH5",
-		"BkZJ-F", "y6dqnW", "1QzO9p", "LP2uzL", "3sh7aE", "t9e9WK", "58g9Uv", "hFUZGv", "g5sPE7", "mytTfS",
-		"HJX7kf", "ELCBy1", "QWoQva", "0bfLDU", "UES6vd", "v3EPfM", "UmteoF", "icJY9M", "xy188e", "0XddP6",
-		"6QWtzF", "eWoLig", "zNM96v", "FB3G05", "xs6RmQ", "e-BjhR", "g_YGPD", "a0wSSL", "gFK9pj", "q-3Apg",
-		"zyEDRT", "0TF2Ni", "eiAHA5", "M3eCmT", "TeXpLK", "j4rQ-D", "Rz6hEt", "mQvqUE", "Oj45G-", "1SfsPh",
-		"5vf4Bo", "tF1FMT", "X1vpyy", "fQdf6S", "hLR2ny", "SNf2tV", "rnUwMz", "FdLRDE", "juErdu", "9mP2zu",
-		"mSrBo9", "QDzNbg", "XdzW3V", "gRymo8", "ivYdYx", "vufDPt", "m2ULd4", "g8QEe3",
-	},
-	shikai = {
-		"NipNkN", "rHtX6r", "isCXGC", "O21tUW", "5bM1Xk", "fJ0Eke", "LvqVbo", "Au0kJj", "pjWo6j", "MFJdGA",
-		"5Ukaks", "Wv8nt-", "DAtt41", "YOtRyC", "7b1meE", "NCi3aZ", "MmMO7a", "fQLUw-", "LL-nPg", "hgUdnu",
-		"W8AaCq", "WnepfJ", "pif9uz", "b26SYj", "XMbEi6", "qRPHqi", "Y4w5LL", "OU0jkU", "2MSgs2", "qk0240",
-		"a54Mh0", "4r112h", "tJMxzW", "94ZHEC", "Jfrjc9", "o2CjHM", "eBgFdi", "b-etw_", "9R6J0f", "Wgas3x",
-		"09FT83", "eOMiL_", "wE0_CH", "7VtJs6", "BfysGh", "TBx45D", "JririF", "Y6RXtz", "xbyUuc", "dm2Cro",
-		"SprZ8z", "pW_k02", "6zeMmg", "uaFSD9", "FRdNJ0", "yNtMjH", "1dxJGR", "D2BYSF", "XtNRMA", "4eLN-b",
-		"rWxrPB", "NnqxmT", "8ki4lT", "BNLA4m", "2xYTPc", "3k5v_I", "RtTFct", "hWW6H_", "T-2syj", "YzgORE",
-		"BlFBCL", "dlWV1Q", "LPOPko", "P4kd0N", "d9sULu", "nzb9Nn", "27QNqb", "ji_8FQ", "PfAagk", "zkGtHU",
-		"1Rke3H", "2iuxyA", "0VMOIv", "jC4WDh", "FyYl_Q", "N8lPpx", "dNObrL", "uNceZz", "_lKlhY", "nlBPGT",
-		"MEJYU9", "PNTvo1", "EXzgEd", "fH9dmN", "b-d4wx", "mhCQVF", "2I1sTf", "O7mE0f", "mPdb3G", "s4Z2PN",
-		"m9-yvn", "vcw74g", "00H82o", "fe4a9G", "0nziFE", "mVxcTG", "RXrqhs", "B0KOgs", "A88c15",
-	},
-
-	-- Ekstra lokasyonlar
-	storm = {
-		"fwJkMu", "sTLf6S", "n9ObLL", "vwJCg7", "F705Ck", "Ma4a6o", "LQ8sOV", "FZTwXs", "V3LOlI", "ZvXZND",
-		"ir6z3z", "94nkGc", "yZ3wL-", "OVjnP1", "bVtQKv", "cew0OJ", "qPdZda", "-NsAub", "bSFIDx", "G6Mkv5",
-		"kmGafB", "v_-4fR", "t-_Ax-", "kqJuQm", "eXHpWG", "6T38-g", "9vMS00", "mNekH2", "X0DOQT", "TJZcQu",
-		"UQM-vS", "BoZ66J", "GMwsbR", "ZC5xAj", "Qnk0xX", "mYXL-P", "1SpD26", "SpH1yb", "cGwfHf", "qL2AeQ",
-		"6bDhAN", "QUrcoh", "onC-73", "TKyUCS", "bHVBM7", "EHx_5G", "Reggfn", "i71zcm", "W4n-As", "7-Z1zt",
-		"T8paw3", "JqwQvT", "wsrkLW", "UUTJe7", "vfOjWD", "jCXkOw", "63vQuW", "saqXs_", "GsDbnu", "BiYyML",
-		"JmFP12", "Zw-DNq", "dODNK7", "tLQ7U1",
-	},
-	--[[dawn = {
-		"N3UdV1", "SMVZac", "g9iWZY", "_JQ42s", "Tc-F5O", "5Sl-JR", "foq1rK", "Paz2TB", "G7nHqe", "LnXNae",
-		"99bDJL", "3cjO36", "t4Ha0G", "Skge3S", "uE6PgU", "1Ov66S", "mtwbAn", "17bVCg", "6a0ncn", "jobu2T",
-		"Av_ErS", "R8Shmc", "hWrS00", "Jue8Wx", "_5wxEn", "tyK3b5", "eGNF7g", "YU4NjS", "bX2sAG", "MSu1bf",
-		"CO4iOZ", "jRp6P5", "tNdSA6", "gLTDHo", "zgmKGx", "kh1Ba3", "ggabkX", "6j-TTc", "L9tpaO", "MFRH5m",
-		"McpVJ-", "HmNJop", "pPWxGa", "LZ85AV", "mgcqJX", "3Z6vMe", "B37-CF", "wSgb8o", "dRFpr6", "7PLwc5",
-		"UAAWmU", "6zLwsJ", "tbJ2Ry", "7u52Jw", "McQJh_", "acyMFg", "ZyMghM", "MUsTkc", "Dtv_wE", "GRtGGQ",
-		"sum1fK", "zJ6ofk", "ft6Xrj", "uJojh0", "T_Q4M1", "4nT8oM", "jFiDCs", "iyWXHR", "VpmvJB", "j_1NzC",
-		"cg8K-D", "AtdmWJ", "9XAWbF", "9cuNMe", "Bn-YeA", "Fkh6nV", "0QpPwj", "TrF7MX", "f9kW9X", "_q5mTi",
-		"LUvxGF", "CsRvJN", "_g5raE", "3gOhgr", "fO893o", "agUJCc", "J-N3Mc", "Uqda7H", "AL_vt0", "_7ppL_",
-		"P8pn9b", "avbKjk", "JQrM9g", "G6rkSS", "MumdsK", "QowwNe", "G9Hr0y", "2s-Ee1", "B5FKSk",
-	},
-	war = {
-		"_mimQP", "AONKfK", "K5Zsdc", "U16HP7", "0tHwa8", "CAj-VB", "AkivwZ", "Cv0_yl", "ri_YyZ", "cVI1Jg",
-		"lwR0mP", "2SjHi4", "mY-FMQ", "zU4f-f", "ZEqm47", "CfS45q", "FYoZwV", "LFzjzD", "3Ln-0q", "3C_0Qu",
-		"Z2o3oE", "S-frMS", "pgFPqY", "v1eQNa", "sBKQMV", "c-KzVK", "6-g1ej", "8GpNKH", "Yu7t-U", "ZeQUVL",
-		"JQCw1U", "yBTzSq", "1BFze5", "vsGhkE", "V7pKDX", "7Qs27m", "8LApEL",
-	},
-	deva = {
-		"vOAEaS", "pzAdQB", "UyVVla", "VfQg7U", "vwGsAF", "fDxag-", "tsk1Z_", "Mk9q-t", "NrmfcQ", "5lw1w8",
-		"fpXKCj", "-GJslM", "YBdHpd", "4SqX7Q", "omUEvR", "ezsiF6", "CbVbzT", "lm3tzf", "14ZreX", "JpLbsd",
-		"fbT6re", "F5eBtg", "DgxVbV", "G3w4-J", "QmCiRF", "f_g5A5", "PoBvsu", "WjoC0d", "bBHjz4",
-	},
-	forged = {
-		"DgPLLV", "8ckFu-", "Q5nz72", "U2j98z", "qScqMC", "hBdZ3O", "6PKPQ8", "P1XzcE", "PrAND7", "JMqkba",
-		"mACO2m", "E92aqr", "13FZih", "gWNeOH", "VwFAdf", "Kaz5vn", "MTpqo2", "7mW1G4", "9_15Y9", "IsQKzb",
-		"UdBRCg", "2_rVXz", "rySTtu", "SHThoX", "pMS8ss", "Lu8TSM", "tLFUT-", "Fo8OA_", "E9F4e5", "ZVu9LZ",
-		"cNYrgW",
-	},]]
-	shikadai = {
-		"NeMHRn", "a8_4UO", "RYEDJB", "kCj8_s", "s62Ejj", "Kjhgkz", "X88Lw4", "SDHULr", "xxcT87", "DO4uWB",
-		"3pJiw9", "MU3mBg", "pufxyz", "L5IBtA", "AkiZ2Z", "gy8P0Y", "CdSQDR", "IWl4PM", "LLwiLX", "Q3GBhs",
-	},
-	--[[kagoku = {
-		"s7KekO", "XyU1mv", "_GElxS", "PJFt1W", "SEVt-I", "6-ogFX", "W6kH86", "Y-8no7", "2BTige", "_0X-Rq",
-		"Y3fdEb", "qr3xT3", "ap9X3z", "BykNbF", "4cnZA-", "a_Bxk-", "cIeuLB", "at4ETK", "AqRkGE", "WO5vYk",
-		"efb2Xq", "BsuCAk", "P84qnq", "T1hJ5e", "NULxE1", "9ETOZa", "GHeHP2", "4dtySC", "MjJ56w", "A7FcAZ",
-		"5AkmT9", "HTROaY", "3TFjrw", "yGz4Cj", "QD5df4", "RYFKpD", "hO7Hyr", "PbJ4Kz", "68XXTd", "1JePOZ",
-		"cnN1-_", "51X_9h", "UKtu0q", "f6b9FZ", "QtaoFd", "0BCjpE", "Uc6pbC", "200296", "PZVvpx", "UYujD7",
-		"aCzDrt", "C2gDey", "ROqdRd", "t_7AEa", "8P05y2", "M6aCMR", "LyJeT1", "uXfTn8", "NdjGC6", "fAOWfG",
-		"x4inje", "VoQ28H", "LHFTaG", "EVPKTh", "Penjtv", "d_hX32", "2WoiCG", "EtqORq", "CqxB67", "Vt0-TM",
-		"pxpHjp",
-	},]]
-	--jinshiki = {
-	--	"cudGE1", "6V6HXm", "47pUz9", "UsmJsU", "fYh4cg", "ebyPao", "uDL-ue", "ycyPJB", "hHzBJT", "5xqLoJ",
-	--	"u82JrS", "StmS1F", "jrdmfN", "RDLwPk", "xv48g5", "799fnL", "pQ6jQn", "xHKZu5", "MFDUGQ", "zSqaF0",
-	--	"1Vy8o3", "Rr37ZG", "VTAJ48", "msO6iN", "ivtB-A", "Kh_Fxj", "LnoYNe", "BzPE54", "seE83T", "rJj4qT",
-	--	"H_RMO6", "emOmBb", "M56n5P", "8jKFwM", "u0md3V", "RQwNJ2", "EhmDgS", "X6fXYc", "5xSeGD", "Fd60KZ",
-	--	"wbAzQF", "NvSN3e", "Lys01s", "VOT_zc", "7OG8Tw",
-	--},
-	shindairengoku = {
-		"dz3Ay3", "5hSD1d", "c3Rxin", "og8TkS", "jnT1mA", "GLmXHe", "bOiiFu", "M-wCtn", "FQTe-S", "JGdvtQ",
-		"69h2KV", "hB1TOX", "JomUaf", "Hc-Dx3", "BFjcpw", "momu7w", "05cU6U", "7k3CZJ",
-	},
-}
+            ember = {
+                "72ivGo", "BqXz77", "hb4TbR", "h8UN7d", "wN6mFD", "mEjOEA", "L9D1Vq", "13Dj9p", "rojuE4", "L-AzLu",
+                "LcRxLd", "atdWrW", "ufVgLu", "eIC7LA", "BPlBfp", "KFqY40", "_S7oDc", "Tg0_Au", "z5KMRG", "56fXqz",
+                "xN9mN4", "sA7E2A", "de6zJf", "UppJUd", "4MrhMZ", "ywiAQh", "CHZLms", "NlNRDa", "YMJAEr", "IcSnCp",
+                "L4s0py", "PM_yEk", "FfPxyL", "2M4ieq", "GPaih2", "t4n-wt", "ZKa1xh", "voFC4Z", "9gAS_H", "xiWsYq",
+                "Ap1ytv", "S3ngKz", "T6f9X7", "xiZZHA", "S5Me6u", "pPn5VX", "dgagtt", "0dNJVL", "fpwGKg", "lCnqSi",
+                "dc2q_T", "A6iJnw", "OPWJTw", "Zfn6nW", "GmBpOs", "xkbIMy", "u4pkQ1", "1kjoS9", "96H_n7", "yNtKe1",
+                "H9PCO-", "D5thR4", "BCTeP-", "HWPCvV", "7NRGod", "eEElGM", "7_rVaj", "f-zJKQ", "uyU38u", "jW2xJD",
+                "Eh_0EC", "S4Hn-M", "kDnYz6", "antObl", "9wUbJJ", "O7Fkk2", "gsU8mp", "CbMr_T", "9U8LPy", "xoDP4P",
+                "GHdF4r", "sBm_se", "6rko4P", "cN73ya", "UcF4JD", "UtAZlc", "UaXCZk", "ZsFFhZ", "kRAquT", "6NoJgJ",
+                "mt_O2A", "TUdAxo", "eHRHrd", "SxPxu0", "8CGAZH", "CeeBds", "FxhgFM", "BSkZ_n", "OxGgP9", "sssUE9",
+                "SUVs0F", "p5HiOJ", "wLAJX0", "ungkgo", "kUVqRr", "b5ceSi", "chTNe3", "vQ9-BW", "KYG1sq", "tdqgZW",
+                "jyQ3P3", "oYrUR1", "1YOVXZ", "pWnvjd", "Cvs3SS", "KBDjoX", "LAmvYt", "Zqs3Pu", "mW2FoJ", "U2vUrD",
+                "MKys9H", "DEfkMX", "_EXVbM", "FUDgke", "YCePOO", "JUZVBU", "xvFoUq", "_bSq9N", "Ljvff8", "5rz1jq",
+                "A-kRqJ", "8Pw1Ps", "GLPBmU", "_30BAS", "cs1gM5", "SQxoGz", "jkAYFg", "04SWhD", "c6Yfut", "7ErB6Q",
+                "Mz0SYU", "B_72Ob", "vDjzXh", "8pOKv9", "uubfNm", "RceAzV", "qAw1n7", "OXMU1i", "yfmCsw", "3JfSZz",
+                "WMYUAY", "1zPns-", "UQiDdq", "ozw1Mm", "vRxjZQ", "9dokXE", "uxJJdB", "kJTrGz", "FsENu0", "0d9sD5",
+                "X3na7A", "4cpiq_", "LhddGz", "ZsTeKH", "ZRLUoK", "ktOuCE", "Pu-q_c", "QZU7ky", "gpea_7", "MB6SJW",
+                "faXJyz", "09xhRe", "atL9hB", "7Lvj8H", "g0kiz1", "R0iyRs", "DPqYpO", "nmYVJ7", "QArKzc", "jmsbDG",
+                "44puHp", "Q812zF", "M3jgMW", "5mkGoT", "WptNLd", "o9DLRZ", "tkqyBR", "P5OdyM", "h4GAdK", "WsdUgm",
+                "dNsDRE", "zphst5", "SfY2sW", "4qVoLS", "bBwnVe", "2JaspW", "zE_f6v", "Ryt_Zf", "8CTs1m", "wJsLZe",
+                "ACZySD", "uS9XxA", "VvPHt9", "DOrvCW", "tPWQWV", "VqkLJs", "snJvZH", "1ALgoY", "vVDOAn", "k3BAAM",
+                "2FFxzR", "w6Nsno", "DALyaw", "DD7WuX", "1fbK1m", "JO4vZb", "nxAw9U", "v08r6q", "qMdBgO", "XCmrXX",
+                "1bnsym", "_S-hBL", "zhOSC6", "Vp9XSm", "Trmqqm", "k7VNo2", "QYLNta", "dNe5nS", "jmTF12", "sMQC7L",
+                "vSvFKS", "w9fjk1", "sDgpUW", "UrCpGJ", "_DYvBx", "HS9UPW", "BYpYRK", "DyNRsn", "dgFsS5", "eKNPDc",
+                "ZZgYiT", "3gFj7D", "K9gRXl", "b7IpCK", "voL4oL", "Lbgd0H", "q3mdfL", "YM3fj0", "L1XXQa", "nRBS92",
+                "D1NQVx", "wxf1h-", "u5jtbL", "sQpsNr", "KCEX_r", "83ppMG", "CRRvye", "cqkzAR", "sR_MMu", "TGqtm2",
+                "byj8Y8", "GzAAyt", "Trm8CJ", "BsUdJX", "9_bkek", "bqE5im", "G60Qcs", "VopJBa", "QqwGbL", "KrFZni",
+                "j3ZC7W", "LueVBN", "8vmL2y", "3soPN1", "yKMMdm",
+            },
+            blaze = {
+                "oetXZ6", "v44Bd-", "cXXokm", "utcpPx", "kk0Ivx", "bSYHfJ", "nIvabw", "nnANqa", "5aQksY", "Vx1VH4",
+                "pSgj2U", "yYqHFg", "HZ5fHS", "xk55Hb", "VWtj3x", "OF2o67", "GDxN-O", "SBiTde", "5uBjmD", "jgfTo2",
+                "00VdTG", "2xUsba", "y1yXRB", "ScrPMj", "P1kfFb", "HeRPjT", "JO9afK", "Bkqnyi", "kJ66_d", "yDjqNr",
+                "JC2kyC", "fvRGhV", "nFwKdO", "V8PBmA", "xEMGMw", "3kdok-", "V86iuz", "KQrgT6", "FCxzkn", "sH-925",
+                "M5pJP9", "sta7Rh", "CEWQRL", "ikoOpy", "UGOgOS", "i-szVw", "0YRVhs", "iG7E81", "amSL-y", "THvUfE",
+                "zYjBov", "S87mGN", "bCp3iz", "RUxSVc", "WxN0vr", "qf68tG",
+            },
+            obelisk = {
+                "1r-1iU", "ylgHKH", "rzyQWX", "EvRA8H", "DrFQ6t", "aWs6Po", "phyKYA", "WDm6HV", "G1Hdb4", "0goLRB",
+                "U6FaMn", "Z8mGSt", "dcDBR6", "bO8kvU", "mn_xGR", "eLapCt", "8KArxS", "kyM9e0", "ozFZJ6", "WWpFZJ",
+                "MLmOFm", "Wd9r_h", "Ce6dEk", "vHRaZA", "p7agqj", "eMXePh", "LYE3SG", "Mx3e3s", "K4q9Jf", "Edv8uH",
+                "MWrt6c", "24vKA0", "2ThCfw", "8y8Noq", "jQiHp5", "J4HuaK", "Y-yPtF", "BFIVk5", "FTEyfW", "GrdLFY",
+                "8vQTVP", "18mHIn", "gXk0Kv", "_JgFUI", "3DayPA", "MFHOUg", "zUeUBj", "WEhhel", "CjdUGG", "ru4wag",
+                "tpNXsS", "3c94O8", "6mCtFo", "PadPpk", "xg5IR7", "09DvCs", "ALfSDo", "uUU1-r", "5d-88a", "DsjagO",
+                "f2gU8h", "oRFLRc", "uMTFU-", "mGaO6P", "KQmhGQ", "z58fM6", "UbgjOY", "97BHrm", "QVcbYR", "pu9eKj",
+                "G8-EoL", "s3_Rcc", "2tZtRn", "8eR6D3", "s-EuYy", "Fgg5UL", "_JPL0e", "czVWuA", "NmH38c", "RjOXLB",
+                "VRvL2O", "wdT4g5", "G5RqHA", "OAtd0C", "Bz5RQq", "xeLbYv", "OJscUo", "mHAZtS", "Ctadha", "fG4Lgo",
+                "cTMZL7", "3rjpoN", "G2DE29", "4zGwwE", "e5tbEr", "9dokwY", "8ZydHf", "M5z_t0", "ETgE9X", "Muo_65",
+                "yTYxDU", "Wrm89X", "KyJvee", "h23Ok_", "nhP3aF", "P4cu6X", "9C5Eq7", "Pyzx03", "RU2sTg", "us_Enc",
+                "8ZV6sW", "StvooT", "h8jvmy", "Ksjtvp", "EagaGx", "9wXR-R", "aEG4S3", "Rax-zt", "yhsKA2", "BXz902",
+                "gt93NS", "0nsn18", "RnOqf0", "q1gSsj", "u3TUdx", "hGKMts", "QtFx8W", "tJygcs", "4UwtAD", "XstV76",
+                "n49Z8d", "v3o3tL", "YNccZg", "JatC7H", "M3aWJa", "H5CWBv", "33KzX2", "YBTh12", "BCjhP0", "8S951k",
+                "OjXxdg", "NyjA1f", "66Q-qd", "40OsFu", "SrhB9W", "dSPp0F", "Ame5L_", "BoqePB", "UYBUNw", "A6Dv24",
+                "tMkHqz", "LTv36K", "LMmVdB", "YEXQLa", "AgtLcn", "69p42W", "E-4_o-", "EEkmMc", "7XzwT9", "MKh9UQ",
+                "nCBVFL", "yqA6di", "z8eWPA", "wFfisH", "Fh3i-k", "Uno_ha", "_ofQq6", "y65keN", "fRe_4G", "8JwEUQ",
+                "Y-2W6Q", "4WQmJj", "_kHpEk", "O32yWD", "1NKOuP", "0_D_DT", "fDq2LG", "uisHy2", "qThOEp", "FWuWMN",
+                "uoCyLX", "BMKuQT", "c22vBd", "VxwSf4", "DA8vsO",
+            },
+            nimbus = {
+                "cdeLvT", "EnQsaj", "gg-K9s", "-2fmeY", "5pc1Pr", "8tr7iE", "8rE4r5", "utRdr3", "w1wF1v", "V0G5cn",
+                "3yuoU_", "k1dwzw", "KrEckV", "KZR0Ta", "MTVXrF", "Rl573L", "DgEjVF", "DxvS0I", "9Hi-G4", "nbBnO0",
+                "hm1-HC", "vxde84", "yTnUvM", "EuP2oj", "ASVC6V", "msvWWa", "69ebaA", "6QQuvt", "rFsoiV", "sAw7-r",
+                "DU2EgD", "MGwmRc", "o4i-I9", "mQ0jKr", "-fvLt0", "W_zmtA", "-LLpIH", "hVRr3I", "jeSReA", "YrAMoG",
+                "1yvI7G", "O2VD24", "9mGZDI", "c18AoA", "E91YeK", "fTVjjZ", "RUmJQU", "HH5XGe", "Y9bgra", "DaBl7T",
+                "KPAWCt", "4RRCga", "Ygb1G7", "3lnkA6", "dypA5l", "Zs9SDi", "VZvcVX", "D9Y236", "6SZj5k", "h-GzXA",
+                "YzX17x", "YL77hP", "ifYdRS", "AZK7Cd", "dsIW3V", "o1lWNs", "u1z_Le", "M8t44p", "ASVOku", "0SbrMF",
+                "vbMnNN", "0nFNWT", "mZN9-y", "U5fGcw", "FE-JMj", "ch2B9Z", "WB6f4Z", "iFnkSi", "3KaZn-", "ZOuZ9V",
+                "j6E2gX", "2a2gwJ", "Ro-Uam", "JBW_bR", "Iq9gY_", "Lm7IcV", "RXFJm-", "reGDxL", "LYZyXG", "YKtExO",
+                "oMFeZc", "vENja8", "spUHJd", "srZQrF", "hBFA49", "YXo2fd", "R0Mysj", "PQTn2K", "4uN3gM", "4XZ6D8",
+                "ztRqdD", "WUrew9", "tSsMoG", "arJgfw", "NMpeUF", "2f0PZt", "DBp9O0", "Z66rPO", "DDEkzo", "hOEM59",
+                "Ru3bzm", "k5rDA5", "hfNMf_", "UU7fVF", "J6MeA6", "1Su91f", "SDBD4T", "woWVh_", "JbaEgu", "qdy8uR",
+                "siZSB8", "Zd1ko4", "wottW_", "HJ5D3N", "emejZA", "qwPFRV", "ZD_CBn", "uPDavK", "35hwDY", "JxM5xH",
+                "yEraTG", "_eYnoc", "GD-3Xv", "jrK5hZ", "Zm_QZ2", "4LTBso", "Fr9fRs", "nXQw7r", "_Zy2pU", "q3vgbD",
+                "YcVgf6", "TQwd-1", "ezEMtS", "PKs_yL", "k_Bosk", "VaGUJF", "vtczSi", "VQNfsb", "jCFfPb", "pE4ojt",
+                "WS7uL_", "0qA3Y2", "Qy4GvJ", "AWv4Dy", "UXfG7p", "vXHzKE", "xGVKS3", "2zGsS2", "gQPabn", "s--rOQ",
+                "Pc2_ki", "uwggoU", "r0SEht", "cNhF-2", "0uhVFt", "NmuFrf", "EJT_dD", "tf6uwA", "VQqnXg", "Og9_Rw",
+                "imPpVM", "t9DdHg", "p91RTC", "HAOyYs", "IcTyvU", "jEE0Kv", "BJGqU4", "kcccBn", "XXJ5GZ", "uzTYM7",
+                "KEs5Mr", "B5k_LS", "VnamFH", "lGuzZy", "X5gW2c", "DXDc53", "ajZCQ4", "mXdq4s", "hlO3q-", "qXcG3Q",
+                "xn_bkC", "B9Uf7K", "3fFE0a", "UokYmc", "bpRj_J", "7Jgqqj", "9xbVsU", "pHV-r8", "xCurgw", "cvXyX2",
+                "p1rSoO", "90pbW5", "Tr2g-g", "2w8ksR", "wMc4CN", "JK0g7Q", "mpST_c", "mYuS6U", "LAr34x", "4Sdif2",
+                "WqkFyX", "QCdHjB", "9ZDMTk", "RW8X_T", "Co9ctL", "u9oAar", "fFZj57", "8megja", "Bvq2rM", "OgMz5m",
+                "nfgyQY", "RnB_qM", "1z-hQ9", "7EZvCE", "7mnvHv", "PeXZex", "O8UnJH", "xO9ga1", "hFgAqN", "Xdsv6q",
+                "bdZMYD", "MaNXhQ", "Ot9_sd", "8LoCB3", "ku8-dR", "M6wtq0", "0H3j2M",
+            },
+            dunes = {
+                "kjHLQh", "JyD9oK", "c_qb3A", "1QaPSq", "DJNZD1", "j6T2pq", "0uP7b7", "_34jSv", "bbCK0r", "BOIX9J",
+                "i0np8q", "gjezo2", "DBDdn5", "KH-sCe", "PHSFUE", "GwOERh", "cK34vW", "VKft58", "cd45mY", "mK285c",
+                "0oR33t", "hBBm8z", "DEsxis", "jsa_JX", "iT_pya", "tOuUav", "ytwBtB", "aHZElq", "jVlwFh", "OQzhBW",
+                "8OyPal", "AJYQdj", "dZrONC", "TrAulx", "tCumNq", "ABPTGy", "LUaHAY", "979f5G", "0bH64Z", "jslyOK",
+                "CItjVX", "VVqgC5", "uTKrGT", "3qIYHD", "vBgNHv", "5Nxv-u", "DfX4Ef", "td2p72", "tx1CPC", "wZKFSi",
+                "v08Fl2", "iIGh28", "eKV4q3", "F2DP_d", "wEHWxx", "91WKO3", "5Qk8sk", "7tNYtC", "0258mW", "0K4i81",
+                "OeR3rh", "Q4oUKN", "ApG-EZ", "PnT75N", "CJ5wLx", "tycpnO", "O4XrZk", "GqHQkM", "o-QgoF", "3zuqKX",
+                "otPaBW", "ub9jMc", "ChDFGt", "UKydZv", "8y2Emi", "SeEFkV", "WC8uP7", "oLd8md", "DqSnnv", "D91x3Y",
+                "5UEgCH", "QFoxbP", "_KTfgq", "MFNtd_", "z1R73g", "DMUaXm", "p2zoOC", "GDVrV5", "p3ghWd", "SLB2cK",
+                "9oHBKO", "TdswV2", "h_7PW8", "Yfa2Nx", "e5AF56", "GCa3Af", "VPre3-", "O7UMcw", "EpJvb4", "JQhuPL",
+                "XRhBkq", "0q3NdM", "7ewRGF", "a7Qw7w", "mw6_uH", "OFWbaY", "AWh5g-", "8U-hwz", "8mE8Cz", "muT44E",
+                "mm7tmQ", "DPGfmL", "1fErxH", "7ttFkM", "0st9RX", "ArPPuu", "jSkko1", "QVb1Oy", "QDLD6T", "0LA1RZ",
+                "donYFd", "pCGk_4", "pb6SHF", "dYWJ-R", "xdfqBV", "4Nr34A", "yvpQXo", "uyZdWB", "U2LmCB", "ytDCnf",
+                "hJZcbH", "hqL2gD", "EQEvHi", "1Kc9Pn", "d7VxTc", "sebYXD", "PngyGi", "7f7KEn", "FiYBiH", "fVw1aa",
+                "PHrYKv", "6pfjSR", "JPseGP", "pdqe6N", "rWGVZx", "hNc8oB", "0qO3s-", "P2hsW3", "oSLX-6", "AuwSb7",
+                "8PRize", "dRm_jB", "daJrLD", "U2bW6B", "PMWQAo", "nbKuwg", "O1S48D", "eavk6X", "gOwUmB", "FFApKK",
+                "MxMqkE", "gyRZBq", "z8Zp7X", "B3qAQu", "O_UVyp", "9OeU-o", "GqPgCG", "4Udk1k", "5J8hCv",
+            },
+            haze = {
+                "k_EA5-", "SzpGCP", "uJHNVe", "8Qonjc", "xiteS3", "n5QW-C", "IuUYEJ", "dPwoz2", "DHLMcU", "xzDec3",
+                "y3mBGn", "328q0x", "mNMYKT", "GqTBzF", "P-KW7B", "G59Mi8", "Qeq74Z", "FPvTxa", "Pgp-G2", "s5w8ZR",
+                "Nwmp98", "eF6PCu", "ap-L47", "hJ8rtP", "3wF4pq", "YaFgwF", "DAsg9N", "4xuLXp", "nvL_Sb", "p1wCAt",
+                "BGMbRE", "2LvuBX", "QtX2MX", "yWzxmS", "q4oR4k", "wW0pM9", "PZsLoS", "UHBVp6", "DaeRB5", "a6pHGN",
+                "cjUN-W", "QXQTqS", "-gbkXx", "_WX6Qz", "zDQ3Tf", "E-zWby", "M0edch", "mLEJ4z", "81cYgo", "YGjc0k",
+                "a2kDLL", "jkfLAJ", "hHJ3m7", "NcBOc8", "c_1wCP", "K2_Zxd", "oZWwbW", "WaxU6c", "rACjNC", "khQWNN",
+                "JQb7HY", "RoKPkb", "zTfrwf", "ocgSvg", "2W3390", "jSmD9g", "uR9r1G", "mpUjsQ", "8Kw54_", "xXp-Zg",
+                "SuuE1H", "pE_z4G", "rQ3VCJ", "yWKCc5", "ZbPeKU", "2awO1W", "548dQN", "Zp3r_B", "2iiUPR", "GD_nrU",
+                "uU7-ef", "m6MuYt", "rhPhrK", "F0QD23", "3FTY2X", "Tq0Epo", "LmnOeW", "LTQqmH", "1MO_87", "XQP05R",
+                "mDQuHR", "2hBUOe", "S1cR-O", "d7jacs", "4aMVh0", "CBqF8x", "NyYpLe", "etasO1", "fUvY4_", "EmgT7M",
+                "9tmmWX", "OKrErt",
+            },
+            vinland = {
+                "9PZUzn", "QRw2Rt", "mLwFTZ", "aZb1jP", "Ei_8OL", "AP8dXx", "_fVhwa", "OkJXnt", "Ot0Hrn", "VZVAcs",
+                "wKGBbj", "9zew35", "4PrRoK", "_A2jSJ", "muM0gn", "chJTLM", "iaBXsj", "BVB0Zu", "ERJtrm", "QSLpW2",
+                "hhAwJL", "OHSeFD", "RRWxp4", "6oCBWJ", "Ze9nyt", "MvuXNh", "hFi_Rr", "xqdqY9", "o_rM0Z", "7kV9N_",
+                "saLMrG", "WFx0r5", "iSMnJm", "K26t6Y", "hRmG8p", "D8RV-a", "oHeTpn", "bGFYtg", "AmSTyi", "u8aN6U",
+                "ytvDo3", "FfFT1b", "uL3XYq", "2X6oay", "Pq_4se", "qKkdJY", "ZuNMRQ", "jf9xJb", "_02gaY", "HAVpNo",
+                "A5a3CL", "zJFReR", "gUn7H7", "aiy5Pv", "D1Q-PQ", "UN3zxL", "krqs6m", "SMO_Y1", "NU7gKV", "gCb62t",
+                "jbWndN", "NB9Cn5", "ZTxUnk", "KF1loD", "T625xx", "6zPdQC", "46qYUA", "Ekfz2t", "tBSBuq", "XMrkBi",
+                "NCbuxn", "_Uh_Kx", "W-hUcN", "_huiKB", "dCEZ42", "9U_wJr", "X_2-m6", "twPOqe", "PucpvX", "e0SPqJ",
+                "8Q958-", "NDVFK_", "4ghe_6", "MTSp2E", "NUPUQF", "XQf46G", "AVDs18", "hTiOfF", "azpYV0", "3TtVZV",
+                "9QCpQ1", "n1HqKD", "6n_NNu", "D0wOpL", "wOP_UD", "z4O55W", "3ypNv0", "d8JFNF", "-93yfL", "N9jyZc",
+                "eUclSG", "o1SkpH", "nyjgVx", "WqcztZ", "76fBbq", "w6UKd5", "Yw5BPN", "D6yTE-", "0zJVoX", "3eFtfO",
+                "NrnukE", "fycdqQ", "KIsbQ_", "mfwci-", "dgR_da", "XJa1dJ", "QBN15K", "GFZ1L-", "mcOHjs", "dHQoeu",
+                "2LsOsp", "cygBio", "sRsnd8", "UplsX4", "jj-iZx", "KUAIoy", "GIdQeb", "n62GsH", "Q6tRNv", "z5MX20",
+                "td7aTp", "1Gs41a", "6lbj2Z", "FpE_3e", "ozfuTQ", "YvX8z_", "gCT-4b", "qwOghd", "eYWUj_", "z4uJP-",
+                "gM6PCR", "jYq0yD", "tcucju", "dHfdOU", "bYHU0h", "JW0wGk", "PwWlxK", "GS_2nI", "X0mKAW", "9mGUcb",
+            },
+            forest = {
+                "PtyUCG", "QqeKj9", "Bp66ht", "0YjmTf", "1XjC0A", "EXgFws", "g3YHu6", "r8j0DO", "bbzc8a", "SnpGFN",
+                "ZEavDD", "AtqYsx", "CpF3mt", "O_EhTf", "7uixdR", "FrOKMP", "6p4zRS", "ru-xOn", "1RxZXa", "S2Fxx-",
+                "ZL0867", "NBaEpL", "KTds-P", "V58o74", "59_Tfr", "soksfX", "FVwA6c", "SGy28e", "hSCOWY", "1LzeME",
+                "ErdOLV", "Z6vghd", "jpLbfk", "rPprag", "vTTSgM", "pVLc9y", "bwU1HU", "yMkhAd", "r6cNCF", "wTTuFk",
+                "ZVbbA-", "RF_kWT", "pwzhUx", "X9tWQ6", "UPZjnj", "d4y2Cw", "SNLkDX", "tjS6F0", "3DLqyR", "xxKdfu",
+                "A0tpTu",
+            },
+            valley = {
+                "CwUcdw", "6WtZU5", "zQOd95", "PcYb2t", "Rik4AY", "kbWUiN", "OSX5pn", "j2xkXy", "amTKZ4", "HZ73Uz",
+                "zpSPQ3", "uNmDUC", "dsbPap", "UJTkiY", "uPnGFS", "PcLWXv", "tOc6NI", "Dx5HXV", "1nhjzU", "cN47nA",
+                "AFyav9", "0hd0Dq", "67hMtE", "RJ_osx", "8QTsTh", "9mbpz6", "sYe4D-", "y0q8-3", "RTzCOb", "OaMjoZ",
+                "hUE_0O", "janeqc", "kLEqNP", "V8tnKf", "AH7uLs", "aoVKmH", "J0Xgau", "fwRGeC", "SUWUfO", "9S90eU",
+                "9nGdRq", "rSccSk", "tjhOtv", "hR67d2", "bkarof", "X4cjq1", "cQNrYn", "GWhhBy", "NSEaBC", "s-oFTA",
+                "AM_Jy-", "LKThR1", "RuqHC-", "gd52Eo", "P3hQxk", "bGC41C", "WjQs04", "_hskCQ", "nfd1S8", "V9LMdR",
+                "D7ZbRe", "QtPcQm", "aKEBLs", "f-dChp", "QPTsnX", "Zf-Mne", "aCjQJ5", "pDg1xE", "Y8N7uU", "Jvu4xp",
+                "zpxCLu", "LTMPm4", "GnS9f8", "7rhgEp", "vW5FEq", "G4MoPD", "_6dPxJ", "uS9Kac", "8yS6xi", "fV_0T1",
+                "MoViBq", "qbqHaw", "9ShuqZ", "pU_-Q5", "k38Psn", "dQ9LGM", "FiJw2d", "a3vKxa", "xYcLVA", "meD8zx",
+                "DkyGnu", "YsGbTH", "dfjBpd", "aoilqQ", "3BC5UC", "pnJA-W", "FTEdAS", "0u10_P", "aUjZOe", "rePW1z",
+                "0QWfcY", "u6d1kr", "zTZrxV", "mjIuKB", "RTZSt2", "V0KbEd", "jo_twK", "_RlSEe", "1u1Qa7", "eDdDK3",
+                "hM_NEl", "bnd9hg", "xs2ex8", "udrGSV", "T1qTXg", "TMmqXj", "B-Y1Ur", "nNx8to", "6aYFb9", "JcWINp",
+                "IStWXT", "qa5Cm6", "n0KRPO", "Vjn2ag", "zjefKP", "W94SK0", "nLRJJT", "o9ilgb", "Li8JXA", "oo7V5e",
+                "IKfA7V", "4wdOHk", "suJrjY", "qGY0lM", "Sl2QIO", "pGjgp4", "X2lDNQ", "QGrQAc", "WpcJfE", "27J2Uj",
+                "lM8yje", "qonYLZ", "1eRi-N", "8nzqo-", "DdK4hQ", "K_QgsL", "ynPAha", "bIr6eA", "LSAvOb", "u_8Nsd",
+                "RKwiNk", "cedsOz", "cMKfYV", "XBE9Sc", "u3yPxi", "DXgJhn", "8bX3JH", "tZaVIk", "pu3QHf", "OYJgqH",
+                "MjkT5m", "yrFdl1", "BN-9og", "NPjbBb", "MuSbQT", "L1hWO6", "MFFpKK", "dXzjun", "k_3h4C", "TrX6Pr",
+                "pvuTZX", "R-5ip3", "xoncEY", "q8qDYb", "66idLf", "AWGUbo", "ameY6L", "5S-2y1",
+            },
+            tempest = {
+                "clM8Ya", "hiusw7", "mPstuG", "ajmbsg", "QeC90r", "clBYIY", "VGTIH_", "Me0N18", "hbpHqG", "ExvyLL",
+                "4aTrwy", "KiiLWd", "7DLeZ5", "TGqHes", "rm3zlk", "GdLf5x", "kGzK24", "wwUl_X", "2B4cJP", "MQNZS1",
+                "ovzAqp", "1WSvLV", "yMODbc", "jsKAFU", "om40he", "7K3_s2", "xXAy5T", "peWrO0", "WEe7XR", "JgjgF0",
+                "tkN4P4", "nMQZrQ", "4gdXEA", "Qc-oFj", "ganq4R", "qt7y49", "D_ox7q", "fQUQYh", "OpyKRm", "76CgQ0",
+                "NV3JfY", "D-hkZN", "tfr9uN", "YA1ztL", "RLV7jo", "3VG6fN", "bdh8GG", "6LNHXK", "hHVY5s", "TTuFC3",
+                "RSjQsz", "vAw0Zw", "N5Wo1K", "yP4X_a", "LYjwAM", "bGKEak", "DGV7h_", "hrGhUP", "rVfAQX", "nbFJPg",
+                "Vzv0ss", "xUQL1m", "dja-bC", "BhQoDg", "3msTOh", "kAK--6", "cv95dY", "Qktj0v", "Z0O9yo", "vLZVGJ",
+                "2KFoRM", "PeZDYW", "Efw5xv", "f2c_k6", "gCOR-h", "tNyBrn", "E0-uHK", "C59dsV", "m-QqGR", "3x47Xw",
+                "y-uWDo", "JSAtLB", "M4VHkx", "HHEZAx", "aEGYuK", "49EbRS", "ZR8dSJ", "dx0C1T", "0u5_-o", "HBUbpx",
+                "UEWX7o", "29tPAh", "QnGgRk", "fd9x_9", "aCa368", "51orXp", "NVu1WG", "MfdUNo", "NbL4BB", "HOvFtr",
+                "nrCCus", "Y_f9Ua", "Ynmoba", "0M84pP", "W_Qyy-", "qsNbs1", "UtNyb2", "Y1vWkX", "SxsAkP", "e4CaNV",
+                "oK6UMZ", "vnej7C", "LbNFFX", "cuiD9V", "ix3HBq", "SNYywm", "W1rpn9", "iyssuo", "aH2RJf", "ctm8St",
+                "Mjm-ga", "FosAre", "uzC2R7", "WBQUJ_", "08HGnz", "6zrCDv", "NBm9fA", "m18REp", "k3KLeh", "bT9aAT",
+                "GRQZQB", "jQgko_", "5G4OSX", "HcJyCo", "pc7yF3", "3GtSGH", "QZZ-Xf", "07fmMt", "QxM6og", "YWZoMR",
+                "2WPk9G", "mvOsPo", "nhfi2y", "z5o52L", "zDsap0", "ZXc7ys", "go-Mp4", "RTHgom", "5H9Gvo", "SndzyE",
+                "k-VZLc", "XVaLcP", "2LS2yC", "ErsRpy", "SKjkgz", "dO1qwK", "7F8uYZ", "PEBYKE", "xF5dfh",
+            },
+            narumaki = {
+                "_NeQsx", "OZNRd7", "4TaPeU", "sgdMpU", "i4QN9v", "AYYqFf", "Dbzn6u", "3L8Ygu", "eHNDMc", "jVZ3_o",
+                "Qfcn9U", "d9pHeZ", "KZoWPL", "KTD-nL", "HAiPmD", "_XmpKL", "qyYZEO", "vtgHhu", "3LAHby", "3b1-cU",
+                "qHbjmE", "zP6ThL", "mpHkti", "tO6cgK", "mWgRGu", "x7PKS2", "Jb0q5S", "UTzbZm", "NtPS2w", "w5sDFC",
+                "ueobFe", "NBXgvz", "j7HB2h", "Kw8uXx", "kBpYSV", "RST3T9", "KoBnyr", "A8tP0x", "bgk58F", "xmZ2s4",
+                "6eLfPN", "6u9Eq1", "z7BPQz", "0FuAAh", "eVdX8a", "T1V_uR", "30YSZ-", "DsSpuQ", "mCeujT", "TpppdP",
+                "970EfD", "uzb6qH", "oVbO5W", "aXm_vk", "yFPoTw", "q5ka9e",
+            },
+            training = {
+                "5doj-B", "_gDIcA", "yPDCX7", "IVGMx8", "WxUb20", "u5mJ_j", "80GFb1", "37S6b9", "-_bGsT", "JsUU-Z",
+                "32a934", "55XWav", "8jovyH", "_ObYgM", "bBpOy0", "5ETvhC", "6sMurh", "azsAGY", "KGkQCx", "ZbMw-Q",
+                "11r70l", "EgV2KR", "1ChuDd", "rdG19N", "G04KZw", "vGGphK", "m9kdhz", "LordQ9", "HwtTTt", "Kr_O_V",
+                "4fRtk_", "8qSNkM", "ncmnVp", "VB_oMH", "ZMx-pO", "JbEVKV", "_ATBoD", "hQcQHk", "ZddHgf", "w5DxwY",
+                "OgjQOC", "AyYn4h", "Gb-c1U", "eVVW8e", "X2Y7yu", "kpM4eM", "cubSgX", "r1Ynkn", "2_Z9aK", "vWrNeS",
+                "VZoiZs", "TsvXp8", "mwqEsk",
+            },
+            conquest = {
+                "bfkuxr", "HDfPFe",
+            },
+            maki = {
+                "-6z_r7", "nA_CTN", "Kk1_HH", "dKwBq6", "vFZ8_J", "Lonn2a", "kHra48", "u_4P8C", "a9teAc", "WLPkGu",
+                "mffEM2", "m7jT4j", "bFMwMB", "1Zw1RM", "vX913P", "NJUVNZ", "7xzE85", "Jn2DMW", "NxcONg", "O6fCSp",
+                "e7qgBd", "xuzc29", "BquxoB", "bc1Vry", "3uEOQg", "nk_0HN", "jiuKwM", "K-26se", "Qw7T-P", "5M1ttA",
+                "EynhE-", "z4LqW8", "rdGp_9", "ddt_Uf", "1SNU6P", "Z8GmqQ", "NqD0tt", "G-XTnq", "uhUNRu", "A4s2KW",
+                "Eoc77j", "nRZzRq", "UQztSc", "bybUvA", "7LqcZy", "v7gWXw", "rdJSX9", "nFQS83", "exNUVp", "LOsuPF",
+                "NK5sKb", "r3wdkw", "ivouM3", "M5snNQ", "b8JVqb", "0P6fnO",
+            },
+            ryuji = {
+                "xyUudp", "AzUVp0", "t4WbZM", "yhZxnu", "pNq6X4", "LVVskV", "khvmYj", "MdcfAc", "mdREeN", "OZNEA0",
+                "JmrzED", "8VXYDi", "5giQHc", "G9Hlda", "3V1iR8", "DXvnGI", "hv8T6J", "XRwYU0", "sujDw5", "fXO8Sd",
+                "FAmNg5", "izLDaG", "MDF7Ve", "pX-PzQ", "mXmk7E", "ly4wOl", "SdPyK-", "oXtQHb", "Hq2nHx", "y8J_8T",
+                "v3ezvl",
+            },
+            espada = {
+                "Akww4B", "_7EWQG", "PcO0zJ", "ggCtBP",
+            },
+            jejunes = {
+                "9KAwrP", "hWE8in", "swhYEM", "guvf30", "V40gH5", "ZDA2Ee", "21U-bv", "-qhOJe", "Ka3-c0", "eA6Co2",
+                "aQiYne", "lpV0Ca", "mJ37yb", "f-fISM", "xggsbV", "mYRTjm", "ggjYUt", "atbE3T", "J3SSib", "tt19jg",
+                "5EuQzD", "v7o994", "eFJ-vT", "Q8KGOE", "dfx5W7", "BnvsTw", "bEHsFn", "GXvGCO", "wfU87k", "4zSQUP",
+                "3juFj7", "T-c-MK", "O4_MQv", "1gNmXv", "FFQu59", "HrghPQ", "EPg9BV", "bsaAH1", "BLJn7m", "acTm4H",
+                "21H4Lh", "u1cDhu", "aMeKUb", "4-bpj_", "xN_6Wr", "Yn3EjG", "O8XLEU", "kF-eY1", "ca6KLh", "F3819t",
+                "aXxUNW", "w2SUe2", "38V487", "1XxLs_", "9cr9S5", "gZzJJm", "F0rOeM", "k7uk5P", "N3NmGF", "hU1zzL",
+                "1aFDnX", "XF5TTC", "2XoQXu", "UR7xs9", "nd-OFS", "vwmr6u", "rzEi3T", "i-cQvZ", "iFzeQ_", "9ic--K",
+                "nZRZ8x", "hq9Zf1", "MiOP4a", "E7BHUx", "gTywSu", "dYQnDy", "4ijsJX", "16VHoD", "CkwN5P", "uAVNOv",
+                "Nc4wF_", "voUue9", "8G9BhD", "sS6FGF", "YFZMBo", "8BYMU2", "ObZhka", "MGfqK0", "D58LnP", "mA9Uqo",
+                "Cegy3u", "o2vM9L", "jYy894", "08itCg", "nT5ih2", "md3kKh", "bLsRt-", "H-zAz0", "6FiYqQ", "B0aBDx",
+                "KP3BE1", "FT0cV0", "NRdRZ9", "MgLCEU", "RP3DR7", "b4UY5X", "030b33", "vDinuC", "L9D0ff", "FgkQU-",
+                "2CA6f3", "HW_uVx", "QZKEYw", "Qb93PU", "L-uBUV", "UvJj_8", "MEQbOg", "mcMQX-", "Rv6kZ7", "8ncOQD",
+                "s-w3zn", "wJgscr", "G4U81i", "gnmDPN", "0Pj2rc", "GAdz9x", "P5gH8d", "rsUCFa", "8pQYQJ", "GDX_m1",
+                "OGWomV", "oArdxT", "QSHs97", "KtWESX", "_oLa_r", "ZKcMaH", "TnaiA9", "adf88e", "Ou8hrv", "_1ggv3",
+                "qvQEK3", "LPreHN", "5XE7U6", "JTaaUw", "KZcWxe", "9E70VU", "zcjPPa", "qzQHeW", "GfYkfj", "pYem64",
+                "Le1vGb", "rDrPpO", "SZxu67", "ero5Zg", "iy4GNM", "cu4b00", "KuYSQt", "byjjMM", "VP6k5P", "onJS7p",
+                "gkUQXJ", "0uQCxK", "qwraj1", "bNOxnb", "jTgjEm", "xZAd5o", "rr8XJy", "rE9dB2", "kaqh72", "RWxiTG",
+                "Vyt_Uh", "SXX26K", "Jh_xNV", "eQszqH", "9P3ao0", "gD1BQt", "duMXNl", "wmdN69", "U60ku_", "tRkCsd",
+                "DWHyug", "5sOyHU", "4j5P9J", "u8ABwK", "ZUjq8T", "i6NlIw", "5uZqit", "fOROH2", "h7gQsc", "yGlmMp",
+                "Vo7JBY", "C89EbW", "jqbbmd", "boLsrZ", "Ltf-c4", "g6qvMu", "6rSiB6", "DJjVXF", "_BI9VE", "m_iFMa",
+                "WYkR9f", "iMFOlV", "Q0Uxr4", "Q9hN4I", "dz1cr6", "yi_qi2", "zjtfFE", "YMzTfY", "JNvakV", "0e7UAM",
+                "JUStD5", "7k9v8n", "jPD_iB", "7348VJ", "wa1jK3", "iUTQYm", "jHsF-E", "3T3SvN", "0-uFaO", "v5k55H",
+                "x40SVk", "H7yUV3", "fxPhVp", "Fx-T7K", "N-Yc5C", "tt2v6j", "Oynm4i", "zhpBmf", "Rg3jcN",
+            },
+            bridge = {
+                "4bh-U_", "Obqa6S", "huxZuh", "HqUaek", "LNW1yY", "TgVMJI", "09qkoP", "bcTdUh", "mLuOOA", "DgIndz",
+                "FzqC-S", "2QIsEf", "vTd6gX", "KdG-CE", "bUs0Cb", "Q-JZcl", "TQb-up", "8FQLSj", "tyRlB3", "eWe26L",
+                "zfg5QC", "_VEh8a", "s7Jmna", "ZW0y8z", "WYdq58", "FMKOS5", "XAMqZD", "b_1aC-", "M7LDFT", "n6e2NQ",
+                "NVnERa", "o9Hc4e", "nbn0-Y", "4ADD9y", "y_gDXn", "t1AkPJ", "y5sADH", "U12wpj", "tf6OXm", "KMoAiF",
+                "H4zUzS", "jqsLgu", "rxQjcp", "0OP12A", "Fh-3N8", "GPpnZ4", "fOsAo2", "rB9_wn", "O8f-6o", "SBXMH5",
+                "BkZJ-F", "y6dqnW", "1QzO9p", "LP2uzL", "3sh7aE", "t9e9WK", "58g9Uv", "hFUZGv", "g5sPE7", "mytTfS",
+                "HJX7kf", "ELCBy1", "QWoQva", "0bfLDU", "UES6vd", "v3EPfM", "UmteoF", "icJY9M", "xy188e", "0XddP6",
+                "6QWtzF", "eWoLig", "zNM96v", "FB3G05", "xs6RmQ", "e-BjhR", "g_YGPD", "a0wSSL", "gFK9pj", "q-3Apg",
+                "zyEDRT", "0TF2Ni", "eiAHA5", "M3eCmT", "TeXpLK", "j4rQ-D", "Rz6hEt", "mQvqUE", "Oj45G-", "1SfsPh",
+                "5vf4Bo", "tF1FMT", "X1vpyy", "fQdf6S", "hLR2ny", "SNf2tV", "rnUwMz", "FdLRDE", "juErdu", "9mP2zu",
+                "mSrBo9", "QDzNbg", "XdzW3V", "gRymo8", "ivYdYx", "vufDPt", "m2ULd4", "g8QEe3",
+            },
+            shikai = {
+                "NipNkN", "rHtX6r", "isCXGC", "O21tUW", "5bM1Xk", "fJ0Eke", "LvqVbo", "Au0kJj", "pjWo6j", "MFJdGA",
+                "5Ukaks", "Wv8nt-", "DAtt41", "YOtRyC", "7b1meE", "NCi3aZ", "MmMO7a", "fQLUw-", "LL-nPg", "hgUdnu",
+                "W8AaCq", "WnepfJ", "pif9uz", "b26SYj", "XMbEi6", "qRPHqi", "Y4w5LL", "OU0jkU", "2MSgs2", "qk0240",
+                "a54Mh0", "4r112h", "tJMxzW", "94ZHEC", "Jfrjc9", "o2CjHM", "eBgFdi", "b-etw_", "9R6J0f", "Wgas3x",
+                "09FT83", "eOMiL_", "wE0_CH", "7VtJs6", "BfysGh", "TBx45D", "JririF", "Y6RXtz", "xbyUuc", "dm2Cro",
+                "SprZ8z", "pW_k02", "6zeMmg", "uaFSD9", "FRdNJ0", "yNtMjH", "1dxJGR", "D2BYSF", "XtNRMA", "4eLN-b",
+                "rWxrPB", "NnqxmT", "8ki4lT", "BNLA4m", "2xYTPc", "3k5v_I", "RtTFct", "hWW6H_", "T-2syj", "YzgORE",
+                "BlFBCL", "dlWV1Q", "LPOPko", "P4kd0N", "d9sULu", "nzb9Nn", "27QNqb", "ji_8FQ", "PfAagk", "zkGtHU",
+                "1Rke3H", "2iuxyA", "0VMOIv", "jC4WDh", "FyYl_Q", "N8lPpx", "dNObrL", "uNceZz", "_lKlhY", "nlBPGT",
+                "MEJYU9", "PNTvo1", "EXzgEd", "fH9dmN", "b-d4wx", "mhCQVF", "2I1sTf", "O7mE0f", "mPdb3G", "s4Z2PN",
+                "m9-yvn", "vcw74g", "00H82o", "fe4a9G", "0nziFE", "mVxcTG", "RXrqhs", "B0KOgs", "A88c15",
+            },
+            storm = {
+                "fwJkMu", "sTLf6S", "n9ObLL", "vwJCg7", "F705Ck", "Ma4a6o", "LQ8sOV", "FZTwXs", "V3LOlI", "ZvXZND",
+                "ir6z3z", "94nkGc", "yZ3wL-", "OVjnP1", "bVtQKv", "cew0OJ", "qPdZda", "-NsAub", "bSFIDx", "G6Mkv5",
+                "kmGafB", "v_-4fR", "t-_Ax-", "kqJuQm", "eXHpWG", "6T38-g", "9vMS00", "mNekH2", "X0DOQT", "TJZcQu",
+                "UQM-vS", "BoZ66J", "GMwsbR", "ZC5xAj", "Qnk0xX", "mYXL-P", "1SpD26", "SpH1yb", "cGwfHf", "qL2AeQ",
+                "6bDhAN", "QUrcoh", "onC-73", "TKyUCS", "bHVBM7", "EHx_5G", "Reggfn", "i71zcm", "W4n-As", "7-Z1zt",
+                "T8paw3", "JqwQvT", "wsrkLW", "UUTJe7", "vfOjWD", "jCXkOw", "63vQuW", "saqXs_", "GsDbnu", "BiYyML",
+                "JmFP12", "Zw-DNq", "dODNK7", "tLQ7U1",
+            },
+            shikadai = {
+                "NeMHRn", "a8_4UO", "RYEDJB", "kCj8_s", "s62Ejj", "Kjhgkz", "X88Lw4", "SDHULr", "xxcT87", "DO4uWB",
+                "3pJiw9", "MU3mBg", "pufxyz", "L5IBtA", "AkiZ2Z", "gy8P0Y", "CdSQDR", "IWl4PM", "LLwiLX", "Q3GBhs",
+            },
+            shindairengoku = {
+                "dz3Ay3", "5hSD1d", "c3Rxin", "og8TkS", "jnT1mA", "GLmXHe", "bOiiFu", "M-wCtn", "FQTe-S", "JGdvtQ",
+                "69h2KV", "hB1TOX", "JomUaf", "Hc-Dx3", "BFjcpw", "momu7w", "05cU6U", "7k3CZJ",
+            },
+        }
         
-        -- ==========================================
-        -- SCROLL DATA STRUCTURE
-        -- ==========================================
         local ScrollData = {}
         local ScrollWidgets = {}
         
@@ -2020,16 +1979,13 @@ return function(Common)
             return rarity and rarity.Value or "?"
         end
         
-        -- 🆕 ENHANCED FILTER: Exclude bossdrop, 00:00/01:00 times, and drop/boss locations
         local function shouldExcludeScroll(scroll)
             local name = scroll.Name:lower()
             
-            -- Filter 1: Name contains "bossdrop"
             if string.find(name, "bossdrop") then
                 return true
             end
             
-            -- Filter 2: Time is 00:00 or 01:00
             local hour, minute = parseScrollTime(scroll)
             if hour and minute then
                 if (hour == 0 and minute == 0) or (hour == 1 and minute == 0) then
@@ -2037,7 +1993,6 @@ return function(Common)
                 end
             end
             
-            -- Filter 3: Location contains "drop" or "boss"
             local location = getScrollLocation(scroll)
             local locationLower = location:lower()
             if string.find(locationLower, "drop") or string.find(locationLower, "boss") then
@@ -2048,7 +2003,6 @@ return function(Common)
         end
         
         local function refreshScrollList()
-            -- Clear existing widgets
             for _, widget in pairs(ScrollWidgets) do
                 pcall(function() widget:Destroy() end)
             end
@@ -2066,7 +2020,6 @@ return function(Common)
             
             for _, scroll in pairs(clientTell:GetChildren()) do
                 if scroll:IsA("StringValue") then
-                    -- 🆕 Apply enhanced filter
                     if not shouldExcludeScroll(scroll) then
                         local hour, minute = parseScrollTime(scroll)
                         local location = getScrollLocation(scroll)
@@ -2087,7 +2040,6 @@ return function(Common)
                             
                             table.insert(ScrollData, scrollInfo)
                             
-                            -- Create widget
                             local isSelected = table.find(FarmState.ScrollSniperSelected, scroll.Name) ~= nil
                             scrollInfo.selected = isSelected
                             
@@ -2135,6 +2087,70 @@ return function(Common)
             Callback = refreshScrollList
         })
         
+        -- 🆕 SELECT ALL BUTTON
+        Tabs.ScrollSniper:AddButton({
+            Title = "✅ Select All Scrolls",
+            Description = "Select all available scrolls for hunting",
+            Callback = function()
+                if #ScrollData == 0 then
+                    ui.Fluent:Notify({
+                        Title = "[!] No Scrolls",
+                        Content = "No scrolls available. Click 'Refresh Scroll List' first!",
+                        Duration = 3
+                    })
+                    return
+                end
+                
+                FarmState.ScrollSniperSelected = {}
+                
+                for _, scrollInfo in ipairs(ScrollData) do
+                    scrollInfo.selected = true
+                    table.insert(FarmState.ScrollSniperSelected, scrollInfo.name)
+                    
+                    local widgetName = "Scroll_" .. scrollInfo.name
+                    if Fluent.Options[widgetName] then
+                        Fluent.Options[widgetName]:SetValue(true)
+                    end
+                end
+                
+                Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
+                ConfigManager.Save(Config)
+                
+                ui.Fluent:Notify({
+                    Title = "[✓] All Selected",
+                    Content = "Selected " .. #ScrollData .. " scrolls for hunting",
+                    Duration = 3
+                })
+            end
+        })
+        
+        -- 🆕 DESELECT ALL BUTTON
+        Tabs.ScrollSniper:AddButton({
+            Title = "❌ Deselect All Scrolls",
+            Description = "Clear all scroll selections",
+            Callback = function()
+                FarmState.ScrollSniperSelected = {}
+                
+                for _, scrollInfo in ipairs(ScrollData) do
+                    scrollInfo.selected = false
+                    
+                    local widgetName = "Scroll_" .. scrollInfo.name
+                    if Fluent.Options[widgetName] then
+                        Fluent.Options[widgetName]:SetValue(false)
+                    end
+                end
+                
+                Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
+                ConfigManager.Save(Config)
+                
+                ui.Fluent:Notify({
+                    Title = "[✓] All Cleared",
+                    Content = "Deselected all scrolls",
+                    Duration = 3
+                })
+            end
+        })
+        
         Tabs.ScrollSniper:AddToggle("ScrollSniperToggle", {
             Title = "Enable Scroll Sniper",
             Description = "Auto server hop to selected scrolls at their spawn time",
@@ -2155,9 +2171,6 @@ return function(Common)
             end
         end)
         
-        -- ==========================================
-        -- TIME COMPARISON HELPERS
-        -- ==========================================
         local function getCurrentGameTime()
             local globalTime = workspace:FindFirstChild("GLOBALTIME")
             if not globalTime then return nil, nil end
@@ -2165,7 +2178,6 @@ return function(Common)
             local estTime = globalTime:FindFirstChild("globalesttime")
             if not estTime or not estTime.Value then return nil, nil end
             
-            -- Parse "HH:MM AM/PM" format
             local timeStr = estTime.Value
             local hour, minute, period = string.match(timeStr, "(%d+):(%d+)%s*(%a+)")
             
@@ -2174,7 +2186,6 @@ return function(Common)
             hour = tonumber(hour)
             minute = tonumber(minute)
             
-            -- Convert to 24-hour format
             if period then
                 period = period:upper()
                 if period == "PM" and hour ~= 12 then
@@ -2188,14 +2199,11 @@ return function(Common)
         end
         
         local function isTimeInWindow(scrollHour, scrollMinute, currentHour, currentMinute)
-            -- Convert to minutes since midnight
             local scrollTotal = scrollHour * 60 + scrollMinute
             local currentTotal = currentHour * 60 + currentMinute
             
-            -- 20-minute window
             local windowEnd = scrollTotal + 20
             
-            -- Handle day wrap-around
             if windowEnd >= 1440 then
                 windowEnd = windowEnd - 1440
                 if currentTotal >= scrollTotal or currentTotal <= windowEnd then
@@ -2222,14 +2230,10 @@ return function(Common)
             return {}
         end
         
-        -- ==========================================
-        -- SCROLL CLAIM FUNCTION (from existing code)
-        -- ==========================================
         local function claimScroll(scrollName)
             local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not root then return false end
             
-            -- Check workspace.GLOBALTIME
             local globalTime = workspace:FindFirstChild("GLOBALTIME")
             if globalTime then
                 for _, obj in pairs(globalTime:GetChildren()) do
@@ -2251,7 +2255,6 @@ return function(Common)
                 end
             end
             
-            -- Check workspace directly
             for _, obj in pairs(workspace:GetChildren()) do
                 if obj:IsA("Model") and obj:FindFirstChild("sh") then
                     local sh = obj.sh
@@ -2273,9 +2276,6 @@ return function(Common)
             return false
         end
         
-        -- ==========================================
-        -- SCROLL SNIPER MAIN LOOP
-        -- ==========================================
         task.spawn(function()
             while true do
                 if FarmState.ScrollSniperEnabled then
@@ -2288,7 +2288,6 @@ return function(Common)
                             return
                         end
                         
-                        -- Find scrolls in time window
                         local activeScrolls = {}
                         for _, scrollInfo in ipairs(ScrollData) do
                             if scrollInfo.selected and isTimeInWindow(scrollInfo.hour, scrollInfo.minute, currentHour, currentMinute) then
@@ -2303,7 +2302,6 @@ return function(Common)
                             return
                         end
                         
-                        -- Process each active scroll
                         for _, scrollInfo in ipairs(activeScrolls) do
                             if not FarmState.ScrollSniperEnabled then break end
                             
@@ -2321,24 +2319,20 @@ return function(Common)
                                 continue
                             end
                             
-                            -- Try each server
                             for i, serverID in ipairs(serverIDs) do
                                 if not FarmState.ScrollSniperEnabled then break end
                                 
                                 FarmState.ScrollSniperStatus = string.format("Server %d/%d: %s", 
                                     i, #serverIDs, serverID)
                                 
-                                -- Teleport to private server
                                 pcall(function()
                                     LocalPlayer.startevent:FireServer("teleporttoprivate", serverID, game.PlaceId)
                                 end)
                                 
                                 FarmState.ScrollSniperServersHopped = FarmState.ScrollSniperServersHopped + 1
                                 
-                                -- Wait for server to load
                                 task.wait(10)
                                 
-                                -- Try to claim scroll for 30 seconds
                                 local claimStart = tick()
                                 local claimed = false
                                 
@@ -2364,7 +2358,6 @@ return function(Common)
                                 if claimed then break end
                             end
                             
-                            -- Wait before next scroll
                             task.wait(5)
                         end
                     end)
@@ -2376,7 +2369,6 @@ return function(Common)
             end
         end)
         
-        -- Scroll Sniper Status Display
         local ScrollSniperStatusDisplay = Tabs.ScrollSniper:AddParagraph({
             Title = "Scroll Sniper Status",
             Content = "Initializing..."
@@ -2418,7 +2410,6 @@ return function(Common)
             end
         end)
         
-        -- Auto-refresh scroll list on startup
         task.spawn(function()
             task.wait(5)
             refreshScrollList()
