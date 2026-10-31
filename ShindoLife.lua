@@ -2,7 +2,7 @@
 -- // GLOCKREISHUB - SHINDO LIFE MODULE (ENHANCED)
 -- // AutoFarm M1 + Auto Stats + Godmode + Position Control
 -- // Continuous Facing + Underground Attack + Auto Skill Spammer
--- // Mission Protection + InstaKill (M1 Spam + Local Force Kill) 
+-- // Mission Protection + InstaKill (M1 Spam + Local Force Kill)
 -- // Travel System (All Maps + Private/Friend Teleport)
 -- // Scroll Sniper (Auto Server Hop + Time-Based) + Scroll Get (Manual)
 -- // LIVE TIME DISPLAY (GLOBALTIME.globalesttime)
@@ -1638,6 +1638,8 @@ return function(Common)
             Content = "Automatically hunts scrolls based on spawn time.\n\n" ..
                 "🆕 Reads ALL scrolls from GLOBALTIME.clienttell\n" ..
                 "🆕 Filters out BOSSDROP scrolls\n" ..
+                "🆕 🚫 EXCLUDES: 00:00/01:00 time scrolls\n" ..
+                "🆕 🚫 EXCLUDES: Location with 'drop' or 'boss'\n" ..
                 "🆕 Shows location, time (HH:MM), rarity\n" ..
                 "🆕 Select scrolls to hunt\n" ..
                 "🆕 Auto server hops to private servers\n" ..
@@ -1650,8 +1652,6 @@ return function(Common)
         -- ==========================================
         -- PRIVATE SERVER ID TABLE (USER FILLS THIS)
         -- ==========================================
-        -- Format: {location_keyword = {placeId1, placeId2, ...}}
-        -- Location matching is case-insensitive substring match
         local ScrollServerIDs = {
             -- Example (user should fill these):
             -- ember = {123456, 789012},
@@ -1711,9 +1711,31 @@ return function(Common)
             return rarity and rarity.Value or "?"
         end
         
-        local function isBossDrop(scroll)
+        -- 🆕 ENHANCED FILTER: Exclude bossdrop, 00:00/01:00 times, and drop/boss locations
+        local function shouldExcludeScroll(scroll)
             local name = scroll.Name:lower()
-            return string.find(name, "bossdrop") ~= nil
+            
+            -- Filter 1: Name contains "bossdrop"
+            if string.find(name, "bossdrop") then
+                return true
+            end
+            
+            -- Filter 2: Time is 00:00 or 01:00
+            local hour, minute = parseScrollTime(scroll)
+            if hour and minute then
+                if (hour == 0 and minute == 0) or (hour == 1 and minute == 0) then
+                    return true
+                end
+            end
+            
+            -- Filter 3: Location contains "drop" or "boss"
+            local location = getScrollLocation(scroll)
+            local locationLower = location:lower()
+            if string.find(locationLower, "drop") or string.find(locationLower, "boss") then
+                return true
+            end
+            
+            return false
         end
         
         local function refreshScrollList()
@@ -1730,61 +1752,71 @@ return function(Common)
             clientTell = clientTell:FindFirstChild("clienttell")
             if not clientTell then return end
             
+            local excludedCount = 0
+            local includedCount = 0
+            
             for _, scroll in pairs(clientTell:GetChildren()) do
-                if scroll:IsA("StringValue") and not isBossDrop(scroll) then
-                    local hour, minute = parseScrollTime(scroll)
-                    local location = getScrollLocation(scroll)
-                    local rarity = getScrollRarity(scroll)
-                    
-                    if hour and minute then
-                        local scrollInfo = {
-                            name = scroll.Name,
-                            instance = scroll,
-                            hour = hour,
-                            minute = minute,
-                            timeStr = formatTime(hour, minute),
-                            location = location,
-                            rarity = rarity .. "/1",
-                            selected = false
-                        }
+                if scroll:IsA("StringValue") then
+                    -- 🆕 Apply enhanced filter
+                    if not shouldExcludeScroll(scroll) then
+                        local hour, minute = parseScrollTime(scroll)
+                        local location = getScrollLocation(scroll)
+                        local rarity = getScrollRarity(scroll)
                         
-                        table.insert(ScrollData, scrollInfo)
-                        
-                        -- Create widget
-                        local isSelected = table.find(FarmState.ScrollSniperSelected, scroll.Name) ~= nil
-                        scrollInfo.selected = isSelected
-                        
-                        local widget = Tabs.ScrollSniper:AddToggle("Scroll_" .. scroll.Name, {
-                            Title = scroll.Name,
-                            Description = string.format("📍 %s | ⏰ %s | 💎 %s", 
-                                location, scrollInfo.timeStr, scrollInfo.rarity),
-                            Default = isSelected
-                        }):OnChanged(function(v)
-                            scrollInfo.selected = v
+                        if hour and minute then
+                            includedCount = includedCount + 1
+                            local scrollInfo = {
+                                name = scroll.Name,
+                                instance = scroll,
+                                hour = hour,
+                                minute = minute,
+                                timeStr = formatTime(hour, minute),
+                                location = location,
+                                rarity = rarity .. "/1",
+                                selected = false
+                            }
                             
-                            if v then
-                                if not table.find(FarmState.ScrollSniperSelected, scroll.Name) then
-                                    table.insert(FarmState.ScrollSniperSelected, scroll.Name)
-                                end
-                            else
-                                local idx = table.find(FarmState.ScrollSniperSelected, scroll.Name)
-                                if idx then
-                                    table.remove(FarmState.ScrollSniperSelected, idx)
-                                end
-                            end
+                            table.insert(ScrollData, scrollInfo)
                             
-                            Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
-                            ConfigManager.Save(Config)
-                        end)
-                        
-                        table.insert(ScrollWidgets, widget)
+                            -- Create widget
+                            local isSelected = table.find(FarmState.ScrollSniperSelected, scroll.Name) ~= nil
+                            scrollInfo.selected = isSelected
+                            
+                            local widget = Tabs.ScrollSniper:AddToggle("Scroll_" .. scroll.Name, {
+                                Title = scroll.Name,
+                                Description = string.format("📍 %s | ⏰ %s | 💎 %s", 
+                                    location, scrollInfo.timeStr, scrollInfo.rarity),
+                                Default = isSelected
+                            }):OnChanged(function(v)
+                                scrollInfo.selected = v
+                                
+                                if v then
+                                    if not table.find(FarmState.ScrollSniperSelected, scroll.Name) then
+                                        table.insert(FarmState.ScrollSniperSelected, scroll.Name)
+                                    end
+                                else
+                                    local idx = table.find(FarmState.ScrollSniperSelected, scroll.Name)
+                                    if idx then
+                                        table.remove(FarmState.ScrollSniperSelected, idx)
+                                    end
+                                end
+                                
+                                Config.ScrollSniperSelected = FarmState.ScrollSniperSelected
+                                ConfigManager.Save(Config)
+                            end)
+                            
+                            table.insert(ScrollWidgets, widget)
+                        end
+                    else
+                        excludedCount = excludedCount + 1
                     end
                 end
             end
             
             ui.Fluent:Notify({
                 Title = "[S] Scroll List Refreshed",
-                Content = "Found " .. #ScrollData .. " scrolls",
+                Content = string.format("Found %d scrolls (%d excluded: boss/drop/00:00/01:00)", 
+                    includedCount, excludedCount),
                 Duration = 3
             })
         end
@@ -2058,6 +2090,10 @@ return function(Common)
                     "🎯 Current Target: %s\n" ..
                     "🔄 Servers Hopped: %d\n" ..
                     "✅ Scrolls Claimed: %d\n\n" ..
+                    "🚫 Auto-Excluded:\n" ..
+                    "- 00:00 / 01:00 time scrolls\n" ..
+                    "- Location with 'drop' or 'boss'\n" ..
+                    "- Name with 'bossdrop'\n\n" ..
                     "Window: Time to Time+20min\n" ..
                     "Wait: 30s per server\n\n" ..
                     "NOTE: Fill ScrollServerIDs table in code!",
