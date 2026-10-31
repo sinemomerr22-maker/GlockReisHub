@@ -1655,7 +1655,8 @@ return function(Common)
                 "🆕 Auto server hops to private servers\n" ..
                 "🆕 20-minute window (time to time+20min)\n" ..
                 "🆕 30s wait per server, then hops\n" ..
-                "🆕 Auto-claims scroll when found\n\n" ..
+                "🆕 Auto-claims scroll when found\n" ..
+                "🔧 FIXED: Location matching with plain text search\n\n" ..
                 "NOTE: Fill Private Server IDs table below!"
         })
         
@@ -1982,7 +1983,7 @@ return function(Common)
         local function shouldExcludeScroll(scroll)
             local name = scroll.Name:lower()
             
-            if string.find(name, "bossdrop") then
+            if string.find(name, "bossdrop", 1, true) then
                 return true
             end
             
@@ -1995,7 +1996,7 @@ return function(Common)
             
             local location = getScrollLocation(scroll)
             local locationLower = location:lower()
-            if string.find(locationLower, "drop") or string.find(locationLower, "boss") then
+            if string.find(locationLower, "drop", 1, true) or string.find(locationLower, "boss", 1, true) then
                 return true
             end
             
@@ -2087,7 +2088,6 @@ return function(Common)
             Callback = refreshScrollList
         })
         
-        -- 🆕 SELECT ALL BUTTON
         Tabs.ScrollSniper:AddButton({
             Title = "✅ Select All Scrolls",
             Description = "Select all available scrolls for hunting",
@@ -2124,7 +2124,6 @@ return function(Common)
             end
         })
         
-        -- 🆕 DESELECT ALL BUTTON
         Tabs.ScrollSniper:AddButton({
             Title = "❌ Deselect All Scrolls",
             Description = "Clear all scroll selections",
@@ -2218,16 +2217,27 @@ return function(Common)
             return false
         end
         
+        -- 🔧 FIXED: Use plain text search (4th param = true) to avoid Lua pattern issues
+        -- with special characters like [ ] in location strings
         local function getServerIDsForLocation(location)
+            if not location or location == "Unknown" or location == "" then
+                return {}, "empty_location"
+            end
+            
             local locationLower = location:lower()
+            local matchDetails = {}
             
             for keyword, ids in pairs(ScrollServerIDs) do
-                if string.find(locationLower, keyword:lower()) then
-                    return ids
+                local keywordLower = keyword:lower()
+                -- IMPORTANT: 4th parameter 'true' = plain text search (no pattern matching)
+                -- This fixes issues with locations like "[RPG] Village: Ember" where "[" and "]"
+                -- would be interpreted as pattern character classes
+                if string.find(locationLower, keywordLower, 1, true) then
+                    return ids, keyword, #ids
                 end
             end
             
-            return {}
+            return {}, "no_match", locationLower
         end
         
         local function claimScroll(scrollName)
@@ -2308,16 +2318,33 @@ return function(Common)
                             FarmState.ScrollSniperStatus = "Hunting: " .. scrollInfo.name
                             FarmState.ScrollSniperCurrent = scrollInfo.name
                             
-                            local serverIDs = getServerIDsForLocation(scrollInfo.location)
+                            -- 🔧 FIXED: getServerIDsForLocation now returns additional info
+                            local serverIDs, matchInfo, extraInfo = getServerIDsForLocation(scrollInfo.location)
                             
                             if #serverIDs == 0 then
+                                local errorMsg = ""
+                                if matchInfo == "empty_location" then
+                                    errorMsg = "Location is empty/unknown for " .. scrollInfo.name
+                                elseif matchInfo == "no_match" then
+                                    errorMsg = "No server IDs for location: '" .. tostring(extraInfo) .. "'"
+                                else
+                                    errorMsg = "No private servers for " .. scrollInfo.location
+                                end
+                                
                                 ui.Fluent:Notify({
                                     Title = "[!] No Server IDs",
-                                    Content = "No private servers for " .. scrollInfo.location,
-                                    Duration = 3
+                                    Content = errorMsg,
+                                    Duration = 5
                                 })
                                 continue
                             end
+                            
+                            ui.Fluent:Notify({
+                                Title = "[✓] Location Matched",
+                                Content = string.format("Location: %s\nMatched keyword: '%s'\nServers: %d", 
+                                    scrollInfo.location, tostring(matchInfo), #serverIDs),
+                                Duration = 3
+                            })
                             
                             for i, serverID in ipairs(serverIDs) do
                                 if not FarmState.ScrollSniperEnabled then break end
@@ -2384,25 +2411,54 @@ return function(Common)
                 local currentHour, currentMinute = getCurrentGameTime()
                 local gameTimeStr = currentHour and formatTime(currentHour, currentMinute) or "??:??"
                 
+                -- Show location match info for current target
+                local matchInfo = "N/A"
+                if FarmState.ScrollSniperCurrent ~= "" and FarmState.ScrollSniperCurrent ~= "Waiting..." then
+                    for _, scrollInfo in ipairs(ScrollData) do
+                        if scrollInfo.name == FarmState.ScrollSniperCurrent then
+                            local ids, keyword, count = getServerIDsForLocation(scrollInfo.location)
+                            if #ids > 0 then
+                                matchInfo = string.format("'%s' → %d servers", tostring(keyword), count)
+                            else
+                                matchInfo = string.format("No match for '%s'", scrollInfo.location)
+                            end
+                            break
+                        end
+                    end
+                end
+                
                 ScrollSniperStatusDisplay.Content = string.format(
                     "Status: %s\n\n" ..
                     "🕐 Game Time: %s EST\n" ..
                     "📜 Selected Scrolls: %d / %d\n" ..
                     "🎯 Current Target: %s\n" ..
+                    "🗺️ Location Match: %s\n" ..
                     "🔄 Servers Hopped: %d\n" ..
                     "✅ Scrolls Claimed: %d\n\n" ..
                     "🚫 Auto-Excluded:\n" ..
                     "- 00:00 / 01:00 time scrolls\n" ..
                     "- Location with 'drop' or 'boss'\n" ..
                     "- Name with 'bossdrop'\n\n" ..
+                    "🔧 FIXED: Plain text location matching\n" ..
+                    "(handles [RPG], brackets, special chars)\n\n" ..
                     "Window: Time to Time+20min\n" ..
                     "Wait: 30s per server\n\n" ..
-                    "NOTE: Fill ScrollServerIDs table in code!",
+                    "Available keywords: " .. table.concat(
+                        (function() 
+                            local keys = {}
+                            for k, _ in pairs(ScrollServerIDs) do 
+                                table.insert(keys, k) 
+                            end
+                            table.sort(keys)
+                            return keys
+                        end)(), ", "
+                    ),
                     FarmState.ScrollSniperEnabled and "[OK] ACTIVE" or "[X] INACTIVE",
                     gameTimeStr,
                     selectedCount,
                     #ScrollData,
                     FarmState.ScrollSniperCurrent ~= "" and FarmState.ScrollSniperCurrent or "None",
+                    matchInfo,
                     FarmState.ScrollSniperServersHopped,
                     FarmState.ScrollSniperScrollsClaimed
                 )
@@ -3438,7 +3494,7 @@ return function(Common)
         ui.Window:SelectTab(1)
         ui.Fluent:Notify({
             Title = "GlockreisHub",
-            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper + Travel System + InstaKill + LIVE TIME)",
+            Content = "Loaded: Shindo Life In-Game (Enhanced + Scroll Sniper FIXED + Travel System + InstaKill + LIVE TIME)",
             Duration = 5
         })
     end
