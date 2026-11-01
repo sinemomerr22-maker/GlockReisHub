@@ -176,7 +176,7 @@ end
 -- 8. UNIVERSAL MODE
 function Common.setupUniversalMode()
     Common.setupAntiAFK()
-    --Common.setupAntiTP()
+    Common.setupAntiTP()
     --Common.setupCustomCursor()
     
     local ui = Common.loadFluentUI("Universal Mode", game.PlaceId)
