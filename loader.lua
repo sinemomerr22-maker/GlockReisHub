@@ -52,6 +52,7 @@ local moduleUrl = nil
 local shindoInGamePlaces = {4601350214, 5447073001, 6444873399, 5255237254, 5824792748, 6341670805, 5451401540, 6602103757, 6901575446, 5451398863, 5943872934, 5451405681, 5431071837, 4601350760, 4601350656, 7923764447, 4601350394, 8472733618, 6986372023, 4601350587, 4601350809, 4601351115, 4601351332, 4616652839, 4758561453, 5003501700, 5064032128, 5084678830, 5249563214, 5405021965, 5415301824, 5431069982, 5431071837, 5447073001, 5447111963, 5943874201, 5990264023, 6351110753}
 local bloxFruitsPlaces = {2753915549, 4442272183, 7449423635, 85211729168715, 79091703265657, 100117331123089}
 local criminalityPlaces = {4588604953, 8343259840}
+local ninjatycoonPlaces = {221718525}
 
 if placeId == 537413528 then
     currentGame = "BuildABoat"
@@ -65,6 +66,9 @@ elseif table.find(bloxFruitsPlaces, placeId) then
 elseif table.find(criminalityPlaces, placeId) then
     currentGame = "Criminality"
     moduleUrl = REPO_BASE .. "/Criminality.lua" .. cacheBuster
+elseif table.find(ninjatycoonPlaces, placeId) then
+    currentGame = "NinjaTycoon"
+    moduleUrl = REPO_BASE .. "/NinjaTycoon.lua" .. cacheBuster
 end
 
 -- 3. Oyun Modülünü Yükle
