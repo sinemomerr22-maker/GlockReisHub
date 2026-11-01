@@ -177,7 +177,7 @@ end
 function Common.setupUniversalMode()
     Common.setupAntiAFK()
     --Common.setupAntiTP()
-    Common.setupCustomCursor()
+    --Common.setupCustomCursor()
     
     local ui = Common.loadFluentUI("Universal Mode", game.PlaceId)
     local Tabs = {}
